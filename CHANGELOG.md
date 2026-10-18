@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.8 - Unreleased
+## 0.5.8 - 2026-10-18
 
 ### Added
 - **Backup 0.1.0**, a new plugin: backs up rcplug's settings (plugins switched on,
