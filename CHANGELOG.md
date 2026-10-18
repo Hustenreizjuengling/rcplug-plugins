@@ -6,6 +6,13 @@ may break compatibility).
 
 ## 0.5.2 - Unreleased
 
+### Changed
+- Releases are signed with `rcplug-release` from rcplug 0.7.1, which records each
+  plugin's title, description, icon, permissions and translations in `release.json`:
+  rcplug's plugin catalog (Plugins → *More plugins*) shows Sonar with them, and its
+  permission `audio`.
+- Requires the rcplug module 0.7.1 (`go.mod`).
+
 ## 0.5.1 - 2026-10-18
 
 ### Changed
