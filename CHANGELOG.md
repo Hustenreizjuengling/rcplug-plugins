@@ -8,6 +8,21 @@ may break compatibility).
 
 First release as its own repository. Sonar was part of rcplug up to 0.4.0.
 
+### Fixed
+- Switching away from an ALSA or JACK source could hang Sonar's capture until a
+  restart (the radar then showed "live" with a frozen bearing): `arecord` was waited
+  for twice.
+- ALSA and JACK sources now give about 30 radar updates per second instead of 5 to 8
+  (`arecord` uses 20 ms periods instead of the device's default).
+- A source that fails shows `arecord`'s reason on the page instead of "EOF"; an empty
+  WAV file and one with another sample rate than Sonar's are refused with a clear
+  message.
+- Out-of-range `--rate`, `--block`, `--smoothing` and `--noise-floor` stop Sonar at
+  start with a message instead of crashing or spinning later.
+- The retry pause of a failing source stays at most 10 s, as documented.
+- Opening Sonar from a console strip that has no source selects that strip instead of
+  silently keeping the previous channel.
+
 ### Added
 - Sonar updates from the dashboard: its plugin.json names this repository as its
   update source, and the release workflow signs every release (`release.json` +

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -41,13 +43,17 @@ func openSource(ctx context.Context, spec string, rate int) (source, error) {
 	case spec == "stdin":
 		return &readCloser{Reader: os.Stdin, name: "stdin (raw S16_LE stereo)"}, nil
 	case strings.HasPrefix(spec, "wav:"):
-		src, err := newWavSource(strings.TrimPrefix(spec, "wav:"))
+		src, err := newWavSource(strings.TrimPrefix(spec, "wav:"), rate)
 		if err != nil {
 			return nil, err
 		}
 		return paced(src, rate), nil
 	case strings.HasPrefix(spec, "alsa:"):
-		return newArecordSource(ctx, strings.TrimPrefix(spec, "alsa:"), rate)
+		src, err := newArecordSource(ctx, strings.TrimPrefix(spec, "alsa:"), rate)
+		if err != nil {
+			return nil, err // not a typed nil in the interface
+		}
+		return src, nil
 	case strings.HasPrefix(spec, "jack:"):
 		return newJackSource(ctx, strings.TrimPrefix(spec, "jack:"), rate)
 	default:
@@ -136,27 +142,102 @@ func (r *readCloser) describe() string { return r.name }
 
 // newArecordSource spawns arecord and streams its raw output. arecord is part
 // of alsa-utils and is present on the device; shelling out avoids linking
-// libasound into the cross-compiled binary.
-func newArecordSource(ctx context.Context, device string, rate int) (source, error) {
+// libasound into the cross-compiled binary. Periods of 20 ms keep the radar
+// smooth: the default of some devices (the ALSA loopback: 125 ms) would
+// deliver audio in bursts a few times a second.
+func newArecordSource(ctx context.Context, device string, rate int) (*arecordSource, error) {
 	if device == "" {
 		device = "default"
 	}
 	cmd := exec.CommandContext(ctx, "arecord",
 		"-D", device, "-f", "S16_LE", "-c", "2", "-r", fmt.Sprint(rate),
+		"--period-time=20000", "--buffer-time=100000",
 		"-t", "raw", "-q", "-")
 	stdout, err := cmd.StdoutPipe()
-	cmd.Stderr = os.Stderr
 	if err != nil {
 		return nil, err
 	}
+	tail := &lastLine{next: os.Stderr}
+	cmd.Stderr = tail
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start arecord: %w", err)
 	}
-	return &readCloser{
-		Reader: stdout,
-		name:   "alsa:" + device,
-		closer: func() error { _ = cmd.Process.Kill(); return cmd.Wait() },
-	}, nil
+	return &arecordSource{Reader: stdout, name: "alsa:" + device, cmd: cmd, stderr: tail}, nil
+}
+
+// arecordSource reads from a running arecord.
+type arecordSource struct {
+	io.Reader
+	name   string
+	cmd    *exec.Cmd
+	stderr *lastLine
+	once   sync.Once
+	err    error // what Wait returned
+}
+
+// Read reports why arecord ended, instead of a bare EOF.
+func (a *arecordSource) Read(b []byte) (int, error) {
+	n, err := a.Reader.Read(b)
+	if err == io.EOF {
+		msg := "arecord stopped"
+		if werr := a.wait(); werr != nil {
+			msg += " (" + werr.Error() + ")"
+		}
+		if l := a.stderr.String(); l != "" {
+			msg += ": " + l
+		}
+		return n, errors.New(msg)
+	}
+	return n, err
+}
+
+// wait waits for arecord once; Close and Read may both get here, also at the
+// same time (exec.Cmd.Wait must only be called once).
+func (a *arecordSource) wait() error {
+	a.once.Do(func() { a.err = a.cmd.Wait() })
+	return a.err
+}
+
+func (a *arecordSource) Close() error {
+	_ = a.cmd.Process.Kill()
+	_ = a.wait()
+	return nil
+}
+
+func (a *arecordSource) describe() string { return a.name }
+
+// lastLine passes output on and keeps its last non-empty line for error
+// messages.
+type lastLine struct {
+	mu   sync.Mutex
+	next io.Writer
+	line string
+	part []byte
+}
+
+func (l *lastLine) Write(b []byte) (int, error) {
+	l.mu.Lock()
+	for _, c := range b {
+		if c == '\n' {
+			if s := strings.TrimSpace(string(l.part)); s != "" {
+				l.line = s
+			}
+			l.part = l.part[:0]
+		} else if len(l.part) < 512 {
+			l.part = append(l.part, c)
+		}
+	}
+	l.mu.Unlock()
+	return l.next.Write(b)
+}
+
+func (l *lastLine) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if s := strings.TrimSpace(string(l.part)); s != "" {
+		return s
+	}
+	return l.line
 }
 
 // listAlsaCaptureDevices parses `arecord -L` into device ids for the UI.
@@ -225,7 +306,7 @@ type wavSource struct {
 // maxWav bounds a WAV file loaded into memory (~5 min of 48 kHz stereo).
 const maxWav = 64 << 20
 
-func newWavSource(path string) (source, error) {
+func newWavSource(path string, rate int) (source, error) {
 	if fi, err := os.Stat(path); err != nil {
 		return nil, err
 	} else if fi.Size() > maxWav {
@@ -235,12 +316,18 @@ func newWavSource(path string) (source, error) {
 	if err != nil {
 		return nil, err
 	}
-	pcm, ch, bits, err := parseWav(raw)
+	pcm, ch, bits, fileRate, err := parseWav(raw)
 	if err != nil {
 		return nil, err
 	}
+	if len(pcm) < 4 {
+		return nil, errors.New("the WAV file contains no audio")
+	}
 	if ch != 2 || bits != 16 {
 		return nil, fmt.Errorf("wav must be 16-bit stereo, got %d-bit %d-ch", bits, ch)
+	}
+	if fileRate != rate {
+		return nil, fmt.Errorf("the WAV file has %d Hz, Sonar runs at %d Hz (--rate)", fileRate, rate)
 	}
 	return &wavSource{path: path, data: pcm, name: "wav:" + path}, nil
 }
@@ -265,9 +352,9 @@ func (w *wavSource) Read(p []byte) (int, error) {
 }
 
 // parseWav extracts the PCM data chunk and format from a RIFF/WAVE file.
-func parseWav(b []byte) (pcm []byte, channels, bits int, err error) {
+func parseWav(b []byte) (pcm []byte, channels, bits, rate int, err error) {
 	if len(b) < 12 || string(b[0:4]) != "RIFF" || string(b[8:12]) != "WAVE" {
-		return nil, 0, 0, fmt.Errorf("not a RIFF/WAVE file")
+		return nil, 0, 0, 0, fmt.Errorf("not a RIFF/WAVE file")
 	}
 	i := 12
 	for i+8 <= len(b) {
@@ -281,6 +368,7 @@ func parseWav(b []byte) (pcm []byte, channels, bits int, err error) {
 		case "fmt ":
 			if sz >= 16 {
 				channels = int(binary.LittleEndian.Uint16(b[body+2 : body+4]))
+				rate = int(binary.LittleEndian.Uint32(b[body+4 : body+8]))
 				bits = int(binary.LittleEndian.Uint16(b[body+14 : body+16]))
 			}
 		case "data":
@@ -292,7 +380,7 @@ func parseWav(b []byte) (pcm []byte, channels, bits int, err error) {
 		}
 	}
 	if pcm == nil {
-		return nil, 0, 0, fmt.Errorf("no data chunk")
+		return nil, 0, 0, 0, fmt.Errorf("no data chunk")
 	}
-	return pcm, channels, bits, nil
+	return pcm, channels, bits, rate, nil
 }

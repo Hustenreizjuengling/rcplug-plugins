@@ -268,9 +268,9 @@ func newJackSource(ctx context.Context, spec string, rate int) (source, error) {
 		stopBridge()
 		return nil, err
 	}
-	inner := rec.(*readCloser)
+	inner := rec
 	return &readCloser{
-		Reader: inner.Reader,
+		Reader: inner,
 		name:   "jack:" + left + " + " + right,
 		closer: func() error {
 			err := inner.Close()

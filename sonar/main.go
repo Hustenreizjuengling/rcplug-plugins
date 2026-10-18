@@ -37,14 +37,26 @@ func main() {
 		"audio source: test | stdin | wav:<path> | alsa:<device> | jack:<port>,<port>")
 	rate := flag.Int("rate", 48000, "sample rate (Hz)")
 	block := flag.Int("block", 1024, "DSP block size in frames")
-	smoothing := flag.Float64("smoothing", 0.6, "EMA smoothing 0..1")
+	smoothing := flag.Float64("smoothing", 0.6, "smoothing of the bearing, 0 (none) to 0.99")
 	flip := flag.Bool("flip", false, "flip left/right orientation")
-	noiseFloor := flag.Float64("noise-floor", -60, "silence threshold dBFS")
+	noiseFloor := flag.Float64("noise-floor", -60, "silence threshold in dBFS, -120 to -1")
 	showVer := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 	if *showVer {
 		fmt.Println(version)
 		return
+	}
+	// The same limits as the settings on the page; anything else would crash
+	// the plugin or make it spin.
+	switch {
+	case *rate < 8000 || *rate > 192000:
+		usageError("--rate must be 8000 to 192000 Hz")
+	case *block < 64 || *block > 65536:
+		usageError("--block must be 64 to 65536 frames")
+	case *smoothing < 0 || *smoothing > 0.99:
+		usageError("--smoothing must be 0 to 0.99")
+	case *noiseFloor < -120 || *noiseFloor >= 0:
+		usageError("--noise-floor must be -120 to -1 dBFS")
 	}
 	_ = sdk.LowPriority() // no-op when started by rcplugd (already nice 19)
 
@@ -151,9 +163,7 @@ func (h *hub) run(ctx context.Context) {
 		case <-h.restart:
 			backoff = time.Second
 		case <-time.After(backoff):
-			if backoff < 10*time.Second {
-				backoff *= 2
-			}
+			backoff = min(2*backoff, 10*time.Second)
 		}
 	}
 }
@@ -409,6 +419,11 @@ func (h *hub) handleConfig(w http.ResponseWriter, r *http.Request) {
 		"noiseFloor": h.cfg.NoiseFloor, "rate": h.rate,
 		"channel": h.channel, "channels": channels,
 	})
+}
+
+func usageError(msg string) {
+	fmt.Fprintln(os.Stderr, "sonar: "+msg)
+	os.Exit(2)
 }
 
 func clamp(x, lo, hi float64) float64 {

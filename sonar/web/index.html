@@ -349,8 +349,10 @@ $('#flip').addEventListener('change', (e) => patch({ flip: e.target.checked }));
 (async () => {
   await Promise.all([loadSources(), loadStrips()]);
   await loadConfig();
-  // Opened from a console action: ?strip=…&source=combo1&label=…
-  const want = new URLSearchParams(location.search).get('source');
+  // Opened from a console action: ?strip=…&source=combo1&label=…. A strip
+  // without a source sends an empty source; Sonar lists those as "none".
+  const q = new URLSearchParams(location.search);
+  const want = q.has('source') ? (q.get('source') || 'none') : '';
   if (want && /^[a-z][a-z0-9_-]{0,31}$/.test(want) && want !== cfg.channel) await patch({ channel: want });
 })();
 </script>

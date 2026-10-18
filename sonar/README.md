@@ -19,7 +19,7 @@ Sources:
 | `test` | Built-in signal that sweeps from left to right; works without hardware |
 | `alsa:<device>` | Capture with `arecord -D <device>` (S16_LE, stereo), e.g. `alsa:default` or `alsa:hw:0,0` |
 | `jack:<port>,<port>` | Two JACK ports, e.g. `jack:system:capture_1,system:capture_2`, bridged into Sonar (see below). The way to the desk's audio on the RØDECaster Duo. |
-| `wav:<file>` | Loops a 16-bit stereo WAV file. Over the web UI only files inside the plugin's data directory are accepted. |
+| `wav:<file>` | Loops a 16-bit stereo WAV file at Sonar's sample rate. Set it with `--source` or the API (`POST api/config`); the web page has no file picker. Over the API only files inside the plugin's data directory are accepted. |
 | `stdin` | Raw S16_LE stereo on standard input (command line only) |
 
 Sonar ships with the `test` source, so a fresh install shows the built-in sweep. Pick
@@ -79,7 +79,9 @@ restarts. They win over the command-line flags below; delete
   height of the correlation peak doubles as the **confidence**.
 
 The result is an azimuth from −90° (left) to +90° (right), the level in dBFS, the
-confidence, the left and right levels and the estimated delay. It is smoothed with an
+confidence, the left and right levels and the estimated delay. The level difference
+alone reaches about ±60° (one channel silent); the outer part of the range needs the
+time difference as well. It is smoothed with an
 exponential moving average. Tests cover hard left and right, centre, pure time
 panning, silence and the flipped orientation.
 
@@ -91,15 +93,20 @@ the confidence stays low.
 
 | Setting | Flag | Meaning |
 |---|---|---|
-| Source | `--source` | see above (default `test`) |
-| Smoothing | `--smoothing` | 0 (none) to 0.95; higher is calmer and slower |
-| Noise floor | `--noise-floor` | below this level (dBFS) the input counts as silence |
+| Source | `--source`, env `SONAR_SOURCE` | see above (default `test`) |
+| Smoothing | `--smoothing` | 0 (none) to 0.99; higher is calmer and slower |
+| Noise floor | `--noise-floor` | −120 to −1 dBFS; below this level the input counts as silence (default −60) |
 | Swap left/right | `--flip` | for a reversed microphone |
-| Sample rate, block size | `--rate`, `--block` | 48000 and 1024 by default |
+| Sample rate | `--rate` | 8000 to 192000 Hz (default 48000) |
+| Block size | `--block` | 64 to 65536 frames per estimate (default 1024) |
+| Listen address | `--addr` | set by rcplugd (`127.0.0.1:{{port}}`); default `127.0.0.1:8081` when run alone |
+| Version | `--version` | print the version and exit |
 
-Settings changed in the web UI apply at once; changing the source restarts the
-capture. A failing source is retried with a growing pause (1 to 10 s) and the error
-is shown on the page.
+Values outside these ranges make Sonar exit with an error at start. Settings changed
+in the web UI apply at once and are kept in the data directory (they win over the
+flags); changing the source restarts the capture. A failing source is retried with a
+growing pause (1 to 10 s) and the error is shown on the page, for ALSA and JACK with
+`arecord`'s own message.
 
 ## API
 
