@@ -17,7 +17,7 @@ RCPLUG ?= ../rcplug
 # Signs releases; the version go.mod pins (in a go.work: the local clone).
 RELEASE_TOOL ?= $(GO) run github.com/Hustenreizjuengling/rcplug/cmd/rcplug-release
 
-.PHONY: help all check fmt fmt-check vet test test-race test-arm64 build build-arm64 build-host \
+.PHONY: help all check fmt fmt-check vet test test-race test-arm64 build build-arm64 build-host \ check-versions
         package sign run-local clean docs-check
 
 help: ## show this help
@@ -35,6 +35,9 @@ fmt-check: ## fail if Go code is not formatted
 
 vet: ## go vet
 	$(GO) vet ./...
+
+check-versions: ## every plugin that changed since the last release has a new version in its plugin.json
+	tools/check-plugin-versions.sh
 
 docs-check: ## every relative link and #anchor in the Markdown files resolves
 	$(GO) run ./tools/doclinks

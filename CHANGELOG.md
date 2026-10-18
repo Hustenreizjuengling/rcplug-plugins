@@ -6,6 +6,14 @@ may break compatibility).
 
 ## 0.5.3 - Unreleased
 
+### Fixed
+- **Sonar 0.5.2:** Sonar's own version was not raised in 0.5.1 and 0.5.2, so devices
+  with Sonar 0.5.0 were not offered the version that hears the desk through rcplug's
+  shared audio taps. It is 0.5.2 now, built with the rcplug 0.7.1 module (its console
+  requests carry the plugin's token).
+- The release workflow refuses a release in which a plugin changed (or the module's
+  `go.mod`) without a new version in its `plugin.json` (`make check-versions`).
+
 ## 0.5.2 - 2026-10-18
 
 ### Changed

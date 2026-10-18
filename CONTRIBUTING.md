@@ -24,7 +24,10 @@ problems privately, see [SECURITY.md](SECURITY.md).
 
 A new plugin is a folder `<name>/` with its `plugin.json`, a `main` package and a
 `README.md`; the Makefile picks it up. Raise the `version` in a plugin's `plugin.json`
-with its changes: devices offer an update when it is newer than the installed one.
+with its changes, also when only `go.mod` changed (a new rcplug module changes its
+build): devices offer an update only when it is newer than the installed one. The
+release workflow refuses to release a plugin that changed without a new version
+(`make check-versions` shows it beforehand).
 
 ## Releases and automation
 
