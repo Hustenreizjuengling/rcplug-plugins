@@ -75,18 +75,19 @@ lists the ports and connections, `jack_lsp -c -p`, while Sonar runs):
 Sonar proposes these pairs when a channel is opened from the console. A stereo source
 such as a game's audio over USB 1 is the classic case for the radar.
 
-### Channels of the desk
+### What Sonar hears
+
+One list chooses it, by name: *Inputs of the desk* (Mic 1 + Mic 2, USB 1 and USB 2 from
+the computer, the chat, the calls, RØDE wireless), *Outputs of the mixer* (the mix to
+the computer, the mixer's outputs) and *Other audio* (the test signal, and anything
+else JACK or ALSA offers, under its technical name). Choosing switches at once; the
+technical name of the choice is shown beneath it.
 
 Every channel strip of the console has a "◉ Sonar" button (a plugin action, see
-[plugin-api.md](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-api.md#actions)), and Sonar has a channel list read from the
-console (*What Sonar hears*). A channel needs its audio chosen once: Sonar asks which
-audio carries it and remembers the answer per console source (`combo1`, `usb2`, …), so
-the next time the channel opens with the right input. For a microphone channel it
-proposes the JACK pair of the device's inputs 1+2 (or 3+4) if JACK offers it. A single
-microphone is mono and has no direction: for a mono channel Sonar says so and proposes
-the pair. Choosing the audio without a channel is under *Choose the audio directly*. The web UI lists the JACK pairs and
-capture devices it finds; which of them carries which channel of the desk has not
-been checked on hardware yet (see [device-notes.md](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/device-notes.md)).
+[plugin-api.md](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-api.md#actions)). Opened from it, Sonar listens to where
+that channel comes in right away. A single microphone has no direction, so for Mic 1
+it takes Mic 1 + Mic 2 and says so. For a channel whose way in it does not know (a
+virtual channel, Bluetooth) it says that too and leaves the choice as it was.
 
 The chosen source and the tuning are saved in the plugin's data directory and survive
 restarts. They win over the command-line flags below; delete

@@ -30,8 +30,6 @@
   canvas{position:absolute;inset:0;width:100%;height:100%}
   .readouts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:12px}
   .note{font-size:12px;color:var(--muted);margin:8px 2px 0}
-  details.adv summary{cursor:pointer;font-size:13px;color:var(--muted)}
-  details.adv[open] summary{margin-bottom:8px}
   .cal{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
   .ro{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center}
   .ro .v{font-size:20px;font-weight:650;font-variant-numeric:tabular-nums}
@@ -96,21 +94,10 @@
     </section>
     <div class="side">
       <section class="card" id="chanCard">
-        <h3 data-t="listensTo"></h3>
-        <label class="muted small" for="channel" data-t="channel"></label>
-        <select id="channel"></select>
-        <p class="small" id="chanInfo"></p>
-        <div id="assignBox" hidden>
-          <div class="banner" id="assignMsg"></div>
-          <div class="row"><select id="assignSrc" aria-label="Audio"></select><button type="button" class="btn primary" id="assignBtn" data-t="assign"></button></div>
-        </div>
-        <button type="button" class="btn link" id="reassign" data-t="reassign" hidden></button>
-        <button type="button" class="btn link" id="unassign" data-t="unassign" hidden></button>
-        <details class="adv" style="margin-top:10px">
-          <summary data-t="source"></summary>
-          <div class="row"><select id="source" aria-label="Audio"></select><button type="button" class="btn" id="refreshSrc" data-t-title="refresh">⟳</button></div>
-          <p class="muted small" data-t="hint"></p>
-        </details>
+        <h3 id="listenTitle" data-t="listensTo"></h3>
+        <div class="row"><select id="listen" aria-labelledby="listenTitle" style="flex:1;min-width:0"></select><button type="button" class="btn" id="refreshSrc" data-t-title="refresh">⟳</button></div>
+        <div class="banner" id="listenNote" hidden></div>
+        <p class="muted small" id="listenInfo"></p>
       </section>
       <section class="card">
         <h3 data-t="calTitle"></h3>
@@ -132,40 +119,44 @@
 'use strict';
 const T = {
   en: {
-    bearing: 'Bearing', side: 'Side', level: 'Level dBFS', confidence: 'Confidence', channel: 'Channel of the desk', source: 'Choose the audio directly (without a channel)',
+    bearing: 'Bearing', side: 'Side', level: 'Level dBFS', confidence: 'Confidence',
     listensTo: 'What Sonar hears', distance: 'Distance', near: 'near', mid: 'middle', far2: 'far',
     radarNote: 'A stereo signal shows left and right only: front and back sound the same to it, and it has no height. The distance is an estimate from the level and the room’s reverberation; calibrate it for this room.',
-    reassign: 'Choose other audio', suggested: '{src} (suggested)',
-    mono: '“{ch}” is a mono channel: one microphone has no direction. Sonar needs two microphones or a stereo microphone, for example Mic 1 and Mic 2 as a pair.',
+    grpIn: 'Inputs of the desk', grpOut: 'Outputs of the mixer', grpOther: 'Other audio',
+    sMic12: 'Mic 1 + Mic 2', sMic23: 'Mic 2 + Mic 3', sIn34: 'Inputs 3 + 4', sUsb1: 'USB 1 from the computer', sUsb2: 'USB 2 from the computer', sChat: 'Chat',
+    sCall: 'Call {n}', sWireless: 'RØDE wireless', sToUsb1: 'Mix to the computer (USB 1)', sToChat: 'Chat to the computer', sToUsb2: 'USB 2 to the computer',
+    sMixOut: 'Mixer output {a} + {b}', sTest: 'Test signal (moves left ↔ right)',
+    noteMono: '“{ch}” is one microphone, which has no direction: Sonar listens to {src}.',
+    noteUnknown: 'Sonar does not know where “{ch}” comes in: choose above what it should hear.',
+    noteTaps: 'The desk’s audio reaches Sonar through rcplug’s audio taps, which are switched off.', tapsLink: 'Switch them on',
     calTitle: 'Calibrate the distance', calHint: 'Speak or clap for a few seconds close to the microphones and press “Near”, then from the far end of the room and press “Far”.',
     calNear: 'Near', calFar: 'Far', calReset: 'Reset', calNone: 'Not calibrated: a rough estimate.', calOnlyNear: 'Near is set; now far.', calOnlyFar: 'Far is set; now near.',
     calDone: 'Calibrated (near {n} dBFS, far {f} dBFS).', calSame: 'Near was not louder than far: calibrate again.', noSignal: 'No sound in the last seconds: speak or clap while calibrating.',
     settings: 'Settings', refresh: 'Reload the source list', smoothing: 'Smoothing', noise: 'Noise floor', flip: 'Swap left/right',
     connecting: 'connecting…', reconnecting: 'reconnecting…', live: 'live', noData: 'no data', failed: 'Could not apply the setting: {err}',
     centre: 'CENTRE', far: 'FAR {s}', slight: 'slightly {s}', radar: 'Radar showing the estimated direction of the loudest sound', switchLang: 'Deutsch',
-    noChannel: '— no channel —', noConsole: 'The console is not reachable, so channels cannot be listed. Choose the audio source directly.',
-    mapped: 'Hears {src}.', unmapped: 'Which audio carries “{ch}”? Choose it once; Sonar remembers it for this channel.',
-    assign: 'Use it', unassign: 'Forget this assignment', chanHint: 'Choose a channel of the desk, or the audio directly below.',
-    hint: 'Direction finding needs a real stereo signal (two microphones or a stereo microphone). The built-in test signal sweeps from left to right.',
-    jackWarn: 'Listen to JACK ports {src}?\n\nSonar hears them through rcplug’s shared audio taps (dashboard → System → Audio taps; they must be switched on), which add a small client to RØDE’s audio graph. If you hear dropouts or clicks, switch back to the test signal.',
+
+
   },
   de: {
-    bearing: 'Richtung', side: 'Seite', level: 'Pegel dBFS', confidence: 'Sicherheit', channel: 'Kanal am Pult', source: 'Audio direkt wählen (ohne Kanal)',
+    bearing: 'Richtung', side: 'Seite', level: 'Pegel dBFS', confidence: 'Sicherheit',
     listensTo: 'Was Sonar hört', distance: 'Entfernung', near: 'nah', mid: 'mittel', far2: 'fern',
     radarNote: 'Ein Stereosignal zeigt nur links und rechts: Vorne und hinten klingen darin gleich, und Höhe kennt es nicht. Die Entfernung ist eine Schätzung aus Pegel und Raumhall; kalibriere sie für diesen Raum.',
-    reassign: 'Anderes Audio wählen', suggested: '{src} (Vorschlag)',
-    mono: '„{ch}“ ist ein Mono-Kanal: Ein Mikrofon allein hat keine Richtung. Sonar braucht zwei Mikrofone oder ein Stereomikrofon, zum Beispiel Mic 1 und Mic 2 als Paar.',
+    grpIn: 'Eingänge des Pults', grpOut: 'Ausgänge des Mixers', grpOther: 'Weiteres Audio',
+    sMic12: 'Mic 1 + Mic 2', sMic23: 'Mic 2 + Mic 3', sIn34: 'Eingänge 3 + 4', sUsb1: 'USB 1 vom Computer', sUsb2: 'USB 2 vom Computer', sChat: 'Chat',
+    sCall: 'Anruf {n}', sWireless: 'RØDE Wireless', sToUsb1: 'Mix zum Computer (USB 1)', sToChat: 'Chat zum Computer', sToUsb2: 'USB 2 zum Computer',
+    sMixOut: 'Mixer-Ausgang {a} + {b}', sTest: 'Testsignal (wandert links ↔ rechts)',
+    noteMono: '„{ch}“ ist ein einzelnes Mikrofon und hat keine Richtung: Sonar hört {src}.',
+    noteUnknown: 'Wo „{ch}“ ankommt, kennt Sonar nicht: Wähle oben, was es hören soll.',
+    noteTaps: 'Das Audio des Pults kommt über die Audio-Abgriffe von rcplug zu Sonar, und die sind ausgeschaltet.', tapsLink: 'Einschalten',
     calTitle: 'Entfernung kalibrieren', calHint: 'Ein paar Sekunden nah an den Mikrofonen sprechen oder klatschen und „Nah“ drücken, dann vom anderen Ende des Raums und „Fern“.',
     calNear: 'Nah', calFar: 'Fern', calReset: 'Zurücksetzen', calNone: 'Nicht kalibriert: eine grobe Schätzung.', calOnlyNear: 'Nah ist gesetzt, jetzt Fern.', calOnlyFar: 'Fern ist gesetzt, jetzt Nah.',
     calDone: 'Kalibriert (nah {n} dBFS, fern {f} dBFS).', calSame: 'Nah war nicht lauter als fern: bitte neu kalibrieren.', noSignal: 'In den letzten Sekunden war nichts zu hören: beim Kalibrieren sprechen oder klatschen.',
     settings: 'Einstellungen', refresh: 'Quellenliste neu laden', smoothing: 'Glättung', noise: 'Rauschschwelle', flip: 'Links/Rechts tauschen',
     connecting: 'verbinde…', reconnecting: 'verbinde neu…', live: 'live', noData: 'keine Daten', failed: 'Einstellung nicht übernommen: {err}',
     centre: 'MITTE', far: 'GANZ {s}', slight: 'leicht {s}', radar: 'Radar mit der geschätzten Richtung des lautesten Geräuschs', switchLang: 'English',
-    noChannel: '— kein Kanal —', noConsole: 'Die Konsole ist nicht erreichbar, daher keine Kanalliste. Wähle die Audioquelle direkt.',
-    mapped: 'Hört {src}.', unmapped: 'Welches Audio gehört zu „{ch}“? Einmal wählen, Sonar merkt es sich für diesen Kanal.',
-    assign: 'Übernehmen', unassign: 'Zuordnung vergessen', chanHint: 'Wähle einen Kanal des Pults oder unten das Audio direkt.',
-    hint: 'Für die Richtung braucht es ein echtes Stereosignal (zwei Mikrofone oder ein Stereomikrofon). Das eingebaute Testsignal schwenkt von links nach rechts.',
-    jackWarn: 'Auf die JACK-Ports {src} hören?\n\nSonar hört sie über die gemeinsamen Audio-Abgriffe von rcplug (Dashboard → System → Audio-Abgriffe; sie müssen eingeschaltet sein), die einen kleinen Client in RØDEs Audio-Graph hängen. Wenn du Aussetzer oder Knackser hörst, zurück auf das Testsignal schalten.',
+
+
   },
 };
 let lang = 'en';
@@ -200,15 +191,21 @@ function resize() {
 window.addEventListener('resize', resize); resize();
 
 const TRAIL_MS = 2000, TRAIL_MAX = 120;
+// state is the latest reading; view follows it smoothly between readings,
+// which come about 30 times a second.
 const state = { az: 0, level: 0, conf: 0, dist: 0.5 };
+const view = { az: 0, level: 0, conf: 0, dist: 0.5 };
+const FOLLOW_MS = { az: 140, level: 90, conf: 200, dist: 400 };
 // Near the centre is near the microphones, the outer ring far away.
 const radiusOf = (dist) => 0.12 + 0.83 * Math.max(0, Math.min(1, dist));
 const trail = [];
-let sweep = 0, lastFrame = performance.now(), lastData = 0;
+let lastFrame = performance.now(), lastData = 0, lastText = 0;
 const angleOf = (az) => Math.PI + (az + 90) / 180 * Math.PI;
 
 function draw(now) {
   const dt = Math.min(100, now - lastFrame); lastFrame = now;
+  for (const k in view) view[k] += (state[k] - view[k]) * (1 - Math.exp(-dt / FOLLOW_MS[k]));
+  if (now - lastText > 200) { lastText = now; showReadouts(); }
   ctx.clearRect(0, 0, W, H);
   const cx = W / 2, cy = H * 0.95, R = Math.min(W / 2 - 14, H * 0.88);
   ctx.strokeStyle = C.line; ctx.lineWidth = 1;
@@ -224,27 +221,21 @@ function draw(now) {
   ctx.fillText(t('near'), cx + R * 0.14, cy - 4);
   ctx.fillText(t('far2'), cx + R * 0.72, cy - 4);
   ctx.textAlign = 'center';
-  sweep = (sweep + dt / 1300) % 1;
-  const sAng = Math.PI + sweep * Math.PI;
-  const grad = ctx.createLinearGradient(cx, cy, cx + Math.cos(sAng) * R, cy + Math.sin(sAng) * R);
-  grad.addColorStop(0, `rgba(${C.accent},0.45)`); grad.addColorStop(1, `rgba(${C.accent},0)`);
-  ctx.strokeStyle = grad; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sAng) * R, cy + Math.sin(sAng) * R); ctx.stroke();
   pruneTrail(now);
   for (const p of trail) {
     const age = (now - p.at) / TRAIL_MS, ang = angleOf(p.az), rr = R * radiusOf(p.dist);
     ctx.fillStyle = `rgba(${C.accent},${(1 - age) * 0.5 * p.level})`;
     ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr, 3, 0, 2 * Math.PI); ctx.fill();
   }
-  const ang = angleOf(state.az), rr = R * radiusOf(state.dist);
-  const x = cx + Math.cos(ang) * rr, y = cy + Math.sin(ang) * rr, size = 5 + state.level * 14;
+  const ang = angleOf(view.az), rr = R * radiusOf(view.dist);
+  const x = cx + Math.cos(ang) * rr, y = cy + Math.sin(ang) * rr, size = 5 + view.level * 14;
   const glow = ctx.createRadialGradient(x, y, 0, x, y, size * 2.2);
-  glow.addColorStop(0, `rgba(231,237,243,${0.55 + 0.4 * state.conf})`);
-  glow.addColorStop(0.4, `rgba(${C.accent},${0.45 * state.level + 0.2})`);
+  glow.addColorStop(0, `rgba(231,237,243,${0.55 + 0.4 * view.conf})`);
+  glow.addColorStop(0.4, `rgba(${C.accent},${0.45 * view.level + 0.2})`);
   glow.addColorStop(1, `rgba(${C.accent},0)`);
   ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, size * 2.2, 0, 2 * Math.PI); ctx.fill();
   ctx.fillStyle = '#e7edf3'; ctx.beginPath(); ctx.arc(x, y, 3, 0, 2 * Math.PI); ctx.fill();
-  ctx.strokeStyle = `rgba(${C.accent},${0.3 + 0.5 * state.conf})`; ctx.lineWidth = 1.5;
+  ctx.strokeStyle = `rgba(${C.accent},${0.3 + 0.5 * view.conf})`; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ang) * R, cy + Math.sin(ang) * R); ctx.stroke();
   requestAnimationFrame(draw);
 }
@@ -264,23 +255,29 @@ function dirName(az) {
   return m > 25 ? s : t('slight', { s });
 }
 
-let sourceName = '';
+// The numbers change five times a second: often enough to follow, slow
+// enough to read.
+let levelDb = -120;
+function showReadouts() {
+  $('#distV').textContent = view.level > 0.04 ? t(view.dist < 0.34 ? 'near' : view.dist < 0.67 ? 'mid' : 'far2') : '—';
+  $('#azV').textContent = (view.az > 0.5 ? '+' : '') + view.az.toFixed(0) + '°';
+  $('#dirV').textContent = dirName(view.az);
+  $('#lvlV').textContent = levelDb <= -99 ? '-∞' : levelDb.toFixed(0);
+  $('#confV').textContent = (view.conf * 100).toFixed(0) + '%';
+}
+let srcErr = '';
 function onData(d) {
   lastData = performance.now();
   $('#scope').classList.remove('stale');
   state.az = d.az; state.level = d.level; state.conf = d.conf; state.dist = d.dist ?? 0.5;
-  if (d.level > 0.04) { trail.push({ az: d.az, level: d.level, dist: state.dist, at: lastData }); pruneTrail(lastData); }
-  $('#distV').textContent = d.level > 0.04 ? t(state.dist < 0.34 ? 'near' : state.dist < 0.67 ? 'mid' : 'far2') : '—';
-  $('#azV').textContent = (d.az > 0 ? '+' : '') + d.az.toFixed(0) + '°';
-  $('#dirV').textContent = dirName(d.az);
-  $('#lvlV').textContent = d.levelDb <= -99 ? '-∞' : d.levelDb.toFixed(0);
-  $('#confV').textContent = (d.conf * 100).toFixed(0) + '%';
+  levelDb = d.levelDb;
+  if (d.level > 0.04) { trail.push({ az: view.az, level: view.level, dist: view.dist, at: lastData }); pruneTrail(lastData); }
   $('#mL').style.transform = `scaleX(${Math.max(0, Math.min(1, d.l))})`;
   $('#mR').style.transform = `scaleX(${Math.max(0, Math.min(1, d.r))})`;
-  sourceName = d.source || '';
-  $('#state').textContent = d.err ? d.err : t('live');
+  const tapsOff = !!d.err && /audio taps/.test(d.err);
+  $('#state').textContent = tapsOff ? t('noData') : d.err ? d.err : t('live');
   $('#state').classList.toggle('on', !d.err);
-  updateSubline();
+  if ((d.err || '') !== srcErr) { srcErr = d.err || ''; renderListen(); }
 }
 
 // ---- live stream: reopened with backoff when it closes
@@ -303,8 +300,8 @@ setInterval(() => {
   }
 }, 1000);
 
-// ---- config, sources and channels
-let cfg = { channels: {} }, srcList = [], strips = [];
+// ---- config and what Sonar hears
+let cfg = {}, sources = { jack: [], alsa: [], builtin: [] };
 async function api(path, body) {
   const opt = body === undefined ? { cache: 'no-store' } : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Rcplug': '1' }, body: JSON.stringify(body) };
   const r = await fetch(path, opt);
@@ -317,116 +314,125 @@ async function patch(p) {
   try { cfg = await api('api/config', p); showErr(''); renderConfig(); }
   catch (e) { showErr(e.code === 'no_signal' ? t('noSignal') : t('failed', { err: e.message })); loadConfig(); }
 }
-function fillSelect(sel, items, current) {
-  sel.textContent = '';
-  for (const [v, label] of items) { const o = document.createElement('option'); o.value = v; o.textContent = label; o.selected = v === current; sel.appendChild(o); }
-}
-const srcLabel = (s) => s.startsWith('alsa:') ? 'ALSA ' + s.slice(5) : s.startsWith('jack:') ? 'JACK ' + s.slice(5).replace(',', ' + ') : s;
-// Choosing a JACK source changes RØDE's audio graph: ask first.
-const jackOK = (src) => !src.startsWith('jack:') || src === cfg.source || confirm(t('jackWarn', { src: srcLabel(src).slice(5) }));
-function sourceItems(current) {
-  const items = srcList.map((s) => [s, srcLabel(s)]);
-  if (current && !items.some(([v]) => v === current)) items.push([current, current]);
-  return items;
-}
-// Mono channels of the desk: one microphone has no direction.
-const MONO = /^(combo[1-4]|callme[1-3])$/;
-// The JACK ports a channel of the desk comes in on, as a Duo with firmware
-// 1.7.6 wires them (its inputs are system:capture_1..4; the computer's USB
-// audio, the chat and the calls are JACK clients of their own).
-const DESK_PORTS = {
-  usb1: 'usb1in:capture_1,usb1in:capture_2', usb2: 'usb2in:capture_1,usb2in:capture_2',
-  chat: 'usb1-chat-in:capture_1,usb1-chat-in:capture_2',
+
+// The desk's audio as a Duo with firmware 1.7.6 wires it in JACK (rcplug's
+// docs/device-notes.md, "The JACK graph"), by name. Pairs not listed here
+// show under their technical names.
+const NAMED = {
+  'system:capture_1,system:capture_2': ['in', () => t('sMic12')],
+  'system:capture_2,system:capture_3': ['in', () => t('sMic23')],
+  'system:capture_3,system:capture_4': ['in', () => t('sIn34')],
+  'usb1in:capture_1,usb1in:capture_2': ['in', () => t('sUsb1')],
+  'usb2in:capture_1,usb2in:capture_2': ['in', () => t('sUsb2')],
+  'usb1-chat-in:capture_1,usb1-chat-in:capture_2': ['in', () => t('sChat')],
+  'sip-audio-in:capture_1,sip-audio-in:capture_2': ['in', () => t('sCall', { n: 1 })],
+  'sip-audio-in:capture_3,sip-audio-in:capture_4': ['in', () => t('sCall', { n: 2 })],
+  'sip-audio-in:capture_5,sip-audio-in:capture_6': ['in', () => t('sCall', { n: 3 })],
+  'RodeRfSPI:TX1,RodeRfSPI:TX2': ['in', () => t('sWireless')],
+  'JUCEJack:out_15,JUCEJack:out_16': ['out', () => t('sToUsb1')],
+  'JUCEJack:out_17,JUCEJack:out_18': ['out', () => t('sToChat')],
+  'JUCEJack:out_19,JUCEJack:out_20': ['out', () => t('sToUsb2')],
+};
+// Where a channel of the desk comes in (the console names its source).
+const FROM_DESK = {
+  combo1: 'system:capture_1,system:capture_2', combo2: 'system:capture_1,system:capture_2', combo1_2: 'system:capture_1,system:capture_2',
+  combo2_3: 'system:capture_2,system:capture_3',
+  combo3: 'system:capture_3,system:capture_4', combo4: 'system:capture_3,system:capture_4', combo3_4: 'system:capture_3,system:capture_4',
+  usb1: 'usb1in:capture_1,usb1in:capture_2', usb2: 'usb2in:capture_1,usb2in:capture_2', chat: 'usb1-chat-in:capture_1,usb1-chat-in:capture_2',
   callme1: 'sip-audio-in:capture_1,sip-audio-in:capture_2', callme2: 'sip-audio-in:capture_3,sip-audio-in:capture_4',
   callme3: 'sip-audio-in:capture_5,sip-audio-in:capture_6',
 };
-// suggestFor proposes the JACK pair a channel comes in on (for a microphone:
-// inputs 1+2 or 3+4 of the device), if JACK offers it.
-function suggestFor(ch) {
-  let pair = DESK_PORTS[ch] ? 'jack:' + DESK_PORTS[ch] : '';
-  const m = /^combo(\d)(?:_\d)?$/.exec(ch || '');
-  if (m) {
-    const first = Number(m[1]) % 2 ? Number(m[1]) : Number(m[1]) - 1;
-    pair = `jack:system:capture_${first},system:capture_${first + 1}`;
+// One microphone has no direction; Sonar takes the pair it is part of.
+const MONO = /^combo[1-4]$/;
+
+// describe names an audio source and puts it into a group.
+function describe(src) {
+  if (src === 'test') return ['other', t('sTest')];
+  if (src.startsWith('jack:')) {
+    const pair = src.slice(5), named = NAMED[pair];
+    if (named) return [named[0], named[1]()];
+    const out = /^JUCEJack:out_(\d+),JUCEJack:out_(\d+)$/.exec(pair);
+    if (out) return ['out', t('sMixOut', { a: out[1], b: out[2] })];
+    return ['other', pair.replace(',', ' + ')];
   }
-  return srcList.includes(pair) ? pair : '';
+  if (src.startsWith('alsa:')) return ['other', 'ALSA ' + src.slice(5)];
+  return ['other', src];
 }
-let reassigning = false;
-const chanLabel = (id) => { const s = strips.find((x) => x.sourceId === id); return s ? `${s.label} · ${s.sourceLabel}` : id; };
-function updateSubline() {
-  const parts = [];
-  if (cfg.channel) parts.push(chanLabel(cfg.channel));
-  if (sourceName) parts.push(sourceName);
-  $('#subline').textContent = parts.join(' · ');
+const technical = (src) => (src.startsWith('jack:') ? 'JACK ' + src.slice(5).replace(',', ' + ') : '');
+
+function renderListen() {
+  const all = [...(sources.jack || []).map((p) => 'jack:' + p), ...(sources.alsa || []).map((d) => 'alsa:' + d), ...(sources.builtin || [])];
+  if (cfg.source && !all.includes(cfg.source)) all.push(cfg.source);
+  const groups = { in: [], out: [], other: [] };
+  for (const src of all) { const [g, name] = describe(src); groups[g].push([src, name]); }
+  const sel = $('#listen');
+  sel.textContent = '';
+  for (const [g, key] of [['in', 'grpIn'], ['out', 'grpOut'], ['other', 'grpOther']]) {
+    if (!groups[g].length) continue;
+    const og = document.createElement('optgroup');
+    og.label = t(key);
+    // Inputs in the order of the table above, outputs by number.
+    const order = Object.keys(NAMED);
+    const rank = (v) => (v === 'test' ? -1 : order.indexOf(v.slice(5)) + 1 || 999);
+    groups[g].sort((a, b) => rank(a[0]) - rank(b[0]) || a[1].localeCompare(b[1], undefined, { numeric: true }));
+    for (const [v, name] of groups[g]) { const o = document.createElement('option'); o.value = v; o.textContent = name; o.selected = v === cfg.source; og.appendChild(o); }
+    sel.appendChild(og);
+  }
+  $('#listenInfo').textContent = technical(cfg.source || '');
+  const note = $('#listenNote');
+  note.textContent = '';
+  if (/audio taps/.test(srcErr)) {
+    const a = document.createElement('a');
+    a.href = '/#/system'; a.target = '_top'; a.textContent = t('tapsLink');
+    note.append(t('noteTaps') + ' ', a);
+  } else if (deskNote) note.textContent = deskNote;
+  note.hidden = !note.textContent;
+  $('#subline').textContent = cfg.source ? describe(cfg.source)[1] : '';
 }
 function renderConfig() {
-  fillSelect($('#source'), sourceItems(cfg.source), cfg.source);
+  renderListen();
   $('#smoothing').value = cfg.smoothing; $('#smoothingV').textContent = (+cfg.smoothing).toFixed(2);
   $('#noise').value = cfg.noiseFloor; $('#noiseV').textContent = cfg.noiseFloor + ' dB';
   for (const id of ['smoothing', 'noise']) { const el = $('#' + id); el.style.setProperty('--p', ((el.value - el.min) / (el.max - el.min) * 100) + '%'); }
   $('#flip').checked = !!cfg.flip;
-  if (strips.length) {
-    fillSelect($('#channel'), [['', t('noChannel')], ...strips.filter((s) => s.sourceId).map((s) => [s.sourceId, `${s.label} · ${s.sourceLabel}`])], cfg.channel || '');
-  }
-  const ch = cfg.channel, mapped = ch && cfg.channels && cfg.channels[ch];
-  const asking = !!ch && (!mapped || reassigning);
-  $('#chanInfo').textContent = !strips.length ? t('noConsole') : mapped ? t('mapped', { src: srcLabel(mapped) }) : t('chanHint');
-  $('#assignBox').hidden = !asking;
-  $('#chanInfo').hidden = asking && !mapped && !!strips.length; // the question says it all
-  $('#reassign').hidden = !mapped || reassigning;
-  $('#unassign').hidden = !mapped;
-  if (asking) {
-    $('#assignMsg').textContent = MONO.test(ch) ? t('mono', { ch: chanLabel(ch) }) : t('unmapped', { ch: chanLabel(ch) });
-    const sug = suggestFor(ch), items = sourceItems(mapped || cfg.source);
-    if (sug) { const i = items.findIndex(([v]) => v === sug); if (i >= 0) items.splice(i, 1); items.unshift([sug, t('suggested', { src: srcLabel(sug) })]); }
-    fillSelect($('#assignSrc'), items, mapped || sug || cfg.source);
-  }
   const c = cfg.calibration || {};
   $('#calState').textContent = c.calibrated ? t('calDone', { n: c.near.db.toFixed(0), f: c.far.db.toFixed(0) })
     : c.near && c.far ? t('calSame') : c.near ? t('calOnlyNear') : c.far ? t('calOnlyFar') : t('calNone');
   $('#calReset').hidden = !c.near && !c.far;
-  updateSubline();
 }
+let deskNote = '';
 async function loadSources() {
-  try { const s = await api('api/sources'); srcList = [...(s.builtin || []), ...(s.alsa || []).map((d) => 'alsa:' + d), ...(s.jack || []).map((p) => 'jack:' + p)]; }
+  try { sources = await api('api/sources'); }
   catch (e) { showErr(t('failed', { err: e.message })); }
 }
 async function loadConfig() {
   try { cfg = await api('api/config'); renderConfig(); } catch (e) { /* the stream shows the state */ }
 }
-// The console lists the desk's channels; reachable through the host only.
-async function loadStrips() {
-  try {
-    const r = await fetch('../console/api/summary', { cache: 'no-store' });
-    if (r.ok) strips = (await r.json()).strips || [];
-  } catch (e) { strips = []; }
-  $('#channel').hidden = !strips.length;
-  $('label[for=channel]').hidden = !strips.length;
-}
 const timers = {};
 function patchSoon(k, p) { clearTimeout(timers[k]); timers[k] = setTimeout(() => patch(p), 150); }
-$('#source').addEventListener('change', (e) => { if (jackOK(e.target.value)) patch({ source: e.target.value }); else renderConfig(); });
-$('#refreshSrc').addEventListener('click', async () => { await loadSources(); renderConfig(); });
-$('#channel').addEventListener('change', (e) => { reassigning = false; patch({ channel: e.target.value }); });
-$('#assignBtn').addEventListener('click', () => { const src = $('#assignSrc').value; if (jackOK(src)) { reassigning = false; patch({ assign: { channel: cfg.channel, source: src } }); } });
-$('#reassign').addEventListener('click', () => { reassigning = true; renderConfig(); });
+$('#listen').addEventListener('change', (e) => { deskNote = ''; trail.length = 0; patch({ source: e.target.value }); });
+$('#refreshSrc').addEventListener('click', async () => { await loadSources(); renderListen(); });
 $('#calNear').addEventListener('click', () => patch({ calibrate: 'near' }));
 $('#calFar').addEventListener('click', () => patch({ calibrate: 'far' }));
 $('#calReset').addEventListener('click', () => patch({ calibrate: 'reset' }));
-$('#unassign').addEventListener('click', () => patch({ assign: { channel: cfg.channel, source: '' } }));
 $('#smoothing').addEventListener('input', (e) => { $('#smoothingV').textContent = (+e.target.value).toFixed(2); e.target.style.setProperty('--p', (e.target.value / 0.95 * 100) + '%'); patchSoon('s', { smoothing: +e.target.value }); });
 $('#noise').addEventListener('input', (e) => { $('#noiseV').textContent = e.target.value + ' dB'; e.target.style.setProperty('--p', ((e.target.value - -80) / 60 * 100) + '%'); patchSoon('n', { noiseFloor: +e.target.value }); });
 $('#flip').addEventListener('change', (e) => patch({ flip: e.target.checked }));
 
 (async () => {
-  await Promise.all([loadSources(), loadStrips()]);
+  await loadSources();
   await loadConfig();
-  // Opened from a console action: ?strip=…&source=combo1&label=…. A strip
-  // without a source sends an empty source; Sonar lists those as "none".
+  // Opened from a channel of the console: ?strip=…&source=combo1&label=….
+  // Sonar listens to where that channel comes in, right away.
   const q = new URLSearchParams(location.search);
-  const want = q.has('source') ? (q.get('source') || 'none') : '';
-  if (want && /^[a-z][a-z0-9_-]{0,31}$/.test(want) && want !== cfg.channel) await patch({ channel: want });
-  if (want && !(cfg.channels || {})[cfg.channel]) $('#chanCard').scrollIntoView({ block: 'nearest' }); // the question first
+  const ch = q.get('source') || '', mic = /^combo(\d)$/.exec(ch);
+  const label = mic ? 'Mic ' + mic[1] : q.get('label') || ch;
+  if (!ch) return;
+  const pair = FROM_DESK[ch];
+  if (!pair) { deskNote = t('noteUnknown', { ch: label }); renderListen(); return; }
+  if (MONO.test(ch)) deskNote = t('noteMono', { ch: label, src: describe('jack:' + pair)[1] });
+  if (cfg.source !== 'jack:' + pair) { trail.length = 0; await patch({ source: 'jack:' + pair, channel: /^[a-z][a-z0-9_-]{0,31}$/.test(ch) ? ch : '' }); }
+  else renderListen();
 })();
 </script>
 </body>

@@ -75,7 +75,7 @@ func TestAlsaDevicesOnTheDesk(t *testing.T) {
 	if got := strings.Join(alsaDevices(list, true), ","); got != "" {
 		t.Fatalf("on the desk: %s", got)
 	}
-	if got := len(alsaDevices(list, false)); got != 6 {
+	if got := len(alsaDevices(list+"hw:CARD=RcplugLoop,DEV=0\n    rcplug's bridge\n", false)); got != 6 {
 		t.Fatalf("elsewhere: %d devices", got)
 	}
 }

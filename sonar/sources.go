@@ -260,6 +260,9 @@ func alsaDevices(list string, desk bool) []string {
 			continue
 		}
 		d := strings.TrimSpace(line)
+		if strings.Contains(d, "RcplugLoop") {
+			continue // the loopback of rcplug's own audio bridge
+		}
 		if desk && (d == "null" || d == "pulse" || d == "default" || strings.Contains(d, "UAC2Gadget") || strings.Contains(d, "RODECaster") || strings.HasPrefix(d, "hw:") || strings.HasPrefix(d, "plughw:")) {
 			continue
 		}
