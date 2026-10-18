@@ -67,3 +67,15 @@ func TestArecordFailureIsExplained(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+// On the desk, devices that RØDE's mixer holds (or that do not exist there)
+// are not offered.
+func TestAlsaDevicesOnTheDesk(t *testing.T) {
+	list := "null\n    Discard all samples\npulse\n    PulseAudio\ndefault\n    Default\nsysdefault:CARD=UAC2Gadget\n    UAC2_Gadget\nhw:CARD=RODECasterDUO,DEV=0\n    RODECaster DUO\nplughw:CARD=Loopback,DEV=1\n    Loopback\n"
+	if got := strings.Join(alsaDevices(list, true), ","); got != "" {
+		t.Fatalf("on the desk: %s", got)
+	}
+	if got := len(alsaDevices(list, false)); got != 6 {
+		t.Fatalf("elsewhere: %d devices", got)
+	}
+}

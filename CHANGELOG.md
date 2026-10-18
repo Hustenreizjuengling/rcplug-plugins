@@ -6,6 +6,11 @@ may break compatibility).
 
 ## 0.5.5 - Unreleased
 
+### Fixed
+- **Sonar 0.6.1:** on the desk the source list no longer offers ALSA devices that can
+  never be recorded there (the desk's own sound card and the USB audio to the computer
+  belong to RØDE's mixer; there is no PulseAudio); the desk's audio comes through JACK.
+
 ## 0.5.4 - 2026-10-18
 
 ### Changed

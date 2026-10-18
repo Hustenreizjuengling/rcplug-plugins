@@ -246,14 +246,32 @@ func listAlsaCaptureDevices() []string {
 	if err != nil {
 		return nil
 	}
+	return alsaDevices(string(out), onDesk())
+}
+
+// alsaDevices parses `arecord -L`. On the desk it leaves out what can never
+// be recorded there: its own sound card and the USB audio to the computer
+// belong to RØDE's mixer, and there is no PulseAudio (the desk's audio comes
+// through JACK).
+func alsaDevices(list string, desk bool) []string {
 	var devs []string
-	for _, line := range strings.Split(string(out), "\n") {
+	for _, line := range strings.Split(list, "\n") {
 		if line == "" || strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
 			continue
 		}
-		devs = append(devs, strings.TrimSpace(line))
+		d := strings.TrimSpace(line)
+		if desk && (d == "null" || d == "pulse" || d == "default" || strings.Contains(d, "UAC2Gadget") || strings.Contains(d, "RODECaster") || strings.HasPrefix(d, "hw:") || strings.HasPrefix(d, "plughw:")) {
+			continue
+		}
+		devs = append(devs, d)
 	}
 	return devs
+}
+
+// onDesk reports whether Sonar runs on a RØDECaster.
+func onDesk() bool {
+	_, err := os.Stat("/usr/bin/rc_audio_mixer")
+	return err == nil
 }
 
 // testSource synthesises a 440 Hz tone whose pan sweeps left↔right while a small
