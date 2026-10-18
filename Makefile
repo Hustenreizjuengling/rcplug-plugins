@@ -17,8 +17,8 @@ RCPLUG ?= ../rcplug
 # Signs releases; the version go.mod pins (in a go.work: the local clone).
 RELEASE_TOOL ?= $(GO) run github.com/Hustenreizjuengling/rcplug/cmd/rcplug-release
 
-.PHONY: help all check fmt fmt-check vet test test-race test-arm64 build build-arm64 build-host \ check-versions
-        package sign run-local clean docs-check
+.PHONY: help all check fmt fmt-check vet test test-race test-arm64 build build-arm64 build-host \
+        package sign run-local clean docs-check check-versions
 
 help: ## show this help
 	@grep -hE '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
