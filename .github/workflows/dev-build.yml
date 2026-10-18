@@ -25,10 +25,10 @@ jobs:
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: rcplug-plugins
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/rcplug
           path: rcplug
