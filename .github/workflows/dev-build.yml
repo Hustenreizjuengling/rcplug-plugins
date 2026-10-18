@@ -1,0 +1,61 @@
+name: Development build
+
+# Every push to main publishes the current state as the pre-release "dev",
+# replacing the previous one: one package per plugin, versioned
+# <version>-dev.<run>, built against rcplug's main branch and signed like a
+# release. Devices never install it by themselves: the in-app update only
+# looks at the latest real release. It needs rcplug's code, so it runs once
+# rcplug is public.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dev-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and publish the pre-release "dev"
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: rcplug-plugins
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/rcplug
+          path: rcplug
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: go work init ./rcplug-plugins ./rcplug
+      - name: Build
+        working-directory: rcplug-plugins
+        run: |
+          v="$(cat VERSION)-dev.${GITHUB_RUN_NUMBER}"
+          echo "DEV_VERSION=$v" >> "$GITHUB_ENV"
+          make package VERSION="$v"
+      - name: Sign
+        working-directory: rcplug-plugins
+        env:
+          RCPLUG_SIGNING_KEY: ${{ secrets.RCPLUG_SIGNING_KEY }}
+        run: |
+          if [ -z "$RCPLUG_SIGNING_KEY" ]; then echo "::error::the repository secret RCPLUG_SIGNING_KEY is not set"; exit 1; fi
+          make sign VERSION="$DEV_VERSION"
+          go run github.com/Hustenreizjuengling/rcplug/cmd/rcplug-release verify dist
+      - name: Publish
+        working-directory: rcplug-plugins
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Development build of commit ${GITHUB_SHA::7}, for testing. Use a release for anything else; devices never update to this by themselves."
+          gh release delete dev --cleanup-tag --yes 2>/dev/null || true
+          gh release create dev --prerelease --target "$GITHUB_SHA" --title "Development build $DEV_VERSION" --notes "$notes" \
+            dist/*-aarch64.tar.gz dist/SHA256SUMS dist/release.json dist/release.json.sig

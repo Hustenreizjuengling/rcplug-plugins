@@ -1,0 +1,60 @@
+name: Security
+
+# Known vulnerabilities in the Go standard library and code the plugins use
+# (govulncheck), on every push and weekly. Both checks need rcplug's code
+# (a checkout next to this one) or CodeQL (free for public repositories
+# only), so they start once the repositories are public.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '35 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: Known vulnerabilities (govulncheck)
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: rcplug-plugins
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/rcplug
+          path: rcplug
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: go work init ./rcplug-plugins ./rcplug
+      - working-directory: rcplug-plugins
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [go, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: matrix.language == 'go'
+        with:
+          go-version: stable
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.language == 'go' && 'autobuild' || 'none' }}
+      - uses: github/codeql-action/analyze@v3

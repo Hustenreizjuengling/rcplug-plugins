@@ -24,6 +24,10 @@ First release as its own repository. Sonar was part of rcplug up to 0.4.0.
   silently keeping the previous channel.
 
 ### Added
+- Automation on GitHub: a development build (pre-release *dev*) on every push to
+  `main`, one-click releases (*Actions → Release → Run workflow*), `govulncheck` and
+  CodeQL, Dependabot for the GitHub Actions and the rcplug SDK, and `make docs-check`.
+  Everything that needs rcplug's code starts once rcplug is public.
 - Sonar updates from the dashboard: its plugin.json names this repository as its
   update source, and the release workflow signs every release (`release.json` +
   `release.json.sig`, checked by rcplugd before it offers or installs an update).

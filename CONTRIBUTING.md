@@ -23,7 +23,25 @@ problems privately, see [SECURITY.md](SECURITY.md).
 5. Describe user-visible changes in `CHANGELOG.md` under an "Unreleased" heading.
 
 A new plugin is a folder `<name>/` with its `plugin.json`, a `main` package and a
-`README.md`; the Makefile picks it up.
+`README.md`; the Makefile picks it up. Raise the `version` in a plugin's `plugin.json`
+with its changes: devices offer an update when it is newer than the installed one.
+
+## Releases and automation
+
+- **CI** runs `make check` (including the doc links), the arm64 tests and the minimum
+  Go version against rcplug's main branch; **Security** runs `govulncheck` on every
+  push and weekly, and CodeQL. Both need rcplug's code, so they start once rcplug is
+  public; until then only the documentation job runs.
+- **Development build:** every push to `main` publishes the pre-release *dev* with
+  one package per plugin (`<version>-dev.<run>`), signed like a release. Devices never
+  update to it by themselves.
+- **Release:** *Actions → Release → Run workflow* (or `gh workflow run release.yml
+  -f version=X.Y.Z`) dates the newest "Unreleased" section of `CHANGELOG.md`, sets
+  `VERSION`, tags, builds against the rcplug version `go.mod` names, signs with the
+  repository secret `RCPLUG_SIGNING_KEY`, publishes, and starts the next version's
+  section. Pushing a tag `v<version>` does the same without the changelog steps.
+  Releases need `go.sum`: run `GOWORK=off go mod tidy` once rcplug is released.
+- **Dependabot** proposes new versions of the GitHub Actions and of the rcplug SDK.
 
 ## Licence
 

@@ -18,14 +18,14 @@ RCPLUG ?= ../rcplug
 RELEASE_TOOL ?= $(GO) run github.com/Hustenreizjuengling/rcplug/cmd/rcplug-release
 
 .PHONY: help all check fmt fmt-check vet test test-race test-arm64 build build-arm64 build-host \
-        package sign run-local clean
+        package sign run-local clean docs-check
 
 help: ## show this help
 	@grep -hE '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
 
 all: check package ## run all checks and build the plugin packages
 
-check: fmt-check vet test-race ## everything CI runs (except arm64)
+check: fmt-check vet test-race docs-check ## everything CI runs (except arm64)
 
 fmt: ## format the Go code
 	gofmt -w .
@@ -35,6 +35,9 @@ fmt-check: ## fail if Go code is not formatted
 
 vet: ## go vet
 	$(GO) vet ./...
+
+docs-check: ## every relative link and #anchor in the Markdown files resolves
+	$(GO) run ./tools/doclinks
 
 test: ## unit tests
 	$(GO) test ./...

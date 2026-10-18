@@ -1,0 +1,16 @@
+# Pull requests for new versions of the GitHub Actions the workflows use, and
+# of the rcplug SDK (the only Go dependency) once rcplug has releases.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "CI:"
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "Go:"

@@ -1,22 +1,81 @@
 name: Release
 
+# A release is published in one of two ways:
+#
+# - Push a tag v<version> that matches VERSION.
+# - Or click: Actions → Release → Run workflow (or `gh workflow run release.yml
+#   -f version=X.Y.Z`). That dates the newest "Unreleased" section of
+#   CHANGELOG.md as the version, sets VERSION, commits and tags; the same run
+#   then builds, signs and publishes, and finally starts the next patch
+#   version's "Unreleased" section. (A tag pushed by a workflow does not start
+#   other workflows, which is why one run does all of it.) Raise the version
+#   in a plugin's plugin.json with its changes: devices offer an update when
+#   that version is newer than the installed one.
+#
+# Releases are built against the rcplug version go.mod names, so rcplug must
+# be public and released, and go.sum present (GOWORK=off go mod tidy). Every
+# release is signed with the repository secret RCPLUG_SIGNING_KEY and checked
+# against the keys built into rcplugd.
+
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, X.Y.Z (empty: the one in VERSION)'
+        required: false
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  release:
+  prepare:
+    name: Date the changelog, set the version, tag
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+      - id: tag
+        env:
+          WANT: ${{ inputs.version }}
+        run: |
+          if [ ! -f go.sum ]; then echo "::error::go.sum is missing: run 'GOWORK=off go mod tidy' once rcplug is public and released"; exit 1; fi
+          v="${WANT:-$(cat VERSION)}"
+          tools/release-version.sh prepare "$v"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -qam "Release $v"
+          git tag "v$v"
+          git push origin HEAD:main "v$v"
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: Build, sign and publish
+    needs: prepare
+    if: ${{ always() && (needs.prepare.result == 'success' || needs.prepare.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.prepare.outputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
-      - name: Tag must match VERSION
-        run: test "v$(cat VERSION)" = "${GITHUB_REF_NAME}"
+          go-version: stable
+      - name: Tag must match VERSION; go.sum must be there
+        run: |
+          test "v$(cat VERSION)" = "$TAG"
+          if [ ! -f go.sum ]; then echo "::error::go.sum is missing: run 'GOWORK=off go mod tidy' once rcplug is public and released"; exit 1; fi
       - run: make test package
       # release.json lists every package with its SHA-256; rcplugd checks the
       # signature over it before it offers or installs a plugin update. The
@@ -33,5 +92,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           notes="$(awk -v v="$(cat VERSION)" '$0 ~ "^## \\[?"v"\\]?" {p=1; next} /^## / && p {exit} p' CHANGELOG.md)"
-          gh release create "$GITHUB_REF_NAME" --title "rcplug-plugins $GITHUB_REF_NAME" --notes "$notes" \
+          gh release create "$TAG" --verify-tag --title "rcplug-plugins $TAG" --notes "$notes" \
             dist/*-aarch64.tar.gz dist/SHA256SUMS dist/release.json dist/release.json.sig
+
+  next:
+    name: Start the next version
+    needs: release
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - run: |
+          tools/release-version.sh next
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -qam "Start $(cat VERSION)"
+          git push origin HEAD:main
