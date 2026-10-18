@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.1 - Unreleased
+## 0.5.1 - 2026-10-18
 
 ### Changed
 - Sonar hears the desk through rcplug's **shared audio taps** (rcplug 0.6.11 and
