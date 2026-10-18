@@ -6,6 +6,20 @@ may break compatibility).
 
 ## 0.5.7 - Unreleased
 
+### Changed
+- **Sonar 0.6.3**, simpler and smoother:
+  - **One list** chooses what Sonar hears, by name (Mic 1 + Mic 2, USB 1 from the
+    computer, chat, calls, RØDE wireless, the mix to the computer, the mixer's
+    outputs, the test signal), grouped into inputs, outputs and other audio. Choosing
+    switches at once, without assigning sources to channels and without a question.
+    Opened from a channel of the console, Sonar listens to where it comes in right
+    away (for a single microphone, the pair it belongs to).
+  - The radar's **sweep line is gone**; the dot glides between readings instead of
+    jumping, and the numbers change five times a second.
+  - If the host's audio taps are switched off, Sonar says so with a link to switch
+    them on.
+  - The loopback of rcplug's own audio bridge is no longer offered as a source.
+
 ## 0.5.6 - 2026-10-18
 
 ### Changed
