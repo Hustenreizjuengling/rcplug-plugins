@@ -27,7 +27,9 @@ import (
 	"github.com/Hustenreizjuengling/rcplug/sdk"
 )
 
-var version = "dev"
+// version is Sonar's own (its plugin.json), release the rcplug-plugins
+// release it came with; both are set at build time.
+var version, release = "dev", ""
 
 //go:embed web
 var webFS embed.FS
@@ -84,7 +86,7 @@ func main() {
 	mux.HandleFunc("GET /api/config", h.handleConfig)
 	mux.HandleFunc("POST /api/config", h.handleConfig)
 
-	log.Printf("sonar %s on %s, source=%s rate=%d", version, *addr, h.srcSpec, *rate)
+	log.Printf("sonar %s (rcplug-plugins %s) on %s, source=%s rate=%d", version, release, *addr, h.srcSpec, *rate)
 	if err := sdk.Serve(ctx, *addr, mux); err != nil {
 		log.Fatal(err)
 	}
@@ -541,7 +543,7 @@ func (h *hub) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 		channels[k] = v
 	}
 	doc := map[string]interface{}{
-		"version": version, "source": h.srcSpec, "sourceName": h.srcName, "sourceError": h.srcErr,
+		"version": version, "release": release, "source": h.srcSpec, "sourceName": h.srcName, "sourceError": h.srcErr,
 		"channel": h.channel, "channels": channels, "lastEstimate": h.last, "lastPublished": h.lastPub,
 		"config": h.cfg, "rate": h.rate, "block": h.block, "streams": len(h.subs),
 	}

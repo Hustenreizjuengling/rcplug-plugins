@@ -7,8 +7,10 @@ VERSION  := $(shell cat VERSION)
 DIST     := dist
 HOSTARCH := $(shell $(GO) env GOARCH)
 HOSTOS   := $(shell $(GO) env GOOS)
-LDFLAGS  := -s -w -X main.version=$(VERSION)
-GOBUILD   = CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) $(GO) build -trimpath -ldflags "$(LDFLAGS)"
+# A plugin's binary reports its own version (from its plugin.json) and the
+# release of this repository it came with.
+LDFLAGS  := -s -w -X main.release=$(VERSION)
+GOBUILD   = CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) $(GO) build -trimpath
 
 PLUGINS  := $(notdir $(patsubst %/,%,$(dir $(wildcard */plugin.json))))
 
@@ -62,7 +64,8 @@ build-host:
 .PHONY: bin
 bin:
 	@for p in $(PLUGINS); do echo "  $(OS)/$(ARCH) $$p"; mkdir -p $(DIST)/$(OS)-$(ARCH)/$$p; \
-	  $(GOBUILD) -o $(DIST)/$(OS)-$(ARCH)/$$p/$$p ./$$p || exit 1; \
+	  v="$$(sed -n 's/^  "version": "\([^"]*\)",$$/\1/p' $$p/plugin.json)"; \
+	  $(GOBUILD) -ldflags "$(LDFLAGS) -X main.version=$$v" -o $(DIST)/$(OS)-$(ARCH)/$$p/$$p ./$$p || exit 1; \
 	  cp $$p/plugin.json $(DIST)/$(OS)-$(ARCH)/$$p/; done
 
 package: build-arm64 ## one tarball per plugin in dist/ (<name>-<version>-aarch64.tar.gz) and SHA256SUMS

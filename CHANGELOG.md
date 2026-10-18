@@ -6,6 +6,14 @@ may break compatibility).
 
 ## 0.5.6 - Unreleased
 
+### Changed
+- **Sonar 0.6.2:** proposes the right JACK pair for USB 1, USB 2, the chat and the
+  calls too, as a real Duo (firmware 1.7.6) wires them, besides the microphone inputs;
+  the README lists the desk's JACK ports. The bridge through the host's taps was
+  measured on a Duo: about 1 % of the device with rcplug 0.7.4.
+- A plugin's binary reports its own version (from its `plugin.json`) and the release of
+  this repository it came with; before, it reported only the latter.
+
 ## 0.5.5 - 2026-10-18
 
 ### Fixed

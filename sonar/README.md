@@ -55,11 +55,25 @@ connections; the module stays loaded until the next reboot.
 short periods (112 frames at 48 kHz): if the device is short of CPU, the whole desk
 could click or drop out. The web UI lists the stereo pairs JACK offers (consecutive
 ports of one client: `system:capture_1` + `_2`, `JUCEJack:out_1` + `_2`, …) and asks
-before using one. It has been tested against the firmware's own JACK tools and with
-JACK2 and a real ALSA loopback, but **not yet on a real Duo**. Which port carries
-which input of the desk is not known yet; the diagnostics bundle lists the JACK
-ports and their connections (`jack_lsp -c -p`) to find out. If anything sounds
-wrong, switch Sonar back to `test`.
+before using one. On a real Duo (firmware 1.7.6) it works through the host's taps:
+with rcplug 0.7.4 the bridge costs about 1 % of the device (before, with 8 channels,
+13 %). If anything sounds wrong, switch Sonar back to `test`.
+
+How a Duo with firmware 1.7.6 wires the desk's inputs in JACK (the diagnostics bundle
+lists the ports and connections, `jack_lsp -c -p`, while Sonar runs):
+
+| Channel of the desk | JACK ports |
+|---|---|
+| Microphone inputs 1–4 | `system:capture_1` … `_4` (each mono) |
+| USB 1 from the computer | `usb1in:capture_1`, `_2` (stereo) |
+| USB 2 | `usb2in:capture_1`, `_2` |
+| Chat | `usb1-chat-in:capture_1`, `_2` |
+| Calls 1–3 | `sip-audio-in:capture_1` … `_6` (two per call) |
+| RØDE wireless | `RodeRfSPI:TX1`, `TX2` |
+| The mixer's outputs | `JUCEJack:out_1` … `_46` (1–8 go to the headphones and speakers, 15–16 to the computer over USB 1) |
+
+Sonar proposes these pairs when a channel is opened from the console. A stereo source
+such as a game's audio over USB 1 is the classic case for the radar.
 
 ### Channels of the desk
 

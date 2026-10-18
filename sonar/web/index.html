@@ -331,13 +331,24 @@ function sourceItems(current) {
 }
 // Mono channels of the desk: one microphone has no direction.
 const MONO = /^(combo[1-4]|callme[1-3])$/;
-// suggestFor proposes the JACK pair a microphone channel probably comes in
-// on (inputs 1+2 or 3+4 of the device), if JACK offers it.
+// The JACK ports a channel of the desk comes in on, as a Duo with firmware
+// 1.7.6 wires them (its inputs are system:capture_1..4; the computer's USB
+// audio, the chat and the calls are JACK clients of their own).
+const DESK_PORTS = {
+  usb1: 'usb1in:capture_1,usb1in:capture_2', usb2: 'usb2in:capture_1,usb2in:capture_2',
+  chat: 'usb1-chat-in:capture_1,usb1-chat-in:capture_2',
+  callme1: 'sip-audio-in:capture_1,sip-audio-in:capture_2', callme2: 'sip-audio-in:capture_3,sip-audio-in:capture_4',
+  callme3: 'sip-audio-in:capture_5,sip-audio-in:capture_6',
+};
+// suggestFor proposes the JACK pair a channel comes in on (for a microphone:
+// inputs 1+2 or 3+4 of the device), if JACK offers it.
 function suggestFor(ch) {
+  let pair = DESK_PORTS[ch] ? 'jack:' + DESK_PORTS[ch] : '';
   const m = /^combo(\d)(?:_\d)?$/.exec(ch || '');
-  if (!m) return '';
-  const first = Number(m[1]) % 2 ? Number(m[1]) : Number(m[1]) - 1;
-  const pair = `jack:system:capture_${first},system:capture_${first + 1}`;
+  if (m) {
+    const first = Number(m[1]) % 2 ? Number(m[1]) : Number(m[1]) - 1;
+    pair = `jack:system:capture_${first},system:capture_${first + 1}`;
+  }
   return srcList.includes(pair) ? pair : '';
 }
 let reassigning = false;

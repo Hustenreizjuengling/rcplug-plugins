@@ -3,7 +3,7 @@
   "name": "sonar",
   "title": "Sonar",
   "description": "Direction finder for a channel's stereo signal: shows where a sound comes from, estimated from level and phase, as a live radar.",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "exec": [
     "./sonar",
     "--addr",
