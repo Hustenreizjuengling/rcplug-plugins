@@ -33,8 +33,14 @@ On the Duo the whole desk is a JACK graph (JACK2 1.9.20, firmware 1.7.x):
 output of the desk. So `arecord` cannot open the hardware there, and the ALSA
 entries the UI lists on the Duo (`default`, `pulse`, …) carry no desk audio.
 
-A `jack:` source therefore bridges two JACK ports into Sonar, with tools the
-firmware ships and nothing installed:
+With **rcplug 0.6.11 or later**, a `jack:` source hears the two ports through the
+host's **shared audio taps**: one bridge for every plugin, switched on once in the
+dashboard (System → *Audio taps*), which shows what runs and whether audio drops out
+([rcplug's plugin API](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-api.md#audio)).
+While the taps are switched off, Sonar says so instead of starting a bridge of its own.
+
+On an **older host** without the taps, a `jack:` source bridges the two JACK ports into
+Sonar itself, with tools the firmware ships and nothing installed:
 
 1. it loads `snd-aloop` as ALSA card `RcplugLoop` (index 7, two substreams), unless
    a loopback card is there already, and picks a substream no other program holds;

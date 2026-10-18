@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Hustenreizjuengling/rcplug/sdk"
 )
 
 // JACK capture, opt-in. On the RØDECaster Duo the whole desk is a JACK graph
@@ -30,6 +32,10 @@ import (
 // Stopping the source ends alsa_out, which removes its connections. The
 // module stays loaded. This adds a client to RØDE's audio graph, so the UI
 // asks before choosing a jack source; it is never the default.
+//
+// Since rcplug 0.6.11 the host runs one such bridge for every plugin (the
+// shared audio taps), and Sonar uses it: one switch in the dashboard, one
+// client in RØDE's graph. Sonar's own bridge remains for older hosts.
 
 const (
 	jackClient = "rcplug-sonar"
@@ -145,9 +151,16 @@ func loopbackCard(cards string) string {
 	return other
 }
 
-// listJackPairs returns the stereo pairs JACK offers now, or nil when JACK is
-// not running or its tools are missing (any computer but the device).
+// listJackPairs returns the stereo pairs JACK offers now (through the host's
+// audio taps when it has them), or nil when JACK is not running or its tools
+// are missing (any computer but the device).
 func listJackPairs(ctx context.Context) []string {
+	if on, ports, err := audioPorts(ctx); err == nil {
+		if !on {
+			return nil
+		}
+		return jackPairs(ports)
+	}
 	ports, err := jackOutputs(ctx)
 	if err != nil {
 		return nil
@@ -207,12 +220,42 @@ func loopSubstream(read func(string) ([]byte, error), card string) (int, error) 
 	return 0, fmt.Errorf("every substream of the loopback card %s is in use (another sound server may hold it)", card)
 }
 
-// newJackSource bridges two JACK ports into Sonar (see the top of this file).
+// errTapsOff: the host has the shared audio taps, switched off.
+var errTapsOff = errors.New("switch on the audio taps in the dashboard (System → Audio taps): Sonar hears the desk through them")
+
+// audioPorts is sdk.AudioPorts (tests replace it).
+var audioPorts = sdk.AudioPorts
+
+// audioTap is sdk.AudioTap (tests replace it).
+var audioTap = sdk.AudioTap
+
+// newJackSource brings two JACK ports into Sonar: through the host's shared
+// audio taps, or with Sonar's own bridge on a host without them (see the top
+// of this file).
 func newJackSource(ctx context.Context, spec string, rate int) (source, error) {
 	left, right, err := parseJackSpec(spec)
 	if err != nil {
 		return nil, err
 	}
+	if on, _, err := audioPorts(ctx); err == nil {
+		if !on {
+			return nil, errTapsOff
+		}
+		if rate != 48000 {
+			return nil, fmt.Errorf("the audio taps run at 48 kHz; Sonar runs at %d Hz (--rate)", rate)
+		}
+		r, err := audioTap(ctx, left, right)
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("jack source: %s + %s through the host's audio taps", left, right)
+		return &readCloser{Reader: r, name: "jack:" + left + " + " + right + " (audio taps)", closer: r.Close}, nil
+	}
+	return newOwnJackSource(ctx, left, right, rate)
+}
+
+// newOwnJackSource is Sonar's own bridge, for hosts without audio taps.
+func newOwnJackSource(ctx context.Context, left, right string, rate int) (source, error) {
 	for _, tool := range []string{"jack_lsp", "jack_connect", "alsa_out", "arecord", "modprobe"} {
 		if _, err := exec.LookPath(tool); err != nil {
 			return nil, fmt.Errorf("the JACK source needs %s, which is not installed here", tool)

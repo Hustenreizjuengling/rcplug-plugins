@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -100,5 +103,46 @@ func TestLoopSubstream(t *testing.T) {
 	files["/proc/asound/RcplugLoop/pcm1c/sub1/status"] = "state: PREPARED\n"
 	if _, err := loopSubstream(read, "RcplugLoop"); err == nil || !strings.Contains(err.Error(), "in use") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// Without a host the tests never reach one: the audio taps are absent.
+func TestMain(m *testing.M) {
+	audioPorts = func(context.Context) (bool, []string, error) { return false, nil, errors.New("no host in tests") }
+	os.Exit(m.Run())
+}
+
+func TestJackSourceUsesTheHostsAudioTaps(t *testing.T) {
+	oldPorts, oldTap := audioPorts, audioTap
+	t.Cleanup(func() { audioPorts, audioTap = oldPorts, oldTap })
+	ports := []string{"system:capture_1", "system:capture_2", "JUCEJack:out_1", "JUCEJack:out_2"}
+	on := false
+	audioPorts = func(context.Context) (bool, []string, error) { return on, ports, nil }
+	var asked []string
+	audioTap = func(ctx context.Context, p ...string) (io.ReadCloser, error) {
+		asked = p
+		return io.NopCloser(strings.NewReader("\x01\x00\x02\x00")), nil
+	}
+	ctx := context.Background()
+	if _, err := newJackSource(ctx, "system:capture_1,system:capture_2", 48000); err != errTapsOff {
+		t.Fatalf("taps switched off: %v", err)
+	}
+	if got := listJackPairs(ctx); got != nil {
+		t.Fatalf("pairs while the taps are off: %v", got)
+	}
+	on = true
+	if got := listJackPairs(ctx); len(got) != 2 {
+		t.Fatalf("pairs %v", got)
+	}
+	if _, err := newJackSource(ctx, "system:capture_1,system:capture_2", 44100); err == nil {
+		t.Fatal("another rate than the taps' was accepted")
+	}
+	src, err := newJackSource(ctx, "JUCEJack:out_1,JUCEJack:out_2", 48000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer src.Close()
+	if strings.Join(asked, ",") != "JUCEJack:out_1,JUCEJack:out_2" || !strings.Contains(src.describe(), "audio taps") {
+		t.Fatalf("asked %v, %s", asked, src.describe())
 	}
 }

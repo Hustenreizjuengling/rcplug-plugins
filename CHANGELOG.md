@@ -6,6 +6,13 @@ may break compatibility).
 
 ## 0.5.1 - Unreleased
 
+### Changed
+- Sonar hears the desk through rcplug's **shared audio taps** (rcplug 0.6.11 and
+  later): one bridge for every plugin, switched on in the dashboard (System → *Audio
+  taps*). While they are off, Sonar asks for them instead of starting its own client in
+  RØDE's audio graph; on older hosts it still bridges JACK itself.
+- Requires the rcplug module 0.6.11 (`go.mod`).
+
 ## 0.5.0 - 2026-10-18
 
 First release as its own repository. Sonar was part of rcplug up to 0.4.0.
