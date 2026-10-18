@@ -1,5 +1,5 @@
 {
-  "$schema": "../../plugin.schema.json",
+  "$schema": "https://raw.githubusercontent.com/Hustenreizjuengling/rcplug/main/plugin.schema.json",
   "name": "sonar",
   "title": "Sonar",
   "description": "Direction finder for a channel's stereo signal: shows where a sound comes from, estimated from level and phase, as a live radar.",
@@ -16,6 +16,9 @@
   "needsAudio": true,
   "order": 50,
   "icon": "◉",
+  "update": {
+    "github": "Hustenreizjuengling/rcplug-plugins"
+  },
   "translations": {
     "de": {
       "description": "Richtungsanzeige für das Stereosignal eines Kanals: zeigt aus Pegel und Phase, woher ein Geräusch kommt, als Live-Radar."

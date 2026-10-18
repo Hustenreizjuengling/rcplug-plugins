@@ -14,6 +14,17 @@ Deutsch: [README.de.md](README.de.md)
 > own tools under emulation and natively; not yet on a real device. rcplug is not
 > affiliated with or endorsed by RØDE.
 
+## ⚠ Disclaimer: use at your own risk
+
+rcplug, its plugins and its tools are **unofficial, experimental software**, provided
+"as is" **without any warranty** (see the [MIT license](LICENSE)). Getting SSH onto
+the RØDECaster means flashing a modified firmware. Flashing, installing software on the
+device and changing its settings **can make the device unusable ("brick" it)**, lose
+settings or recordings and **void your warranty**. RØDE does not support devices
+changed this way. Whatever you do with this project, you do **on your own
+responsibility**: the authors accept no liability for damage to your device, your
+data or your productions. Do not use it during a show that must not fail.
+
 ## Install a plugin
 
 Every [release](../../releases) has one tarball per plugin,
@@ -26,7 +37,10 @@ mkdir sonar && tar -xzf sonar-0.5.0-aarch64.tar.gz -C sonar
 ```
 
 The plugin appears on rcplug's dashboard (`http://<device-ip>:8080/`). Installing it
-again updates it and keeps its settings.
+again updates it and keeps its settings. Plugins from this repository also update
+from the dashboard (**System → Updates**, or the **Update** button on the plugin's
+card) once a newer signed release is out; see
+[rcplug's docs/updates.md](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/updates.md).
 
 ## Build and try
 

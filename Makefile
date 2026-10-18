@@ -14,9 +14,11 @@ PLUGINS  := $(notdir $(patsubst %/,%,$(dir $(wildcard */plugin.json))))
 
 # The rcplug platform repository, for run-local.
 RCPLUG ?= ../rcplug
+# Signs releases; the version go.mod pins (in a go.work: the local clone).
+RELEASE_TOOL ?= $(GO) run github.com/Hustenreizjuengling/rcplug/cmd/rcplug-release
 
 .PHONY: help all check fmt fmt-check vet test test-race test-arm64 build build-arm64 build-host \
-        package run-local clean
+        package sign run-local clean
 
 help: ## show this help
 	@grep -hE '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
@@ -64,6 +66,10 @@ package: build-arm64 ## one tarball per plugin in dist/ (<name>-<version>-aarch6
 	  tar --owner=0 --group=0 -C "$$tmp/$$p" -czf $(DIST)/$$p-$(VERSION)-aarch64.tar.gz .; done; \
 	cd $(DIST) && sha256sum $(foreach p,$(PLUGINS),$(p)-$(VERSION)-aarch64.tar.gz) > SHA256SUMS
 	@echo "packaged: $(foreach p,$(PLUGINS),$(DIST)/$(p)-$(VERSION)-aarch64.tar.gz) (+ SHA256SUMS)"
+
+sign: ## sign the packages in dist/ (release.json + .sig, checked by rcplugd before updates); key from $$RCPLUG_SIGNING_KEY
+	$(RELEASE_TOOL) sign --project rcplug-plugins --version $(VERSION) --out $(DIST) \
+	  $(foreach p,$(PLUGINS),$(DIST)/$(p)-$(VERSION)-aarch64.tar.gz)
 
 run-local: build-host ## run the rcplug host (from $(RCPLUG)) with these plugins against the simulator
 	$(MAKE) -C $(RCPLUG) run-local EXTRA_PLUGINS="$(foreach p,$(PLUGINS),$(abspath $(DIST)/$(HOSTOS)-$(HOSTARCH)/$(p)))"

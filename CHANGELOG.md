@@ -9,6 +9,9 @@ may break compatibility).
 First release as its own repository. Sonar was part of rcplug up to 0.4.0.
 
 ### Added
+- Sonar updates from the dashboard: its plugin.json names this repository as its
+  update source, and the release workflow signs every release (`release.json` +
+  `release.json.sig`, checked by rcplugd before it offers or installs an update).
 - Sonar lists the console's channels and remembers which audio source carries each.
 - Sonar can listen to the desk on the Duo, opt-in: a `jack:<port>,<port>` source.
   The firmware runs the whole desk as a JACK graph, and `jackd` holds the card's only

@@ -14,6 +14,19 @@ English: [README.md](README.md)
 > Werkzeugen der Firmware unter Emulation und nativ; noch nicht an einem echten Gerät.
 > rcplug hat nichts mit RØDE zu tun und wird von RØDE nicht unterstützt.
 
+## ⚠ Haftungsausschluss: Nutzung auf eigene Gefahr
+
+rcplug, seine Plugins und Werkzeuge sind **inoffizielle, experimentelle Software** und
+werden „wie besehen“ **ohne jede Gewährleistung** bereitgestellt (siehe
+[MIT-Lizenz](LICENSE)). Für den SSH-Zugang wird eine veränderte Firmware auf den
+RØDECaster geflasht. Das Flashen, das Installieren von Software auf dem Gerät und das
+Ändern seiner Einstellungen **kann das Gerät unbrauchbar machen („bricken“)**,
+Einstellungen oder Aufnahmen löschen und **die Garantie erlöschen lassen**. RØDE
+unterstützt so veränderte Geräte nicht. Alles, was du mit diesem Projekt machst,
+geschieht **in deiner eigenen Verantwortung**: Die Autoren haften nicht für Schäden an
+deinem Gerät, deinen Daten oder deinen Produktionen. Nicht während einer Sendung
+einsetzen, die nicht ausfallen darf.
+
 ## Ein Plugin installieren
 
 Jedes [Release](../../releases) enthält pro Plugin ein Paket
@@ -27,7 +40,12 @@ mkdir sonar && tar -xzf sonar-0.5.0-aarch64.tar.gz -C sonar
 ```
 
 Das Plugin erscheint dann in rcplugs Dashboard (`http://<geräte-ip>:8080/`). Erneut
-installieren aktualisiert es und behält seine Einstellungen.
+installieren aktualisiert es und behält seine Einstellungen. Plugins aus diesem
+Repository lassen sich außerdem direkt im Dashboard aktualisieren (**System → Updates**
+oder der Knopf **Aktualisieren** auf der Karte des Plugins), sobald ein neueres
+signiertes Release erschienen ist; siehe
+[docs/updates.md von rcplug](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/updates.md)
+(Englisch).
 
 ## Bauen und ausprobieren
 
