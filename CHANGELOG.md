@@ -6,6 +6,19 @@ may break compatibility).
 
 ## 0.5.8 - Unreleased
 
+### Added
+- **Backup 0.1.0**, a new plugin: backs up rcplug's settings (plugins switched on,
+  their options, updates, catalogs, the console's control level and write protection)
+  and the desk's settings (a few thousand: channels and their processing,
+  routing, inputs, SMART pads, effects, outputs, the device's own settings), keeps up
+  to 50 backups on the device, and downloads and uploads them as files. **Restore…**
+  first shows what would change, with readable names, and restores only after
+  confirmation: the desk through the console's checks (switching to the expert level
+  for it and back, asking for the PIN if one is set), then rcplug's settings, with a
+  button to install plugins the device lacks from the catalog. Never in a backup:
+  passwords and the PIN, recordings, shows, network settings and the volume of
+  headphones and monitors. Needs rcplug 0.8.5.
+
 ## 0.5.7 - 2026-10-18
 
 ### Changed

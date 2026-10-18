@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backup · rcplug</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect x=%222%22 y=%222%22 width=%2212%22 height=%2212%22 rx=%222%22 fill=%22none%22 stroke=%22%2319c37d%22 stroke-width=%222%22/%3E%3Crect x=%225%22 y=%222%22 width=%226%22 height=%224%22 fill=%22%2319c37d%22/%3E%3C/svg%3E">
+<style>
+  /* Same palette and components as the console, so the plugins look like one app. */
+  :root{
+    --bg:#0d1015; --panel:#151a21; --panel2:#1c232c; --panel3:#232c37; --line:#2a333f;
+    --fg:#e7edf3; --muted:#9aa8b6; --dim:#7d8a97; --accent:#19c37d; --accent-ink:#04261a;
+    --amber:#e3a008; --red:#f85149; --radius:12px; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  button,input,select{font:inherit;color:inherit}
+  .top{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .logo{font-size:20px;color:var(--accent)}
+  .dev{font-weight:650;font-size:16px}
+  .sub{color:var(--muted);font-size:12px}
+  .spacer{flex:1}
+  main{padding:16px;max-width:980px;margin:0 auto;display:grid;gap:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;min-width:0}
+  .card h3{margin:0 0 10px;font-size:14px;font-weight:650;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .card h4{margin:14px 0 6px;font-size:13px;font-weight:650}
+  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .grow{flex:1 1 220px;min-width:0}
+  input[type=text],input[type=password]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+  .check{display:flex;gap:8px;align-items:flex-start;margin:6px 0;cursor:pointer}
+  .check input{margin-top:3px;accent-color:var(--accent)}
+  .check small{display:block;color:var(--muted);font-size:12px}
+  .btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;text-decoration:none;display:inline-block;color:var(--fg)}
+  .btn:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+  .btn:hover{border-color:var(--accent)}
+  .btn:disabled{opacity:.5;cursor:default;border-color:var(--line)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+  .btn.danger:hover{border-color:var(--red);color:#ffb3ae}
+  .muted{color:var(--muted)} .small{font-size:12px} .mono{font-family:var(--mono);font-size:12px}
+  .banner{border:1px solid var(--amber);background:#2a2110;color:#ffe2a3;border-radius:10px;padding:8px 12px;font-size:13px;margin:8px 0}
+  .banner.bad{border-color:var(--red);background:#2a1414;color:#ffb3ae}
+  .banner.ok{border-color:var(--accent);background:#0f241a;color:#b6f0d3}
+  .tag{font-size:11px;padding:1px 8px;border-radius:20px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .tag.on{border-color:var(--accent);color:var(--accent)}
+  .list{display:grid;gap:8px}
+  .item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .item .name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item .meta{color:var(--muted);font-size:12px}
+  .item .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;grid-row:1/3;grid-column:2}
+  .item.sel{border-color:var(--accent)}
+  ul.changes{margin:4px 0;padding-left:18px}
+  ul.changes li{margin:2px 0}
+  ul.changes .mono{color:var(--muted)}
+  details{margin:6px 0}
+  summary{cursor:pointer;color:var(--muted);font-size:13px}
+  .groups{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+  [hidden]{display:none !important}
+  body.embedded .top{padding:6px 14px;background:var(--panel2)}
+  body.embedded #lang{display:none}
+  @media (max-width:640px){ main{padding:10px} .item{grid-template-columns:1fr} .item .acts{grid-row:auto;grid-column:auto;justify-content:flex-start} }
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="logo" aria-hidden="true">↺</span>
+  <div><div class="dev" data-t="title"></div><div class="sub" data-t="subline"></div></div>
+  <span class="spacer"></span>
+  <button type="button" class="btn" id="lang"></button>
+</header>
+<main>
+  <div id="err" class="banner bad" role="alert" hidden></div>
+
+  <section class="card">
+    <h3 data-t="newTitle"></h3>
+    <div class="row"><div class="grow"><input type="text" id="name" maxlength="80" data-t-ph="namePh"></div></div>
+    <label class="check"><input type="checkbox" id="incRcplug" checked><span><span data-t="partRcplug"></span><small data-t="partRcplugHint"></small></span></label>
+    <label class="check"><input type="checkbox" id="incDesk" checked><span><span data-t="partDesk"></span><small data-t="partDeskHint"></small></span></label>
+    <div class="row"><button type="button" class="btn primary" id="create" data-t="create"></button><span class="small muted" id="createState" aria-live="polite"></span></div>
+    <p class="small muted" data-t="notIncluded"></p>
+  </section>
+
+  <section class="card" id="restore" hidden>
+    <h3><span id="rTitle"></span><span class="spacer"></span><button type="button" class="btn" id="rClose" data-t="close"></button></h3>
+    <div id="rBody" aria-live="polite"></div>
+  </section>
+
+  <section class="card">
+    <h3><span data-t="listTitle"></span><span class="tag" id="count"></span></h3>
+    <div class="list" id="list"></div>
+    <h4 data-t="upload"></h4>
+    <div class="row"><label class="btn"><input type="file" id="file" accept=".json,application/json" style="position:absolute;opacity:0;width:1px;height:1px"><span data-t="chooseFile"></span></label><span class="small muted" data-t="uploadHint"></span></div>
+  </section>
+</main>
+<script>
+'use strict';
+const T = {
+  en: {
+    title: 'Backup', subline: "rcplug's and the desk's settings", switchLang: 'Deutsch',
+    newTitle: 'New backup', namePh: 'Name (optional), e.g. Before the show',
+    partRcplug: 'rcplug settings', partRcplugHint: 'Which plugins are installed and on, their options, updates, the console’s control level and write protection',
+    partDesk: 'Desk settings', partDeskHint: 'Channels and their processing, routing, inputs, SMART pads, effects, outputs and the device’s own settings',
+    create: 'Create backup', creating: 'Reading the settings…', created: 'Backup stored.',
+    notIncluded: 'Not included: the dashboard’s password, the console’s PIN, recordings, the pads’ sounds, RØDE shows, the plugins’ own data, and the volume of headphones and monitors (a restore never turns them up).',
+    listTitle: 'Backups on the device', empty: 'No backups yet.', count: '{n} of at most {max}',
+    restore: 'Restore…', download: 'Download', delete: 'Delete', confirmDelete: 'Delete the backup “{name}”?',
+    upload: 'Upload a backup file', chooseFile: 'Choose a file…', uploadHint: 'A file downloaded here, e.g. kept on a computer.',
+    unnamed: 'Backup', settingsN: '{n} settings', pluginsN: '{n} plugins', partR: 'rcplug', partD: 'Desk',
+    close: 'Close', rTitle: 'Restore “{name}”', rLoading: 'Comparing with the device…',
+    rRcplug: 'rcplug settings', rDesk: 'Desk settings', rNothing: 'Nothing to change.',
+    rDeskN: '{n} settings differ.', rDeskN1: '1 setting differs.', rDetails: 'Show the differences', rMore: '… and {n} more',
+    rMissing: 'Not installed now: {list}.', rMissingHint: 'Install them first, then their settings are restored too.',
+    rInstall: 'Install {name}', rInstalling: 'Installing {name}…', rNotInCatalog: '{name} is not in the catalog.',
+    rSkipped: 'Not restorable: {list}', rUse: 'Restore these', rMissingDesk: '{n} settings of the backup do not exist on the device and are skipped.',
+    rOtherModel: 'This backup is of a {a}, the device is a {b}: desk settings are only restored on the same model.',
+    rPassive: 'The console only reads along right now (full control is not possible at the moment), so it cannot restore the desk’s settings. Try again in a moment.',
+    rReadOnly: 'Write protection is on in the console: switch it off there to restore the desk’s settings.',
+    rLevel: 'The console’s control level is {level} now: for the restore it switches to Expert and back afterwards.',
+    rPin: 'Console PIN', rApply: 'Restore now', rWorking: 'Restoring…',
+    rDoneDesk: 'Desk: {w} settings written, {r} refused, {left} still different.',
+    rDoneDesk0: 'Desk: nothing was left to write.', rDoneDesk1: 'Desk: 1 setting written, {r} refused, {left} still different.',
+    rDoneRcplug: 'rcplug: {n} changes made.', rDoneRcplug1: 'rcplug: 1 change made.', rDoneConsole: 'Console settings restored.', rProblems: 'Problems: {list}',
+    rRestart: 'Plugins whose options changed restart now.',
+    on: 'on', off: 'off', dflt: 'default', switchOn: 'switch on', switchOff: 'switch off',
+    autoCheck: 'Daily search for updates', catAdd: 'Add the catalog {id}', catRemove: 'Remove the catalog {id}', catChange: 'Change the key of the catalog {id}',
+    level: 'Console · control level', readOnly: 'Console · write protection', expertTag: 'Expert',
+    lvl_off: 'Off', lvl_basic: 'Basic', lvl_expert: 'Expert',
+    needsNew: 'This needs rcplug 0.8.5 or newer: update rcplug under System.',
+    noConsole: 'The console plugin does not answer: desk settings are not available right now.',
+    pinWrong: 'The PIN is missing or wrong.',
+    fam_CHANNEL: 'Channel', fam_MIX: 'Routing', fam_INPUTSOURCE: 'Input', fam_FADER: 'Fader', fam_PAD: 'Pad',
+    fam_EFFECTS_PARAMETERS: 'Effects', 'fam_PADEFFECTS/EFFECTS_PARAMETERS': 'Pad effects', fam_OUTPUT: 'Outputs',
+    fam_SYSTEM: 'Device', fam_GUI: 'Screen', fam_THEME: 'Theme', fam_HEADPHONE: 'Headphones', fam_MASTERCHANNEL: 'Master',
+    fam_MIXMINUSES: 'Mix-minus', fam_DUCKER: 'Ducker', 'fam_RADIO/RADIOTX': 'Wireless', fam_RCSYNCMIX: 'Sync routing',
+    fam_RCSYNCMIXMINUES: 'Sync mix-minus', fam_STREAMERXSTREAMMIX: 'Streamer X',
+  },
+  de: {
+    title: 'Sicherung', subline: 'Einstellungen von rcplug und dem Pult', switchLang: 'English',
+    newTitle: 'Neue Sicherung', namePh: 'Name (optional), z. B. Vor der Sendung',
+    partRcplug: 'rcplug-Einstellungen', partRcplugHint: 'Welche Plugins installiert und an sind, ihre Optionen, Updates, Steuerstufe und Schreibschutz der Konsole',
+    partDesk: 'Pult-Einstellungen', partDeskHint: 'Kanäle und ihre Bearbeitung, Routing, Eingänge, SMART Pads, Effekte, Ausgänge und die Einstellungen des Geräts',
+    create: 'Sicherung erstellen', creating: 'Lese die Einstellungen…', created: 'Sicherung gespeichert.',
+    notIncluded: 'Nicht enthalten: das Passwort des Dashboards, die PIN der Konsole, Aufnahmen, die Sounds der Pads, RØDE-Shows, die Daten der Plugins und die Lautstärke von Kopfhörern und Monitoren (eine Wiederherstellung dreht sie nie auf).',
+    listTitle: 'Sicherungen auf dem Gerät', empty: 'Noch keine Sicherungen.', count: '{n} von höchstens {max}',
+    restore: 'Wiederherstellen…', download: 'Herunterladen', delete: 'Löschen', confirmDelete: 'Sicherung „{name}“ löschen?',
+    upload: 'Sicherungsdatei hochladen', chooseFile: 'Datei auswählen…', uploadHint: 'Eine hier heruntergeladene Datei, z. B. auf einem Rechner aufbewahrt.',
+    unnamed: 'Sicherung', settingsN: '{n} Einstellungen', pluginsN: '{n} Plugins', partR: 'rcplug', partD: 'Pult',
+    close: 'Schließen', rTitle: '„{name}“ wiederherstellen', rLoading: 'Vergleiche mit dem Gerät…',
+    rRcplug: 'rcplug-Einstellungen', rDesk: 'Pult-Einstellungen', rNothing: 'Nichts zu ändern.',
+    rDeskN: '{n} Einstellungen weichen ab.', rDeskN1: '1 Einstellung weicht ab.', rDetails: 'Unterschiede zeigen', rMore: '… und {n} weitere',
+    rMissing: 'Gerade nicht installiert: {list}.', rMissingHint: 'Zuerst installieren, dann werden auch ihre Einstellungen zurückgespielt.',
+    rInstall: '{name} installieren', rInstalling: '{name} wird installiert…', rNotInCatalog: '{name} ist nicht im Katalog.',
+    rSkipped: 'Nicht übernehmbar: {list}', rUse: 'Diese zurückspielen', rMissingDesk: '{n} Einstellungen der Sicherung gibt es auf dem Gerät nicht; sie werden übersprungen.',
+    rOtherModel: 'Diese Sicherung stammt von einem {a}, das Gerät ist ein {b}: Pult-Einstellungen gehen nur auf dasselbe Modell.',
+    rPassive: 'Die Konsole liest gerade nur mit (volle Steuerung ist im Moment nicht möglich) und kann die Pult-Einstellungen deshalb nicht zurückspielen. Gleich noch einmal versuchen.',
+    rReadOnly: 'Der Schreibschutz der Konsole ist an: dort ausschalten, um die Pult-Einstellungen zurückzuspielen.',
+    rLevel: 'Die Steuerstufe der Konsole ist gerade {level}: für die Wiederherstellung stellt sie kurz auf Experte und danach zurück.',
+    rPin: 'PIN der Konsole', rApply: 'Jetzt wiederherstellen', rWorking: 'Wird wiederhergestellt…',
+    rDoneDesk: 'Pult: {w} Einstellungen geschrieben, {r} abgelehnt, {left} weiterhin anders.',
+    rDoneDesk0: 'Pult: Es war nichts mehr zu schreiben.', rDoneDesk1: 'Pult: 1 Einstellung geschrieben, {r} abgelehnt, {left} weiterhin anders.',
+    rDoneRcplug: 'rcplug: {n} Änderungen übernommen.', rDoneRcplug1: 'rcplug: 1 Änderung übernommen.', rDoneConsole: 'Einstellungen der Konsole zurückgespielt.', rProblems: 'Probleme: {list}',
+    rRestart: 'Plugins mit geänderten Optionen starten jetzt neu.',
+    on: 'an', off: 'aus', dflt: 'Standard', switchOn: 'einschalten', switchOff: 'ausschalten',
+    autoCheck: 'Tägliche Suche nach Updates', catAdd: 'Katalog {id} hinzufügen', catRemove: 'Katalog {id} entfernen', catChange: 'Schlüssel des Katalogs {id} ändern',
+    level: 'Konsole · Steuerstufe', readOnly: 'Konsole · Schreibschutz', expertTag: 'Experte',
+    lvl_off: 'Aus', lvl_basic: 'Basis', lvl_expert: 'Experte',
+    needsNew: 'Dafür braucht es rcplug 0.8.5 oder neuer: rcplug unter System aktualisieren.',
+    noConsole: 'Das Konsolen-Plugin antwortet nicht: Pult-Einstellungen sind gerade nicht verfügbar.',
+    pinWrong: 'Die PIN fehlt oder ist falsch.',
+    fam_CHANNEL: 'Kanal', fam_MIX: 'Routing', fam_INPUTSOURCE: 'Eingang', fam_FADER: 'Fader', fam_PAD: 'Pad',
+    fam_EFFECTS_PARAMETERS: 'Effekte', 'fam_PADEFFECTS/EFFECTS_PARAMETERS': 'Pad-Effekte', fam_OUTPUT: 'Ausgänge',
+    fam_SYSTEM: 'Gerät', fam_GUI: 'Bildschirm', fam_THEME: 'Design', fam_HEADPHONE: 'Kopfhörer', fam_MASTERCHANNEL: 'Master',
+    fam_MIXMINUSES: 'Mix-Minus', fam_DUCKER: 'Ducker', 'fam_RADIO/RADIOTX': 'Funk', fam_RCSYNCMIX: 'Sync-Routing',
+    fam_RCSYNCMIXMINUES: 'Sync-Mix-Minus', fam_STREAMERXSTREAMMIX: 'Streamer X',
+    words: { Headphones: 'Kopfhörer', Speakers: 'Lautsprecher', Recording: 'Aufnahme', Virtual: 'Virtuell', Call: 'Anruf',
+      Music: 'Musik', Game: 'Spiel', Mic: 'Mikro' },
+  },
+};
+let lang = 'en';
+try { lang = localStorage.getItem('rcplug-lang') || ((navigator.language || '').toLowerCase().startsWith('de') ? 'de' : 'en'); } catch (e) { /* ignore */ }
+if (!T[lang]) lang = 'en';
+document.documentElement.lang = lang;
+const t = (k, p) => (T[lang][k] ?? T.en[k] ?? k).replace(/\{(\w+)\}/g, (m, n) => (p && n in p ? p[n] : m));
+const tn = (k, n, p) => t(n === 1 && (T[lang][k + '1'] || T.en[k + '1']) ? k + '1' : k, { n, ...p });
+// The console names nodes in English ("Mic 1 → Headphones 2").
+const words = (s) => (T[lang].words ? s.replace(/[A-Z][a-z]+/g, (w) => T[lang].words[w] || w) : s);
+const $ = (s) => document.querySelector(s);
+if (window.self !== window.top) document.body.classList.add('embedded');
+document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+document.querySelectorAll('[data-t-ph]').forEach((el) => { el.placeholder = t(el.dataset.tPh); });
+$('#lang').textContent = t('switchLang');
+$('#lang').addEventListener('click', () => {
+  try { localStorage.setItem('rcplug-lang', lang === 'de' ? 'en' : 'de'); } catch (e) { /* ignore */ }
+  location.reload();
+});
+const showErr = (msg) => { $('#err').textContent = msg || ''; $('#err').hidden = !msg; };
+
+// The page is /plugins/backup/ on rcplugd: the host's API is two levels up,
+// the console beside it.
+const HOST = new URL('../../', location.href).pathname;
+const CONSOLE = HOST + 'plugins/console/';
+
+// el builds an element: el('li', {class: 'x'}, 'text', child…).
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn);
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids) if (k != null && k !== false) e.append(k);
+  return e;
+}
+
+async function api(path, { method = 'GET', body, pin } = {}) {
+  const opt = { method, headers: { 'X-Rcplug': '1' }, cache: 'no-store' };
+  if (body !== undefined) {
+    opt.headers['Content-Type'] = 'application/json';
+    opt.body = typeof body === 'string' ? body : JSON.stringify(body);
+  }
+  if (pin) opt.headers['X-Rcplug-Pin'] = pin;
+  try {
+    const r = await fetch(path, opt);
+    let data = null;
+    try { data = await r.json(); } catch (e) { /* not JSON */ }
+    return { ok: r.ok, status: r.status, data };
+  } catch (e) {
+    return { ok: false, status: 0, data: { error: String(e) } };
+  }
+}
+const errText = (r) => (r.data && r.data.code === 'pin_required' ? t('pinWrong') : (r.data && r.data.error) || 'HTTP ' + r.status);
+
+const fmtSize = (n) => (n >= 1 << 20 ? (n / (1 << 20)).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+const fmtDate = (s) => { const d = new Date(s); return isNaN(d) ? s : d.toLocaleString(lang, { dateStyle: 'medium', timeStyle: 'short' }); };
+const fmtNum = (n) => Number(n).toLocaleString(lang);
+const nameOf = (sum) => sum.name || t('unnamed') + ' ' + fmtDate(sum.created);
+
+// ---- list
+let backups = [];
+async function load() {
+  const r = await api('api/backups');
+  if (!r.ok) { showErr(errText(r)); return; }
+  backups = r.data.backups;
+  $('#count').textContent = t('count', { n: backups.length, max: r.data.max });
+  const list = $('#list');
+  list.replaceChildren();
+  if (!backups.length) list.append(el('div', { class: 'muted small' }, t('empty')));
+  for (const b of backups) {
+    const meta = [fmtDate(b.created)];
+    if (b.model) meta.push(b.model.toUpperCase() + (b.firmware ? ' ' + b.firmware : ''), t('settingsN', { n: fmtNum(b.settings) }));
+    if (b.parts.includes('rcplug')) meta.push(t('pluginsN', { n: b.plugins }) + (b.rcplug ? ' · rcplug ' + b.rcplug : ''));
+    meta.push(fmtSize(b.onDisk));
+    list.append(el('div', { class: 'item', 'data-id': b.id },
+      el('div', { class: 'name' }, nameOf(b), ' ',
+        b.parts.includes('rcplug') ? el('span', { class: 'tag on' }, t('partR')) : null, ' ',
+        b.parts.includes('desk') ? el('span', { class: 'tag on' }, t('partD')) : null),
+      el('div', { class: 'acts' },
+        el('button', { type: 'button', class: 'btn', on: { click: () => openRestore(b) } }, t('restore')),
+        el('a', { class: 'btn', href: 'api/backups/' + b.id + '?download=1', download: '' }, t('download')),
+        el('button', { type: 'button', class: 'btn danger', on: { click: () => removeBackup(b) } }, t('delete'))),
+      el('div', { class: 'meta' }, meta.join(' · '))));
+  }
+}
+
+async function removeBackup(b) {
+  if (!confirm(t('confirmDelete', { name: nameOf(b) }))) return;
+  const r = await api('api/backups/' + b.id, { method: 'DELETE' });
+  if (!r.ok) showErr(errText(r));
+  if (current && current.sum.id === b.id) closeRestore();
+  load();
+}
+
+// ---- create
+$('#create').addEventListener('click', async () => {
+  const incR = $('#incRcplug').checked, incD = $('#incDesk').checked;
+  if (!incR && !incD) return;
+  showErr('');
+  const btn = $('#create');
+  btn.disabled = true;
+  $('#createState').textContent = t('creating');
+  try {
+    const doc = { kind: 'rcplug-backup', format: 1, created: new Date().toISOString(), name: $('#name').value.trim() };
+    if (incR) {
+      const r = await api(HOST + 'api/backup');
+      if (!r.ok) throw new Error(r.status === 404 ? t('needsNew') : errText(r));
+      doc.rcplug = r.data;
+      const st = await api(CONSOLE + 'api/status');
+      if (st.ok) {
+        doc.console = { readOnly: !!st.data.readOnly && !st.data.readOnlyFlag };
+        if (!st.data.controlLimit) doc.console.control = st.data.control; // the real level (write protection shows "off")
+      }
+    }
+    if (incD) {
+      const r = await api(CONSOLE + 'api/snapshot');
+      if (!r.ok) throw new Error(r.data && r.data.code === 'not_found' ? t('needsNew') : !r.data ? t('noConsole') : errText(r));
+      doc.desk = r.data;
+    }
+    const r = await api('api/backups', { method: 'POST', body: doc });
+    if (!r.ok) throw new Error(errText(r));
+    $('#name').value = '';
+    $('#createState').textContent = t('created');
+    load();
+  } catch (e) {
+    $('#createState').textContent = '';
+    showErr(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---- upload
+$('#file').addEventListener('change', async (ev) => {
+  const f = ev.target.files[0];
+  ev.target.value = '';
+  if (!f) return;
+  showErr('');
+  const r = await api('api/backups', { method: 'POST', body: await f.text() });
+  if (!r.ok) { showErr(errText(r)); return; }
+  await load();
+  openRestore(r.data);
+});
+
+// ---- restore
+let current = null; // {sum, doc, rc, desk, st, cat}
+
+function closeRestore() {
+  current = null;
+  $('#restore').hidden = true;
+  document.querySelectorAll('.item.sel').forEach((e) => e.classList.remove('sel'));
+}
+$('#rClose').addEventListener('click', closeRestore);
+
+const lvlText = (l) => t('lvl_' + l);
+function valText(raw) {
+  if (raw === null || raw === undefined) return t('dflt');
+  if (raw === true) return t('on');
+  if (raw === false) return t('off');
+  return typeof raw === 'string' ? '“' + raw + '”' : String(raw);
+}
+const famText = (f) => (T[lang]['fam_' + f] || T.en['fam_' + f] || f);
+
+async function openRestore(sum) {
+  showErr('');
+  document.querySelectorAll('.item').forEach((e) => e.classList.toggle('sel', e.dataset.id === sum.id));
+  $('#restore').hidden = false;
+  $('#rTitle').textContent = t('rTitle', { name: nameOf(sum) });
+  $('#rBody').replaceChildren(el('div', { class: 'muted' }, t('rLoading')));
+  $('#restore').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  const got = await api('api/backups/' + sum.id);
+  if (!got.ok) { $('#rBody').replaceChildren(el('div', { class: 'banner bad' }, errText(got))); return; }
+  const doc = got.data;
+  const [rc, desk, st, pl] = await Promise.all([
+    doc.rcplug ? api(HOST + 'api/backup/diff', { method: 'POST', body: doc.rcplug }) : null,
+    doc.desk ? api(CONSOLE + 'api/snapshot/diff', { method: 'POST', body: doc.desk }) : null,
+    api(CONSOLE + 'api/status'),
+    api(HOST + 'api/plugins'),
+  ]);
+  current = { sum, doc, rc, desk, st: st.ok ? st.data : null, texts: pl.ok ? pluginTexts(pl.data.plugins) : {} };
+  render();
+}
+
+function consoleChanges() {
+  const c = current, out = [];
+  if (!c.doc.console || !c.st) return out;
+  if (c.doc.console.control && !c.st.controlLimit && c.doc.console.control !== c.st.control) out.push({ what: 'control', from: c.st.control, to: c.doc.console.control });
+  if (typeof c.doc.console.readOnly === 'boolean' && !c.st.readOnlyFlag && c.doc.console.readOnly !== !!c.st.readOnly) out.push({ what: 'readOnly', from: !!c.st.readOnly, to: c.doc.console.readOnly });
+  return out;
+}
+
+// pluginTexts: the installed plugins' titles, option titles and choice
+// titles in the page's language (from rcplugd's api/plugins).
+function pluginTexts(list) {
+  const out = {};
+  for (const p of list || []) {
+    const tr = (p.translations && p.translations[lang]) || {};
+    const opts = {};
+    for (const o of p.options || []) {
+      const ot = (tr.options && tr.options[o.id]) || {};
+      const choices = {};
+      for (const c of o.choices || []) choices[c.value] = (ot.choices && ot.choices[c.value]) || c.title;
+      opts[o.id] = { title: ot.title || o.title, choices, dflt: o.default };
+    }
+    out[p.name] = { title: tr.title || p.title || p.name, opts };
+  }
+  return out;
+}
+
+function rcplugLines(plan) {
+  const texts = current.texts || {};
+  const titles = {};
+  for (const p of current.doc.rcplug.plugins || []) titles[p.name] = (texts[p.name] && texts[p.name].title) || p.title || p.name;
+  const optVal = (o, v) => {
+    if (v === null && o && o.dflt !== undefined) return t('dflt') + ' (' + optVal(o, o.dflt) + ')';
+    return o && typeof v === 'string' && o.choices[v] ? '“' + o.choices[v] + '”' : valText(v);
+  };
+  return plan.changes.map((ch) => {
+    const who = titles[ch.plugin] || ch.plugin;
+    const o = texts[ch.plugin] && texts[ch.plugin].opts[ch.id];
+    switch (ch.what) {
+      case 'enabled': return who + ': ' + t(ch.to ? 'switchOn' : 'switchOff');
+      case 'option': return who + ' · ' + ((o && o.title) || ch.title || ch.id) + ': ' + optVal(o, ch.from) + ' → ' + optVal(o, ch.to);
+      case 'autoCheck': return t('autoCheck') + ': ' + valText(ch.from) + ' → ' + valText(ch.to);
+      case 'catalog': return t(ch.to === null ? 'catRemove' : ch.from === null ? 'catAdd' : 'catChange', { id: ch.id });
+    }
+    return ch.what;
+  });
+}
+
+function render() {
+  const c = current, body = [];
+  let canR = false, canD = false;
+  // rcplug
+  if (c.doc.rcplug) {
+    const sec = [el('h4', {}, t('rRcplug'))];
+    if (!c.rc.ok) sec.push(el('div', { class: 'banner bad' }, c.rc.status === 404 ? t('needsNew') : errText(c.rc)));
+    else {
+      const plan = c.rc.data, lines = rcplugLines(plan);
+      for (const cc of consoleChanges()) lines.push(cc.what === 'control' ? t('level') + ': ' + lvlText(cc.from) + ' → ' + lvlText(cc.to) : t('readOnly') + ': ' + valText(cc.from) + ' → ' + valText(cc.to));
+      if (lines.length) {
+        canR = true;
+        sec.push(el('label', { class: 'check' }, el('input', { type: 'checkbox', id: 'useR', checked: true }), el('span', {}, t('rUse'))));
+        sec.push(el('ul', { class: 'changes' }, ...lines.map((l) => el('li', {}, l))));
+      } else sec.push(el('div', { class: 'muted small' }, t('rNothing')));
+      if (plan.missing.length) {
+        sec.push(el('div', { class: 'banner' }, t('rMissing', { list: plan.missing.map((p) => p.title || p.name).join(', ') }), ' ', t('rMissingHint'),
+          el('div', { class: 'row', id: 'installs', style: 'margin-top:6px' })));
+        offerInstalls(plan.missing);
+      }
+      if (plan.skipped.length) sec.push(el('div', { class: 'small muted' }, t('rSkipped', { list: plan.skipped.map((s) => s.plugin + ' · ' + s.id + ' (' + s.reason + ')').join('; ') })));
+    }
+    body.push(...sec);
+  }
+  // desk
+  if (c.doc.desk) {
+    const sec = [el('h4', {}, t('rDesk'))];
+    if (!c.desk.ok || !c.st) sec.push(el('div', { class: 'banner bad' }, c.desk.status === 404 ? t('needsNew') : c.st ? errText(c.desk) : t('noConsole')));
+    else {
+      const d = c.desk.data, diffs = d.differences.filter((x) => !x.missing), missing = d.differences.length - diffs.length;
+      if (!d.sameModel) sec.push(el('div', { class: 'banner bad' }, t('rOtherModel', { a: String(c.doc.desk.model).toUpperCase(), b: String(d.model).toUpperCase() })));
+      else if (!diffs.length) sec.push(el('div', { class: 'muted small' }, t('rNothing')));
+      else {
+        const blockers = [];
+        if (d.passive) blockers.push(t('rPassive'));
+        if (c.st.readOnly) blockers.push(t('rReadOnly'));
+        canD = !blockers.length;
+        const count = tn('rDeskN', diffs.length, { n: fmtNum(diffs.length) });
+        if (canD) sec.push(el('label', { class: 'check' }, el('input', { type: 'checkbox', id: 'useD', checked: true }), el('span', {}, count)));
+        else sec.push(el('div', {}, count));
+        for (const b of blockers) sec.push(el('div', { class: 'banner' }, b));
+        if (canD && d.level !== 'expert') sec.push(el('div', { class: 'small muted' }, t('rLevel', { level: lvlText(d.level) })));
+        const groups = {};
+        for (const x of diffs) groups[x.node] = (groups[x.node] || 0) + 1;
+        sec.push(el('div', { class: 'groups' }, ...Object.entries(groups).sort((a, b) => b[1] - a[1]).map(([f, n]) => el('span', { class: 'tag' }, famText(f) + ': ' + fmtNum(n)))));
+        const shown = diffs.slice(0, 400);
+        sec.push(el('details', {}, el('summary', {}, t('rDetails')),
+          el('ul', { class: 'changes' }, ...shown.map((x) => el('li', {}, (x.label ? (x.node === 'MIX' ? famText(x.node) + ' ' : '') + words(x.label) : famText(x.node) + ' ' + (x.index + 1)) + ' · ', el('span', { class: 'mono' }, x.name), ': ',
+            valText(x.current) + ' → ' + valText(x.value), x.expert ? el('span', { class: 'tag', style: 'margin-left:6px' }, t('expertTag')) : null)),
+          diffs.length > shown.length ? el('li', { class: 'muted' }, t('rMore', { n: diffs.length - shown.length })) : null)));
+      }
+      if (missing) sec.push(el('div', { class: 'small muted' }, t('rMissingDesk', { n: missing })));
+    }
+    body.push(...sec);
+  }
+  if (canR || canD) {
+    if (c.st && c.st.pinRequired && (canD || consoleChanges().length)) {
+      body.push(el('div', { class: 'row', style: 'margin-top:10px' }, el('label', { for: 'pin', class: 'small muted' }, t('rPin')),
+        el('div', { style: 'width:160px' }, el('input', { type: 'password', id: 'pin', autocomplete: 'off' }))));
+    }
+    body.push(el('div', { class: 'row', style: 'margin-top:12px' }, el('button', { type: 'button', class: 'btn primary', id: 'rApply', on: { click: apply } }, t('rApply')),
+      el('span', { class: 'small muted', id: 'rState' })));
+  }
+  body.push(el('div', { id: 'rResult' }));
+  $('#rBody').replaceChildren(...body);
+}
+
+async function offerInstalls(missing) {
+  const cat = await api(HOST + 'api/catalog');
+  const box = $('#installs');
+  if (!box) return;
+  const entries = (cat.ok && cat.data.plugins) || [];
+  for (const p of missing) {
+    const e = entries.find((x) => x.name === p.name && !x.installed);
+    if (!e) { box.append(el('span', { class: 'small' }, t('rNotInCatalog', { name: p.title || p.name }))); continue; }
+    const btn = el('button', { type: 'button', class: 'btn' }, t('rInstall', { name: e.title || p.name }));
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = t('rInstalling', { name: e.title || p.name });
+      const r = await api(HOST + 'api/catalog/install', { method: 'POST', body: { repo: e.repo, plugin: e.name } });
+      if (!r.ok) { showErr(errText(r)); btn.disabled = false; btn.textContent = t('rInstall', { name: e.title || p.name }); return; }
+      for (let i = 0; i < 60; i++) { // until the host lists it (at most two minutes)
+        await new Promise((res) => setTimeout(res, 2000));
+        const pl = await api(HOST + 'api/plugins');
+        if (pl.ok && pl.data.plugins.some((x) => x.name === p.name)) break;
+      }
+      if (current) openRestore(current.sum);
+    });
+    box.append(btn);
+  }
+}
+
+// apply restores in an order that keeps the console reachable: the desk
+// first (the console raises its level for it), then the console's own
+// settings, then rcplug's (which may restart plugins, the console too).
+async function apply() {
+  const c = current;
+  const useR = !!($('#useR') && $('#useR').checked), useD = !!($('#useD') && $('#useD').checked);
+  if (!useR && !useD) return;
+  const pin = $('#pin') ? $('#pin').value : '';
+  const btn = $('#rApply'), out = [], problems = [];
+  btn.disabled = true;
+  $('#rState').textContent = t('rWorking');
+  try {
+    let level = c.st ? c.st.control : null;
+    const setLevel = async (to) => {
+      const r = await api(CONSOLE + 'api/control', { method: 'POST', body: { level: to }, pin });
+      if (!r.ok) throw new Error(errText(r));
+      level = to;
+    };
+    const wanted = useR && c.doc.console && c.doc.console.control && c.st && !c.st.controlLimit ? c.doc.console.control : level;
+    if (useD) {
+      if (level !== 'expert') await setLevel('expert');
+      const r = await api(CONSOLE + 'api/snapshot/apply', { method: 'POST', body: c.doc.desk, pin });
+      if (!r.ok) problems.push(errText(r));
+      else {
+        out.push(r.data.written || r.data.refused.length || r.data.remaining ? tn('rDoneDesk', r.data.written, { w: r.data.written, r: r.data.refused.length, left: r.data.remaining }) : t('rDoneDesk0'));
+        for (const x of r.data.refused.slice(0, 10)) problems.push(famText(x.node) + ' ' + (x.index + 1) + ' · ' + x.name + ': ' + x.error);
+      }
+    }
+    if (wanted && level !== wanted) await setLevel(wanted);
+    const cc = useR ? consoleChanges() : [];
+    const ro = cc.find((x) => x.what === 'readOnly');
+    if (ro) {
+      const r = await api(CONSOLE + 'api/settings', { method: 'POST', body: { readOnly: ro.to }, pin });
+      if (!r.ok) problems.push(errText(r));
+    }
+    if (cc.length) out.push(t('rDoneConsole'));
+    if (useR && c.rc && c.rc.ok && c.rc.data.changes.length) {
+      const r = await api(HOST + 'api/backup/restore', { method: 'POST', body: c.doc.rcplug });
+      if (!r.ok) problems.push(errText(r));
+      else {
+        out.push(tn('rDoneRcplug', r.data.plan.changes.length));
+        if (r.data.plan.changes.some((x) => x.what === 'option')) out.push(t('rRestart'));
+        problems.push(...r.data.errors);
+      }
+    }
+  } catch (e) {
+    problems.push(e.message);
+  }
+  $('#rState').textContent = '';
+  btn.disabled = false;
+  $('#rResult').replaceChildren(
+    out.length ? el('div', { class: 'banner ok' }, out.join(' ')) : '',
+    problems.length ? el('div', { class: 'banner bad' }, t('rProblems', { list: problems.join('; ') })) : '');
+}
+
+load();
+</script>
+</body>
+</html>
