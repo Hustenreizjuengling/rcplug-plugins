@@ -11,7 +11,8 @@ problems privately, see [SECURITY.md](SECURITY.md).
 
 ## Code
 
-1. Read [rcplug's plugin API](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-api.md).
+1. Read rcplug's [plugin guide](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-guide.md) and
+   [plugin interface](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-api.md).
 2. Keep changes focused, and add tests for new behaviour. Run `make check` before you
    push; CI runs it as well.
 3. Go standard library and rcplug's SDK only. Code, comments and docs in English; UI

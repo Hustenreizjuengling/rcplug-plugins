@@ -63,10 +63,11 @@ go run ./sonar     # nur Sonar mit Testsignal auf http://127.0.0.1:8081
 ## Ein Plugin schreiben
 
 Ein Plugin ist ein Ordner mit `plugin.json` und einem Programm in beliebiger Sprache;
-Go-Plugins nutzen rcplugs SDK (`github.com/Hustenreizjuengling/rcplug/sdk`). Manifest, Umgebung,
-Lebenszyklus und SDK beschreibt
-[rcplugs Plugin-API](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-api.md)
-(Englisch). Für ein neues Plugin hier `<name>/` mit `plugin.json` und einem
+Go-Plugins nutzen rcplugs SDK (`github.com/Hustenreizjuengling/rcplug/sdk`). rcplugs
+[Plugin-Anleitung](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-guide.md) baut eines Schritt für Schritt, das
+[Kochbuch](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/cookbook.md) hat Rezepte, und die
+[Schnittstellen-Referenz](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-api.md) beschreibt alles, was der Host bietet
+(alle Englisch). Ideen für lohnende Plugins stehen in der [Roadmap](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/roadmap.md#plugin-ideas). Für ein neues Plugin hier `<name>/` mit `plugin.json` und einem
 `main`-Paket anlegen; das Makefile baut und verpackt jeden Ordner mit `plugin.json`.
 
 ## Lizenz

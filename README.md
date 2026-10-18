@@ -58,9 +58,11 @@ go run ./sonar     # only Sonar, with its test signal, on http://127.0.0.1:8081
 ## Write a plugin
 
 A plugin is a folder with `plugin.json` and a program in any language; Go plugins use
-rcplug's SDK (`github.com/Hustenreizjuengling/rcplug/sdk`). The manifest, the environment, the
-lifecycle and the SDK are described in
-[rcplug's plugin API](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-api.md).
+rcplug's SDK (`github.com/Hustenreizjuengling/rcplug/sdk`). rcplug's
+[plugin guide](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-guide.md) builds one step by step, the
+[cookbook](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/cookbook.md) has recipes, and the
+[plugin interface](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-api.md) describes everything the host provides.
+Ideas for plugins worth building are in the [roadmap](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/roadmap.md#plugin-ideas).
 To add one here, create `<name>/` with its `plugin.json` and a `main` package; the
 Makefile builds and packages every folder that has a `plugin.json`.
 
