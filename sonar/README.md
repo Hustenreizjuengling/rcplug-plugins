@@ -65,9 +65,12 @@ wrong, switch Sonar back to `test`.
 
 Every channel strip of the console has a "◉ Sonar" button (a plugin action, see
 [plugin-api.md](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/plugin-api.md#actions)), and Sonar has a channel list read from the
-console. A channel needs an audio source assigned once: Sonar asks "which input carries
-this channel?" and remembers the answer per console source (`combo1`, `usb2`, …), so the
-next time the channel opens with the right input. The web UI lists the JACK pairs and
+console (*What Sonar hears*). A channel needs its audio chosen once: Sonar asks which
+audio carries it and remembers the answer per console source (`combo1`, `usb2`, …), so
+the next time the channel opens with the right input. For a microphone channel it
+proposes the JACK pair of the device's inputs 1+2 (or 3+4) if JACK offers it. A single
+microphone is mono and has no direction: for a mono channel Sonar says so and proposes
+the pair. Choosing the audio without a channel is under *Choose the audio directly*. The web UI lists the JACK pairs and
 capture devices it finds; which of them carries which channel of the desk has not
 been checked on hardware yet (see [device-notes.md](https://github.com/Hustenreizjuengling/rcplug/blob/main/docs/device-notes.md)).
 
@@ -95,6 +98,25 @@ This only works with a real stereo pair (two microphones or a stereo microphone)
 A mono source panned in the mixer has a level difference but no time difference, so
 the confidence stays low.
 
+**What a stereo pair cannot tell:** front from back (a sound in front and one behind
+at the same angle reach both microphones alike) and height. Three-dimensional
+direction needs at least four microphones (ambisonics), which the desk does not
+provide; Sonar shows left and right on a half circle.
+
+### Distance
+
+The distance is an estimate from two cues: the level (closer is louder) and how much
+of what both microphones hear is the same signal, the peak of their
+cross-correlation. Close to the microphones the direct sound dominates and both hear
+nearly the same; further away the room's reverberation, which differs between them,
+takes over. Both depend on the room, the source and the microphones, so out of the box
+the estimate is rough (it assumes speech at about −15 dBFS close and 30 dB lower far
+away). **Calibrate** it: speak or clap for a few seconds close to the microphones and
+press *Near*, then from the far end of the room and press *Far*. Sonar takes the
+louder half of the last three seconds for each point (pauses do not count) and keeps
+the calibration with its settings. On the radar, near is at the centre and far at the
+outer ring.
+
 ## Settings
 
 | Setting | Flag | Meaning |
@@ -118,9 +140,9 @@ growing pause (1 to 10 s) and the error is shown on the page, for ALSA and JACK 
 
 | Request | Content |
 |---|---|
-| `GET stream` | Server-Sent Events, about 30 per second: `{"az", "level", "levelDb", "conf", "l", "r", "lagUs", "source", "err", "ts"}` |
+| `GET stream` | Server-Sent Events, about 30 per second: `{"az", "level", "levelDb", "conf", "l", "r", "lagUs", "dist", "coh", "source", "err", "ts"}` (`dist`: 0 near to 1 far; `coh`: the block's peak cross-correlation) |
 | `GET api/config` | Current settings, including `channel` and the `channels` assignments |
-| `POST api/config` | Any subset of `{"source", "smoothing", "flip", "noiseFloor", "channel", "assign": {"channel", "source"}}`; needs `X-Rcplug: 1`. `channel` selects a console source and switches to its assigned audio source; `assign` stores (or with an empty source removes) an assignment. |
+| `POST api/config` | Any subset of `{"source", "smoothing", "flip", "noiseFloor", "channel", "assign": {"channel", "source"}, "calibrate"}`; needs `X-Rcplug: 1`. `channel` selects a console source and switches to its assigned audio source; `assign` stores (or with an empty source removes) an assignment; `calibrate` takes the last seconds of sound as the `"near"` or `"far"` point of the distance (409 `no_signal` without sound), or `"reset"`s both. The answer includes `calibration` (`calibrated`, `near` and `far` with `db` and `coh`). |
 | `GET api/sources` | Current source, ALSA capture devices, JACK stereo pairs, built-in sources |
 
 At most 16 streams are served at once.

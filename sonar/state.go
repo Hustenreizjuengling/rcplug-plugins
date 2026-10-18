@@ -17,6 +17,11 @@ type savedState struct {
 	// Channels maps console sources to audio sources.
 	Channel  string            `json:"channel,omitempty"`
 	Channels map[string]string `json:"channels,omitempty"`
+	// The distance's calibration (dsp.Config).
+	NearDb  float64 `json:"nearDb,omitempty"`
+	NearCoh float64 `json:"nearCoh,omitempty"`
+	FarDb   float64 `json:"farDb,omitempty"`
+	FarCoh  float64 `json:"farCoh,omitempty"`
 }
 
 // statePath returns where the sonar stores its settings, in the plugin's data
@@ -45,6 +50,12 @@ func (h *hub) loadState() {
 	if s.NoiseFloor != 0 {
 		h.cfg.NoiseFloor = s.NoiseFloor
 	}
+	if s.NearDb < 0 && s.NearDb >= -120 {
+		h.cfg.NearDb, h.cfg.NearCoh = s.NearDb, clamp(s.NearCoh, 0, 1)
+	}
+	if s.FarDb < 0 && s.FarDb >= -120 {
+		h.cfg.FarDb, h.cfg.FarCoh = s.FarDb, clamp(s.FarCoh, 0, 1)
+	}
 	if validChannel(s.Channel) {
 		h.channel = s.Channel
 	}
@@ -68,6 +79,7 @@ func (h *hub) saveState() {
 		NoiseFloor: h.cfg.NoiseFloor,
 		Channel:    h.channel,
 		Channels:   map[string]string{},
+		NearDb:     h.cfg.NearDb, NearCoh: h.cfg.NearCoh, FarDb: h.cfg.FarDb, FarCoh: h.cfg.FarCoh,
 	}
 	for k, v := range h.channels {
 		s.Channels[k] = v

@@ -7,7 +7,15 @@
 //     correlation doubles as a confidence score.
 //
 // The result is an azimuth in [-90°,+90°] (positive = right), an overall level,
-// and a confidence. Everything is pure Go and allocation-light so it runs
+// a confidence and a rough distance. A stereo pair tells left from right only:
+// front and back sound alike to it, and it has no sense of height.
+//
+// Distance combines two cues: the level (closer is louder) and how much of
+// what the two microphones hear is the same signal (the peak of their
+// cross-correlation). Close to the microphones the direct sound dominates and
+// both hear nearly the same; further away the room's reverberation, which
+// differs between the two, takes over. Both depend on the room and the
+// source, so a calibration (a reading near and one far) makes it usable. Everything is pure Go and allocation-light so it runs
 // comfortably at lowest priority on the device.
 package dsp
 
@@ -22,6 +30,8 @@ type Estimate struct {
 	L       float64 `json:"l"`       // left level 0..1
 	R       float64 `json:"r"`       // right level 0..1
 	LagUs   float64 `json:"lagUs"`   // inter-channel delay estimate, microseconds (R vs L)
+	Dist    float64 `json:"dist"`    // rough distance, 0 (near) .. 1 (far)
+	Coh     float64 `json:"coh"`     // peak cross-correlation of the block, 0..1 (before smoothing)
 }
 
 // Config tunes the processor.
@@ -31,6 +41,16 @@ type Config struct {
 	MaxLagUs   float64 // max |ITD| considered, microseconds (human max ≈ 700µs)
 	NoiseFloor float64 // dBFS below which input is treated as silence
 	FlipSign   bool    // flip left/right orientation
+	// Calibration for the distance: level (dBFS) and correlation measured
+	// near the microphones and far from them. Zero values: not calibrated.
+	NearDb, FarDb   float64
+	NearCoh, FarCoh float64
+}
+
+// Calibrated reports whether near and far readings are set and near is
+// clearly (3 dB) louder.
+func (c Config) Calibrated() bool {
+	return c.NearDb != 0 && c.FarDb != 0 && c.NearDb > c.FarDb+3
 }
 
 // DefaultConfig returns sensible defaults for a 48 kHz line signal.
@@ -50,6 +70,7 @@ type Processor struct {
 	maxLag int
 	azS    float64
 	lvlS   float64
+	distS  float64
 	primed bool
 }
 
@@ -151,6 +172,7 @@ func (p *Processor) process(l, r []float64, sumL2, sumR2 float64) Estimate {
 	// ITD is added in proportion to phase coherence. Confidence is additionally
 	// gated by level so quiet, noisy input reads as low confidence.
 	az := azILD*0.65 + azITD*0.35*conf
+	near := p.nearness(levelDb, conf)
 	if p.cfg.FlipSign {
 		az = -az
 	}
@@ -159,13 +181,17 @@ func (p *Processor) process(l, r []float64, sumL2, sumR2 float64) Estimate {
 
 	// Temporal smoothing (EMA).
 	a := p.cfg.Smoothing
+	dist := 1 - near
 	if !p.primed {
-		p.azS, p.lvlS, p.primed = az, levelLin, true
+		p.azS, p.lvlS, p.distS, p.primed = az, levelLin, dist, true
 	} else if a > 0 {
 		p.azS = a*p.azS + (1-a)*az
 		p.lvlS = a*p.lvlS + (1-a)*levelLin
+		// Distance moves slower: single words should not make it jump.
+		ad := math.Max(a, 0.85)
+		p.distS = ad*p.distS + (1-ad)*dist
 	} else {
-		p.azS, p.lvlS = az, levelLin
+		p.azS, p.lvlS, p.distS = az, levelLin, dist
 	}
 
 	lagUs := float64(bestLag) / float64(p.cfg.Rate) * 1e6
@@ -180,14 +206,37 @@ func (p *Processor) process(l, r []float64, sumL2, sumR2 float64) Estimate {
 		L:       clamp01((20*math.Log10(rmsL+eps) - p.cfg.NoiseFloor) / -p.cfg.NoiseFloor),
 		R:       clamp01((20*math.Log10(rmsR+eps) - p.cfg.NoiseFloor) / -p.cfg.NoiseFloor),
 		LagUs:   lagUs,
+		Dist:    p.distS,
+		Coh:     conf,
 	}
+}
+
+// nearness is 1 for a source at the microphones and 0 for one far away,
+// from the level and the correlation of the two channels: between the
+// calibrated readings if there are some, otherwise on typical scales (speech
+// at -15 dBFS close, 30 dB lower far; correlation 0.9 close, 0.3 far).
+func (p *Processor) nearness(levelDb, coh float64) float64 {
+	c := p.cfg
+	nearDb, farDb, nearCoh, farCoh := -15.0, -45.0, 0.9, 0.3
+	wLevel := 0.5
+	if c.Calibrated() {
+		nearDb, farDb = c.NearDb, c.FarDb
+		if c.NearCoh > c.FarCoh+0.05 {
+			nearCoh, farCoh = c.NearCoh, c.FarCoh
+		} else {
+			wLevel = 0.85 // the correlation did not tell near from far here
+		}
+	}
+	lv := clamp01((levelDb - farDb) / (nearDb - farDb))
+	ch := clamp01((coh - farCoh) / (nearCoh - farCoh))
+	return wLevel*lv + (1-wLevel)*ch
 }
 
 // decay relaxes the smoothed state toward centre/silence when there is no input.
 func (p *Processor) decay() Estimate {
 	p.lvlS *= 0.8
 	p.azS *= 0.9
-	return Estimate{Azimuth: p.azS, Level: p.lvlS, LevelDb: p.cfg.NoiseFloor, Conf: 0}
+	return Estimate{Azimuth: p.azS, Level: p.lvlS, LevelDb: p.cfg.NoiseFloor, Conf: 0, Dist: p.distS}
 }
 
 // bestLagCorr returns the integer lag in [-maxLag,maxLag] that maximises the

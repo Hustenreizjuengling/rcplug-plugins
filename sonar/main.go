@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"sync"
 	"time"
 
@@ -106,6 +107,7 @@ type hub struct {
 	channel  string
 	channels map[string]string
 	lastPub  time.Time
+	recent   []reading // the last seconds of sound, for calibrating the distance
 	proc     *dsp.Processor
 	subs     map[chan []byte]struct{}
 }
@@ -229,6 +231,7 @@ func (h *hub) captureOnce(ctx context.Context, cfg dsp.Config, spec string) erro
 		}
 		h.mu.Lock() // SetConfig may run concurrently from the HTTP handler
 		latest := proc.ProcessInterleaved(s16)
+		h.note(latest)
 		h.mu.Unlock()
 		select {
 		case <-emit.C:
@@ -312,7 +315,69 @@ func (h *hub) handleSources(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// reading is one block's level and correlation, for calibrating.
+type reading struct {
+	at      time.Time
+	db, coh float64
+}
+
+const calibrateWindow = 3 * time.Second
+
+// note keeps a block's reading if there was sound (h.mu held).
+func (h *hub) note(e dsp.Estimate) {
+	if e.LevelDb <= h.cfg.NoiseFloor {
+		return
+	}
+	now := time.Now()
+	h.recent = append(h.recent, reading{at: now, db: e.LevelDb, coh: e.Coh})
+	drop := 0
+	for drop < len(h.recent) && now.Sub(h.recent[drop].at) > calibrateWindow {
+		drop++
+	}
+	if drop > 0 {
+		h.recent = append(h.recent[:0], h.recent[drop:]...)
+	}
+}
+
+// calibrate takes the louder half of the last seconds' readings as the near
+// or far point of the distance (h.mu held).
+func (h *hub) calibrate(point string) error {
+	if point == "reset" {
+		h.cfg.NearDb, h.cfg.NearCoh, h.cfg.FarDb, h.cfg.FarCoh = 0, 0, 0, 0
+		return nil
+	}
+	var rs []reading
+	for _, r := range h.recent {
+		if time.Since(r.at) <= calibrateWindow {
+			rs = append(rs, r)
+		}
+	}
+	if len(rs) < 10 {
+		return sdk.NewError(http.StatusConflict, "no_signal", "no sound in the last seconds: speak or clap while calibrating")
+	}
+	sort.Slice(rs, func(i, j int) bool { return rs[i].db > rs[j].db })
+	rs = rs[:(len(rs)+1)/2]
+	var db, coh float64
+	for _, r := range rs {
+		db += r.db
+		coh += r.coh
+	}
+	db, coh = db/float64(len(rs)), coh/float64(len(rs))
+	switch point {
+	case "near":
+		h.cfg.NearDb, h.cfg.NearCoh = db, coh
+	case "far":
+		h.cfg.FarDb, h.cfg.FarCoh = db, coh
+	default:
+		return sdk.NewError(http.StatusBadRequest, "bad_request", `calibrate is "near", "far" or "reset"`)
+	}
+	return nil
+}
+
 type configPatch struct {
+	// Calibrate takes the last seconds of sound as the "near" or "far"
+	// point of the distance, or "reset"s both.
+	Calibrate  *string  `json:"calibrate"`
 	Source     *string  `json:"source"`
 	Smoothing  *float64 `json:"smoothing"`
 	Flip       *bool    `json:"flip"`
@@ -367,6 +432,13 @@ func (h *hub) handleConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.mu.Lock()
+		if p.Calibrate != nil {
+			if err := h.calibrate(*p.Calibrate); err != nil {
+				h.mu.Unlock()
+				sdk.WriteError(w, err)
+				return
+			}
+		}
 		if p.Assign != nil {
 			if assignSpec == "" {
 				delete(h.channels, p.Assign.Channel)
@@ -414,10 +486,17 @@ func (h *hub) handleConfig(w http.ResponseWriter, r *http.Request) {
 	for k, v := range h.channels {
 		channels[k] = v
 	}
+	cal := map[string]interface{}{"calibrated": h.cfg.Calibrated()}
+	if h.cfg.NearDb != 0 {
+		cal["near"] = map[string]float64{"db": h.cfg.NearDb, "coh": h.cfg.NearCoh}
+	}
+	if h.cfg.FarDb != 0 {
+		cal["far"] = map[string]float64{"db": h.cfg.FarDb, "coh": h.cfg.FarCoh}
+	}
 	sdk.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"source": h.srcSpec, "smoothing": h.cfg.Smoothing, "flip": h.cfg.FlipSign,
 		"noiseFloor": h.cfg.NoiseFloor, "rate": h.rate,
-		"channel": h.channel, "channels": channels,
+		"channel": h.channel, "channels": channels, "calibration": cal,
 	})
 }
 

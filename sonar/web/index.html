@@ -28,7 +28,11 @@
   .scope{position:relative;width:100%;aspect-ratio:2/1.15;background:#10151b;border:1px solid var(--line);border-radius:10px;overflow:hidden}
   .scope.stale canvas{opacity:.35}
   canvas{position:absolute;inset:0;width:100%;height:100%}
-  .readouts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+  .readouts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:12px}
+  .note{font-size:12px;color:var(--muted);margin:8px 2px 0}
+  details.adv summary{cursor:pointer;font-size:13px;color:var(--muted)}
+  details.adv[open] summary{margin-bottom:8px}
+  .cal{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
   .ro{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center}
   .ro .v{font-size:20px;font-weight:650;font-variant-numeric:tabular-nums}
   .ro .k{font-size:11px;color:var(--muted)}
@@ -61,7 +65,7 @@
   body.embedded .top{padding:6px 14px;background:var(--panel2)}
   body.embedded #lang{display:none}
   @media (max-width:860px){ .layout{grid-template-columns:1fr} main{padding:10px} }
-  @media (max-width:520px){ .readouts{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media (max-width:640px){ .readouts{grid-template-columns:repeat(3,minmax(0,1fr))} }
 </style>
 </head>
 <body>
@@ -80,9 +84,11 @@
       <div class="readouts">
         <div class="ro"><div class="v" id="azV">0°</div><div class="k" data-t="bearing"></div></div>
         <div class="ro"><div class="v" id="dirV">—</div><div class="k" data-t="side"></div></div>
+        <div class="ro"><div class="v" id="distV">—</div><div class="k" data-t="distance"></div></div>
         <div class="ro"><div class="v" id="lvlV">-∞</div><div class="k" data-t="level"></div></div>
         <div class="ro"><div class="v" id="confV">0%</div><div class="k" data-t="confidence"></div></div>
       </div>
+      <p class="note" data-t="radarNote"></p>
       <div class="meters" aria-hidden="true">
         <span>L</span><div class="hbar"><i id="mL"></i></div>
         <span>R</span><div class="hbar"><i id="mR"></i></div>
@@ -90,19 +96,28 @@
     </section>
     <div class="side">
       <section class="card" id="chanCard">
-        <h3 data-t="channel"></h3>
-        <select id="channel" aria-labelledby="chanCard"></select>
-        <p class="muted small" id="chanInfo"></p>
+        <h3 data-t="listensTo"></h3>
+        <label class="muted small" for="channel" data-t="channel"></label>
+        <select id="channel"></select>
+        <p class="small" id="chanInfo"></p>
         <div id="assignBox" hidden>
           <div class="banner" id="assignMsg"></div>
-          <div class="row"><select id="assignSrc"></select><button type="button" class="btn primary" id="assignBtn" data-t="assign"></button></div>
+          <div class="row"><select id="assignSrc" aria-label="Audio"></select><button type="button" class="btn primary" id="assignBtn" data-t="assign"></button></div>
         </div>
+        <button type="button" class="btn link" id="reassign" data-t="reassign" hidden></button>
         <button type="button" class="btn link" id="unassign" data-t="unassign" hidden></button>
+        <details class="adv" style="margin-top:10px">
+          <summary data-t="source"></summary>
+          <div class="row"><select id="source" aria-label="Audio"></select><button type="button" class="btn" id="refreshSrc" data-t-title="refresh">⟳</button></div>
+          <p class="muted small" data-t="hint"></p>
+        </details>
       </section>
       <section class="card">
-        <h3 data-t="source"></h3>
-        <div class="row"><select id="source"></select><button type="button" class="btn" id="refreshSrc" data-t-title="refresh">⟳</button></div>
-        <p class="muted small" data-t="hint"></p>
+        <h3 data-t="calTitle"></h3>
+        <p class="muted small" data-t="calHint"></p>
+        <div class="cal"><button type="button" class="btn" id="calNear" data-t="calNear"></button><button type="button" class="btn" id="calFar" data-t="calFar"></button>
+          <button type="button" class="btn link" id="calReset" data-t="calReset"></button></div>
+        <p class="small" id="calState"></p>
       </section>
       <section class="card">
         <h3 data-t="settings"></h3>
@@ -117,26 +132,40 @@
 'use strict';
 const T = {
   en: {
-    bearing: 'Bearing', side: 'Side', level: 'Level dBFS', confidence: 'Confidence', channel: 'Channel', source: 'Audio source',
+    bearing: 'Bearing', side: 'Side', level: 'Level dBFS', confidence: 'Confidence', channel: 'Channel of the desk', source: 'Choose the audio directly (without a channel)',
+    listensTo: 'What Sonar hears', distance: 'Distance', near: 'near', mid: 'middle', far2: 'far',
+    radarNote: 'A stereo signal shows left and right only: front and back sound the same to it, and it has no height. The distance is an estimate from the level and the room’s reverberation; calibrate it for this room.',
+    reassign: 'Choose other audio', suggested: '{src} (suggested)',
+    mono: '“{ch}” is a mono channel: one microphone has no direction. Sonar needs two microphones or a stereo microphone, for example Mic 1 and Mic 2 as a pair.',
+    calTitle: 'Calibrate the distance', calHint: 'Speak or clap for a few seconds close to the microphones and press “Near”, then from the far end of the room and press “Far”.',
+    calNear: 'Near', calFar: 'Far', calReset: 'Reset', calNone: 'Not calibrated: a rough estimate.', calOnlyNear: 'Near is set; now far.', calOnlyFar: 'Far is set; now near.',
+    calDone: 'Calibrated (near {n} dBFS, far {f} dBFS).', calSame: 'Near was not louder than far: calibrate again.', noSignal: 'No sound in the last seconds: speak or clap while calibrating.',
     settings: 'Settings', refresh: 'Reload the source list', smoothing: 'Smoothing', noise: 'Noise floor', flip: 'Swap left/right',
     connecting: 'connecting…', reconnecting: 'reconnecting…', live: 'live', noData: 'no data', failed: 'Could not apply the setting: {err}',
     centre: 'CENTRE', far: 'FAR {s}', slight: 'slightly {s}', radar: 'Radar showing the estimated direction of the loudest sound', switchLang: 'Deutsch',
     noChannel: '— no channel —', noConsole: 'The console is not reachable, so channels cannot be listed. Choose the audio source directly.',
-    mapped: 'Audio source: {src}', unmapped: 'No audio source is assigned to “{ch}” yet. Which input carries this channel?',
-    assign: 'Assign', unassign: 'Remove assignment', chanHint: 'Pick a console channel; the sonar listens to the audio source assigned to it.',
+    mapped: 'Hears {src}.', unmapped: 'Which audio carries “{ch}”? Choose it once; Sonar remembers it for this channel.',
+    assign: 'Use it', unassign: 'Forget this assignment', chanHint: 'Choose a channel of the desk, or the audio directly below.',
     hint: 'Direction finding needs a real stereo signal (two microphones or a stereo microphone). The built-in test signal sweeps from left to right.',
-    jackWarn: 'Listen to JACK ports {src}?\n\nOn the RØDECaster the desk’s audio runs through JACK, so Sonar adds a small client to RØDE’s audio graph: it loads the ALSA loopback driver (snd-aloop) and runs alsa_out. This has not been tried on a real device yet. If you hear dropouts or clicks, switch back to the test signal.',
+    jackWarn: 'Listen to JACK ports {src}?\n\nSonar hears them through rcplug’s shared audio taps (dashboard → System → Audio taps; they must be switched on), which add a small client to RØDE’s audio graph. If you hear dropouts or clicks, switch back to the test signal.',
   },
   de: {
-    bearing: 'Richtung', side: 'Seite', level: 'Pegel dBFS', confidence: 'Sicherheit', channel: 'Kanal', source: 'Audioquelle',
+    bearing: 'Richtung', side: 'Seite', level: 'Pegel dBFS', confidence: 'Sicherheit', channel: 'Kanal am Pult', source: 'Audio direkt wählen (ohne Kanal)',
+    listensTo: 'Was Sonar hört', distance: 'Entfernung', near: 'nah', mid: 'mittel', far2: 'fern',
+    radarNote: 'Ein Stereosignal zeigt nur links und rechts: Vorne und hinten klingen darin gleich, und Höhe kennt es nicht. Die Entfernung ist eine Schätzung aus Pegel und Raumhall; kalibriere sie für diesen Raum.',
+    reassign: 'Anderes Audio wählen', suggested: '{src} (Vorschlag)',
+    mono: '„{ch}“ ist ein Mono-Kanal: Ein Mikrofon allein hat keine Richtung. Sonar braucht zwei Mikrofone oder ein Stereomikrofon, zum Beispiel Mic 1 und Mic 2 als Paar.',
+    calTitle: 'Entfernung kalibrieren', calHint: 'Ein paar Sekunden nah an den Mikrofonen sprechen oder klatschen und „Nah“ drücken, dann vom anderen Ende des Raums und „Fern“.',
+    calNear: 'Nah', calFar: 'Fern', calReset: 'Zurücksetzen', calNone: 'Nicht kalibriert: eine grobe Schätzung.', calOnlyNear: 'Nah ist gesetzt, jetzt Fern.', calOnlyFar: 'Fern ist gesetzt, jetzt Nah.',
+    calDone: 'Kalibriert (nah {n} dBFS, fern {f} dBFS).', calSame: 'Nah war nicht lauter als fern: bitte neu kalibrieren.', noSignal: 'In den letzten Sekunden war nichts zu hören: beim Kalibrieren sprechen oder klatschen.',
     settings: 'Einstellungen', refresh: 'Quellenliste neu laden', smoothing: 'Glättung', noise: 'Rauschschwelle', flip: 'Links/Rechts tauschen',
     connecting: 'verbinde…', reconnecting: 'verbinde neu…', live: 'live', noData: 'keine Daten', failed: 'Einstellung nicht übernommen: {err}',
     centre: 'MITTE', far: 'GANZ {s}', slight: 'leicht {s}', radar: 'Radar mit der geschätzten Richtung des lautesten Geräuschs', switchLang: 'English',
     noChannel: '— kein Kanal —', noConsole: 'Die Konsole ist nicht erreichbar, daher keine Kanalliste. Wähle die Audioquelle direkt.',
-    mapped: 'Audioquelle: {src}', unmapped: 'Für „{ch}“ ist noch keine Audioquelle zugeordnet. Über welchen Eingang kommt dieser Kanal?',
-    assign: 'Zuordnen', unassign: 'Zuordnung entfernen', chanHint: 'Wähle einen Kanal der Konsole; das Sonar hört auf die Audioquelle, die ihm zugeordnet ist.',
+    mapped: 'Hört {src}.', unmapped: 'Welches Audio gehört zu „{ch}“? Einmal wählen, Sonar merkt es sich für diesen Kanal.',
+    assign: 'Übernehmen', unassign: 'Zuordnung vergessen', chanHint: 'Wähle einen Kanal des Pults oder unten das Audio direkt.',
     hint: 'Für die Richtung braucht es ein echtes Stereosignal (zwei Mikrofone oder ein Stereomikrofon). Das eingebaute Testsignal schwenkt von links nach rechts.',
-    jackWarn: 'Auf die JACK-Ports {src} hören?\n\nAm RØDECaster läuft das Audio des Pults über JACK, daher hängt Sonar einen kleinen Client in RØDEs Audio-Graph: es lädt den ALSA-Loopback-Treiber (snd-aloop) und startet alsa_out. Das wurde an einem echten Gerät noch nicht ausprobiert. Wenn du Aussetzer oder Knackser hörst, zurück auf das Testsignal schalten.',
+    jackWarn: 'Auf die JACK-Ports {src} hören?\n\nSonar hört sie über die gemeinsamen Audio-Abgriffe von rcplug (Dashboard → System → Audio-Abgriffe; sie müssen eingeschaltet sein), die einen kleinen Client in RØDEs Audio-Graph hängen. Wenn du Aussetzer oder Knackser hörst, zurück auf das Testsignal schalten.',
   },
 };
 let lang = 'en';
@@ -171,7 +200,9 @@ function resize() {
 window.addEventListener('resize', resize); resize();
 
 const TRAIL_MS = 2000, TRAIL_MAX = 120;
-const state = { az: 0, level: 0, conf: 0 };
+const state = { az: 0, level: 0, conf: 0, dist: 0.5 };
+// Near the centre is near the microphones, the outer ring far away.
+const radiusOf = (dist) => 0.12 + 0.83 * Math.max(0, Math.min(1, dist));
 const trail = [];
 let sweep = 0, lastFrame = performance.now(), lastData = 0;
 const angleOf = (az) => Math.PI + (az + 90) / 180 * Math.PI;
@@ -189,6 +220,10 @@ function draw(now) {
     const lx = cx + Math.cos(ang) * (R + 4) + (a === -90 ? 14 : a === 90 ? -14 : 0), ly = cy + Math.sin(ang) * (R + 8) - (Math.abs(a) === 90 ? 6 : 0);
     ctx.fillText((a > 0 ? '+' : '') + a + '°', lx, ly);
   }
+  ctx.textAlign = 'left';
+  ctx.fillText(t('near'), cx + R * 0.14, cy - 4);
+  ctx.fillText(t('far2'), cx + R * 0.72, cy - 4);
+  ctx.textAlign = 'center';
   sweep = (sweep + dt / 1300) % 1;
   const sAng = Math.PI + sweep * Math.PI;
   const grad = ctx.createLinearGradient(cx, cy, cx + Math.cos(sAng) * R, cy + Math.sin(sAng) * R);
@@ -197,11 +232,11 @@ function draw(now) {
   ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sAng) * R, cy + Math.sin(sAng) * R); ctx.stroke();
   pruneTrail(now);
   for (const p of trail) {
-    const age = (now - p.at) / TRAIL_MS, ang = angleOf(p.az), rr = R * (0.35 + 0.6 * p.level);
+    const age = (now - p.at) / TRAIL_MS, ang = angleOf(p.az), rr = R * radiusOf(p.dist);
     ctx.fillStyle = `rgba(${C.accent},${(1 - age) * 0.5 * p.level})`;
     ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr, 3, 0, 2 * Math.PI); ctx.fill();
   }
-  const ang = angleOf(state.az), rr = R * (0.35 + 0.6 * state.level);
+  const ang = angleOf(state.az), rr = R * radiusOf(state.dist);
   const x = cx + Math.cos(ang) * rr, y = cy + Math.sin(ang) * rr, size = 5 + state.level * 14;
   const glow = ctx.createRadialGradient(x, y, 0, x, y, size * 2.2);
   glow.addColorStop(0, `rgba(231,237,243,${0.55 + 0.4 * state.conf})`);
@@ -233,8 +268,9 @@ let sourceName = '';
 function onData(d) {
   lastData = performance.now();
   $('#scope').classList.remove('stale');
-  state.az = d.az; state.level = d.level; state.conf = d.conf;
-  if (d.level > 0.04) { trail.push({ az: d.az, level: d.level, at: lastData }); pruneTrail(lastData); }
+  state.az = d.az; state.level = d.level; state.conf = d.conf; state.dist = d.dist ?? 0.5;
+  if (d.level > 0.04) { trail.push({ az: d.az, level: d.level, dist: state.dist, at: lastData }); pruneTrail(lastData); }
+  $('#distV').textContent = d.level > 0.04 ? t(state.dist < 0.34 ? 'near' : state.dist < 0.67 ? 'mid' : 'far2') : '—';
   $('#azV').textContent = (d.az > 0 ? '+' : '') + d.az.toFixed(0) + '°';
   $('#dirV').textContent = dirName(d.az);
   $('#lvlV').textContent = d.levelDb <= -99 ? '-∞' : d.levelDb.toFixed(0);
@@ -274,12 +310,12 @@ async function api(path, body) {
   const r = await fetch(path, opt);
   let d = null;
   try { d = await r.json(); } catch (e) { /* not JSON */ }
-  if (!r.ok) throw new Error((d && d.error) || 'HTTP ' + r.status);
+  if (!r.ok) { const e = new Error((d && d.error) || 'HTTP ' + r.status); e.code = d && d.code; throw e; }
   return d;
 }
 async function patch(p) {
   try { cfg = await api('api/config', p); showErr(''); renderConfig(); }
-  catch (e) { showErr(t('failed', { err: e.message })); loadConfig(); }
+  catch (e) { showErr(e.code === 'no_signal' ? t('noSignal') : t('failed', { err: e.message })); loadConfig(); }
 }
 function fillSelect(sel, items, current) {
   sel.textContent = '';
@@ -293,6 +329,18 @@ function sourceItems(current) {
   if (current && !items.some(([v]) => v === current)) items.push([current, current]);
   return items;
 }
+// Mono channels of the desk: one microphone has no direction.
+const MONO = /^(combo[1-4]|callme[1-3])$/;
+// suggestFor proposes the JACK pair a microphone channel probably comes in
+// on (inputs 1+2 or 3+4 of the device), if JACK offers it.
+function suggestFor(ch) {
+  const m = /^combo(\d)(?:_\d)?$/.exec(ch || '');
+  if (!m) return '';
+  const first = Number(m[1]) % 2 ? Number(m[1]) : Number(m[1]) - 1;
+  const pair = `jack:system:capture_${first},system:capture_${first + 1}`;
+  return srcList.includes(pair) ? pair : '';
+}
+let reassigning = false;
 const chanLabel = (id) => { const s = strips.find((x) => x.sourceId === id); return s ? `${s.label} · ${s.sourceLabel}` : id; };
 function updateSubline() {
   const parts = [];
@@ -310,14 +358,22 @@ function renderConfig() {
     fillSelect($('#channel'), [['', t('noChannel')], ...strips.filter((s) => s.sourceId).map((s) => [s.sourceId, `${s.label} · ${s.sourceLabel}`])], cfg.channel || '');
   }
   const ch = cfg.channel, mapped = ch && cfg.channels && cfg.channels[ch];
-  $('#chanInfo').textContent = !strips.length ? t('noConsole') : mapped ? t('mapped', { src: mapped }) : t('chanHint');
-  $('#assignBox').hidden = !ch || !!mapped;
-  $('#chanInfo').hidden = !!ch && !mapped && !!strips.length; // the assignment prompt says it all
+  const asking = !!ch && (!mapped || reassigning);
+  $('#chanInfo').textContent = !strips.length ? t('noConsole') : mapped ? t('mapped', { src: srcLabel(mapped) }) : t('chanHint');
+  $('#assignBox').hidden = !asking;
+  $('#chanInfo').hidden = asking && !mapped && !!strips.length; // the question says it all
+  $('#reassign').hidden = !mapped || reassigning;
   $('#unassign').hidden = !mapped;
-  if (ch && !mapped) {
-    $('#assignMsg').textContent = t('unmapped', { ch: chanLabel(ch) });
-    fillSelect($('#assignSrc'), sourceItems(cfg.source), cfg.source);
+  if (asking) {
+    $('#assignMsg').textContent = MONO.test(ch) ? t('mono', { ch: chanLabel(ch) }) : t('unmapped', { ch: chanLabel(ch) });
+    const sug = suggestFor(ch), items = sourceItems(mapped || cfg.source);
+    if (sug) { const i = items.findIndex(([v]) => v === sug); if (i >= 0) items.splice(i, 1); items.unshift([sug, t('suggested', { src: srcLabel(sug) })]); }
+    fillSelect($('#assignSrc'), items, mapped || sug || cfg.source);
   }
+  const c = cfg.calibration || {};
+  $('#calState').textContent = c.calibrated ? t('calDone', { n: c.near.db.toFixed(0), f: c.far.db.toFixed(0) })
+    : c.near && c.far ? t('calSame') : c.near ? t('calOnlyNear') : c.far ? t('calOnlyFar') : t('calNone');
+  $('#calReset').hidden = !c.near && !c.far;
   updateSubline();
 }
 async function loadSources() {
@@ -334,13 +390,18 @@ async function loadStrips() {
     if (r.ok) strips = (await r.json()).strips || [];
   } catch (e) { strips = []; }
   $('#channel').hidden = !strips.length;
+  $('label[for=channel]').hidden = !strips.length;
 }
 const timers = {};
 function patchSoon(k, p) { clearTimeout(timers[k]); timers[k] = setTimeout(() => patch(p), 150); }
 $('#source').addEventListener('change', (e) => { if (jackOK(e.target.value)) patch({ source: e.target.value }); else renderConfig(); });
 $('#refreshSrc').addEventListener('click', async () => { await loadSources(); renderConfig(); });
-$('#channel').addEventListener('change', (e) => patch({ channel: e.target.value }));
-$('#assignBtn').addEventListener('click', () => { const src = $('#assignSrc').value; if (jackOK(src)) patch({ assign: { channel: cfg.channel, source: src } }); });
+$('#channel').addEventListener('change', (e) => { reassigning = false; patch({ channel: e.target.value }); });
+$('#assignBtn').addEventListener('click', () => { const src = $('#assignSrc').value; if (jackOK(src)) { reassigning = false; patch({ assign: { channel: cfg.channel, source: src } }); } });
+$('#reassign').addEventListener('click', () => { reassigning = true; renderConfig(); });
+$('#calNear').addEventListener('click', () => patch({ calibrate: 'near' }));
+$('#calFar').addEventListener('click', () => patch({ calibrate: 'far' }));
+$('#calReset').addEventListener('click', () => patch({ calibrate: 'reset' }));
 $('#unassign').addEventListener('click', () => patch({ assign: { channel: cfg.channel, source: '' } }));
 $('#smoothing').addEventListener('input', (e) => { $('#smoothingV').textContent = (+e.target.value).toFixed(2); e.target.style.setProperty('--p', (e.target.value / 0.95 * 100) + '%'); patchSoon('s', { smoothing: +e.target.value }); });
 $('#noise').addEventListener('input', (e) => { $('#noiseV').textContent = e.target.value + ' dB'; e.target.style.setProperty('--p', ((e.target.value - -80) / 60 * 100) + '%'); patchSoon('n', { noiseFloor: +e.target.value }); });
@@ -354,6 +415,7 @@ $('#flip').addEventListener('change', (e) => patch({ flip: e.target.checked }));
   const q = new URLSearchParams(location.search);
   const want = q.has('source') ? (q.get('source') || 'none') : '';
   if (want && /^[a-z][a-z0-9_-]{0,31}$/.test(want) && want !== cfg.channel) await patch({ channel: want });
+  if (want && !(cfg.channels || {})[cfg.channel]) $('#chanCard').scrollIntoView({ block: 'nearest' }); // the question first
 })();
 </script>
 </body>

@@ -6,6 +6,20 @@ may break compatibility).
 
 ## 0.5.4 - Unreleased
 
+### Changed
+- **Sonar 0.6.0**, after the first tests on a real Duo:
+  - **Distance:** estimated from the level and from how much both microphones hear
+    the same signal (direct sound against the room's reverberation), with a
+    calibration (*Near*, *Far*) for the room. On the radar, near is now at the centre
+    and far at the outer ring; before, a louder sound was drawn further out, which
+    read as "far". A *Distance* readout shows near, middle or far.
+  - **What Sonar hears:** one card for the channel of the desk and its audio. A mono
+    channel (one microphone) says that it has no direction and proposes a pair; for
+    microphone channels the JACK pair of inputs 1+2 (or 3+4) is proposed. Choosing
+    the audio without a channel moved under *Choose the audio directly*.
+  - The radar says what a stereo signal cannot tell: front from back, and height.
+  - The question before a JACK source describes the host's shared audio taps.
+
 ## 0.5.3 - 2026-10-18
 
 ### Fixed
