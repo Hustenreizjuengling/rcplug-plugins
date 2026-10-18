@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Go tests (with rcplug's SDK from main)
+    # It checks out the rcplug repository, which GitHub only allows while it is public.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: rcplug-plugins
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/rcplug
+          path: rcplug
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: rcplug-plugins/go.mod
+      - run: go work init ./rcplug-plugins ./rcplug
+      - run: make -C rcplug-plugins check package
+      - name: arm64 tests (qemu-user)
+        run: |
+          sudo apt-get update && sudo apt-get install -y qemu-user
+          make -C rcplug-plugins test-arm64

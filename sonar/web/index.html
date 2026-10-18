@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonar · rcplug</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%227%22 fill=%22none%22 stroke=%22%2319c37d%22 stroke-width=%222%22/%3E%3Ccircle cx=%228%22 cy=%228%22 r=%222%22 fill=%22%2319c37d%22/%3E%3C/svg%3E">
+<style>
+  /* Same palette and components as the console, so the plugins look like one app. */
+  :root{
+    --bg:#0d1015; --panel:#151a21; --panel2:#1c232c; --panel3:#232c37; --line:#2a333f;
+    --fg:#e7edf3; --muted:#9aa8b6; --dim:#7d8a97; --accent:#19c37d; --accent-ink:#04261a;
+    --amber:#e3a008; --red:#f85149; --radius:12px; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  button,input,select{font:inherit;color:inherit}
+  .top{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .logo{font-size:22px;color:var(--accent)}
+  .dev{font-weight:650;font-size:16px}
+  .sub{color:var(--muted);font-size:12px}
+  .spacer{flex:1}
+  main{padding:16px;max-width:1400px;margin:0 auto}
+  .layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:12px;align-items:start}
+  .side{display:grid;gap:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;min-width:0}
+  .card h3{margin:0 0 10px;font-size:14px;font-weight:650;display:flex;align-items:center;gap:8px}
+  .scope{position:relative;width:100%;aspect-ratio:2/1.15;background:#10151b;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .scope.stale canvas{opacity:.35}
+  canvas{position:absolute;inset:0;width:100%;height:100%}
+  .readouts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+  .ro{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center}
+  .ro .v{font-size:20px;font-weight:650;font-variant-numeric:tabular-nums}
+  .ro .k{font-size:11px;color:var(--muted)}
+  .meters{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;margin-top:12px;font-size:12px;color:var(--muted)}
+  .hbar{height:8px;background:var(--panel3);border-radius:4px;overflow:hidden}
+  .hbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent) 70%,var(--amber) 88%,var(--red));transform-origin:left;transform:scaleX(0)}
+  .ctlrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center;margin:8px 0}
+  .ctlrow label{grid-column:1/-1;color:var(--muted);font-size:13px}
+  .val{font-family:var(--mono);font-size:12px;min-width:56px;text-align:right}
+  select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .row select{flex:1 1 160px;width:auto;min-width:0}
+  .btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+  .btn.link{background:none;border:0;padding:0;color:var(--muted);text-decoration:underline;font-size:12px}
+  .sw{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:13px}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;cursor:pointer;margin:0;--p:0%}
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--accent) var(--p),var(--panel3) var(--p))}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-5px;border-radius:50%;background:#e7edf3;border:2px solid var(--accent)}
+  input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--panel3)}
+  input[type=range]::-moz-range-progress{height:4px;border-radius:2px;background:var(--accent)}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#e7edf3;border:2px solid var(--accent)}
+  .muted{color:var(--muted)} .small{font-size:12px} .mono{font-family:var(--mono);font-size:12px}
+  .banner{border:1px solid var(--amber);background:#2a2110;color:#ffe2a3;border-radius:10px;padding:8px 12px;font-size:13px;margin:8px 0}
+  .banner.bad{border-color:var(--red);background:#2a1414;color:#ffb3ae}
+  .tag{font-size:11px;padding:1px 8px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+  .tag.on{border-color:var(--accent);color:var(--accent)}
+  [hidden]{display:none !important}
+  body.embedded .top{padding:6px 14px;background:var(--panel2)}
+  body.embedded #lang{display:none}
+  @media (max-width:860px){ .layout{grid-template-columns:1fr} main{padding:10px} }
+  @media (max-width:520px){ .readouts{grid-template-columns:repeat(2,minmax(0,1fr))} }
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="logo" aria-hidden="true">◉</span>
+  <div><div class="dev">Sonar</div><div class="sub" id="subline" aria-live="polite"></div></div>
+  <span class="spacer"></span>
+  <span class="tag" id="state"></span>
+  <button type="button" class="btn" id="lang"></button>
+</header>
+<main>
+  <div id="err" class="banner bad" role="alert" hidden></div>
+  <div class="layout">
+    <section class="card">
+      <div class="scope" id="scope"><canvas id="cv" role="img"></canvas></div>
+      <div class="readouts">
+        <div class="ro"><div class="v" id="azV">0°</div><div class="k" data-t="bearing"></div></div>
+        <div class="ro"><div class="v" id="dirV">—</div><div class="k" data-t="side"></div></div>
+        <div class="ro"><div class="v" id="lvlV">-∞</div><div class="k" data-t="level"></div></div>
+        <div class="ro"><div class="v" id="confV">0%</div><div class="k" data-t="confidence"></div></div>
+      </div>
+      <div class="meters" aria-hidden="true">
+        <span>L</span><div class="hbar"><i id="mL"></i></div>
+        <span>R</span><div class="hbar"><i id="mR"></i></div>
+      </div>
+    </section>
+    <div class="side">
+      <section class="card" id="chanCard">
+        <h3 data-t="channel"></h3>
+        <select id="channel" aria-labelledby="chanCard"></select>
+        <p class="muted small" id="chanInfo"></p>
+        <div id="assignBox" hidden>
+          <div class="banner" id="assignMsg"></div>
+          <div class="row"><select id="assignSrc"></select><button type="button" class="btn primary" id="assignBtn" data-t="assign"></button></div>
+        </div>
+        <button type="button" class="btn link" id="unassign" data-t="unassign" hidden></button>
+      </section>
+      <section class="card">
+        <h3 data-t="source"></h3>
+        <div class="row"><select id="source"></select><button type="button" class="btn" id="refreshSrc" data-t-title="refresh">⟳</button></div>
+        <p class="muted small" data-t="hint"></p>
+      </section>
+      <section class="card">
+        <h3 data-t="settings"></h3>
+        <div class="ctlrow"><label for="smoothing" data-t="smoothing"></label><input type="range" id="smoothing" min="0" max="0.95" step="0.05"><span class="val" id="smoothingV"></span></div>
+        <div class="ctlrow"><label for="noise" data-t="noise"></label><input type="range" id="noise" min="-80" max="-20" step="1"><span class="val" id="noiseV"></span></div>
+        <label class="sw"><input type="checkbox" id="flip"> <span data-t="flip"></span></label>
+      </section>
+    </div>
+  </div>
+</main>
+<script>
+'use strict';
+const T = {
+  en: {
+    bearing: 'Bearing', side: 'Side', level: 'Level dBFS', confidence: 'Confidence', channel: 'Channel', source: 'Audio source',
+    settings: 'Settings', refresh: 'Reload the source list', smoothing: 'Smoothing', noise: 'Noise floor', flip: 'Swap left/right',
+    connecting: 'connecting…', reconnecting: 'reconnecting…', live: 'live', noData: 'no data', failed: 'Could not apply the setting: {err}',
+    centre: 'CENTRE', far: 'FAR {s}', slight: 'slightly {s}', radar: 'Radar showing the estimated direction of the loudest sound', switchLang: 'Deutsch',
+    noChannel: '— no channel —', noConsole: 'The console is not reachable, so channels cannot be listed. Choose the audio source directly.',
+    mapped: 'Audio source: {src}', unmapped: 'No audio source is assigned to “{ch}” yet. Which input carries this channel?',
+    assign: 'Assign', unassign: 'Remove assignment', chanHint: 'Pick a console channel; the sonar listens to the audio source assigned to it.',
+    hint: 'Direction finding needs a real stereo signal (two microphones or a stereo microphone). The built-in test signal sweeps from left to right.',
+    jackWarn: 'Listen to JACK ports {src}?\n\nOn the RØDECaster the desk’s audio runs through JACK, so Sonar adds a small client to RØDE’s audio graph: it loads the ALSA loopback driver (snd-aloop) and runs alsa_out. This has not been tried on a real device yet. If you hear dropouts or clicks, switch back to the test signal.',
+  },
+  de: {
+    bearing: 'Richtung', side: 'Seite', level: 'Pegel dBFS', confidence: 'Sicherheit', channel: 'Kanal', source: 'Audioquelle',
+    settings: 'Einstellungen', refresh: 'Quellenliste neu laden', smoothing: 'Glättung', noise: 'Rauschschwelle', flip: 'Links/Rechts tauschen',
+    connecting: 'verbinde…', reconnecting: 'verbinde neu…', live: 'live', noData: 'keine Daten', failed: 'Einstellung nicht übernommen: {err}',
+    centre: 'MITTE', far: 'GANZ {s}', slight: 'leicht {s}', radar: 'Radar mit der geschätzten Richtung des lautesten Geräuschs', switchLang: 'English',
+    noChannel: '— kein Kanal —', noConsole: 'Die Konsole ist nicht erreichbar, daher keine Kanalliste. Wähle die Audioquelle direkt.',
+    mapped: 'Audioquelle: {src}', unmapped: 'Für „{ch}“ ist noch keine Audioquelle zugeordnet. Über welchen Eingang kommt dieser Kanal?',
+    assign: 'Zuordnen', unassign: 'Zuordnung entfernen', chanHint: 'Wähle einen Kanal der Konsole; das Sonar hört auf die Audioquelle, die ihm zugeordnet ist.',
+    hint: 'Für die Richtung braucht es ein echtes Stereosignal (zwei Mikrofone oder ein Stereomikrofon). Das eingebaute Testsignal schwenkt von links nach rechts.',
+    jackWarn: 'Auf die JACK-Ports {src} hören?\n\nAm RØDECaster läuft das Audio des Pults über JACK, daher hängt Sonar einen kleinen Client in RØDEs Audio-Graph: es lädt den ALSA-Loopback-Treiber (snd-aloop) und startet alsa_out. Das wurde an einem echten Gerät noch nicht ausprobiert. Wenn du Aussetzer oder Knackser hörst, zurück auf das Testsignal schalten.',
+  },
+};
+let lang = 'en';
+try { lang = localStorage.getItem('rcplug-lang') || ((navigator.language || '').toLowerCase().startsWith('de') ? 'de' : 'en'); } catch (e) { /* ignore */ }
+if (!T[lang]) lang = 'en';
+document.documentElement.lang = lang;
+const t = (k, p) => (T[lang][k] ?? T.en[k] ?? k).replace(/\{(\w+)\}/g, (m, n) => (p && n in p ? p[n] : m));
+const $ = (s) => document.querySelector(s);
+const embedded = window.self !== window.top;
+if (embedded) document.body.classList.add('embedded');
+document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+document.querySelectorAll('[data-t-title]').forEach((el) => { el.title = t(el.dataset.tTitle); el.setAttribute('aria-label', el.title); });
+$('#cv').setAttribute('aria-label', t('radar'));
+$('#state').textContent = t('connecting');
+$('#lang').textContent = t('switchLang');
+$('#lang').addEventListener('click', () => {
+  try { localStorage.setItem('rcplug-lang', lang === 'de' ? 'en' : 'de'); } catch (e) { /* ignore */ }
+  location.reload();
+});
+const showErr = (msg) => { $('#err').textContent = msg || ''; $('#err').hidden = !msg; };
+
+// ---- radar
+const cv = $('#cv'), ctx = cv.getContext('2d');
+const css = getComputedStyle(document.documentElement);
+const C = { line: css.getPropertyValue('--line').trim(), muted: css.getPropertyValue('--dim').trim(), accent: '25,195,125' };
+let W = 0, H = 0;
+function resize() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1), r = cv.getBoundingClientRect();
+  W = r.width; H = r.height;
+  cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize); resize();
+
+const TRAIL_MS = 2000, TRAIL_MAX = 120;
+const state = { az: 0, level: 0, conf: 0 };
+const trail = [];
+let sweep = 0, lastFrame = performance.now(), lastData = 0;
+const angleOf = (az) => Math.PI + (az + 90) / 180 * Math.PI;
+
+function draw(now) {
+  const dt = Math.min(100, now - lastFrame); lastFrame = now;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H * 0.95, R = Math.min(W / 2 - 14, H * 0.88);
+  ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+  for (let k = 1; k <= 4; k++) { ctx.beginPath(); ctx.arc(cx, cy, R * k / 4, Math.PI, 2 * Math.PI); ctx.stroke(); }
+  ctx.fillStyle = C.muted; ctx.font = '11px system-ui, sans-serif'; ctx.textAlign = 'center';
+  for (const a of [-90, -45, 0, 45, 90]) {
+    const ang = angleOf(a), x = cx + Math.cos(ang) * R, y = cy + Math.sin(ang) * R;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, y); ctx.stroke();
+    const lx = cx + Math.cos(ang) * (R + 4) + (a === -90 ? 14 : a === 90 ? -14 : 0), ly = cy + Math.sin(ang) * (R + 8) - (Math.abs(a) === 90 ? 6 : 0);
+    ctx.fillText((a > 0 ? '+' : '') + a + '°', lx, ly);
+  }
+  sweep = (sweep + dt / 1300) % 1;
+  const sAng = Math.PI + sweep * Math.PI;
+  const grad = ctx.createLinearGradient(cx, cy, cx + Math.cos(sAng) * R, cy + Math.sin(sAng) * R);
+  grad.addColorStop(0, `rgba(${C.accent},0.45)`); grad.addColorStop(1, `rgba(${C.accent},0)`);
+  ctx.strokeStyle = grad; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sAng) * R, cy + Math.sin(sAng) * R); ctx.stroke();
+  pruneTrail(now);
+  for (const p of trail) {
+    const age = (now - p.at) / TRAIL_MS, ang = angleOf(p.az), rr = R * (0.35 + 0.6 * p.level);
+    ctx.fillStyle = `rgba(${C.accent},${(1 - age) * 0.5 * p.level})`;
+    ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr, 3, 0, 2 * Math.PI); ctx.fill();
+  }
+  const ang = angleOf(state.az), rr = R * (0.35 + 0.6 * state.level);
+  const x = cx + Math.cos(ang) * rr, y = cy + Math.sin(ang) * rr, size = 5 + state.level * 14;
+  const glow = ctx.createRadialGradient(x, y, 0, x, y, size * 2.2);
+  glow.addColorStop(0, `rgba(231,237,243,${0.55 + 0.4 * state.conf})`);
+  glow.addColorStop(0.4, `rgba(${C.accent},${0.45 * state.level + 0.2})`);
+  glow.addColorStop(1, `rgba(${C.accent},0)`);
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, size * 2.2, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = '#e7edf3'; ctx.beginPath(); ctx.arc(x, y, 3, 0, 2 * Math.PI); ctx.fill();
+  ctx.strokeStyle = `rgba(${C.accent},${0.3 + 0.5 * state.conf})`; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ang) * R, cy + Math.sin(ang) * R); ctx.stroke();
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+function pruneTrail(now) {
+  let drop = 0;
+  while (drop < trail.length && now - trail[drop].at > TRAIL_MS) drop++;
+  if (trail.length - drop > TRAIL_MAX) drop = trail.length - TRAIL_MAX;
+  if (drop) trail.splice(0, drop);
+}
+
+function dirName(az) {
+  if (Math.abs(az) < 6) return t('centre');
+  const s = az < 0 ? 'L' : 'R', m = Math.abs(az);
+  if (m > 60) return t('far', { s });
+  return m > 25 ? s : t('slight', { s });
+}
+
+let sourceName = '';
+function onData(d) {
+  lastData = performance.now();
+  $('#scope').classList.remove('stale');
+  state.az = d.az; state.level = d.level; state.conf = d.conf;
+  if (d.level > 0.04) { trail.push({ az: d.az, level: d.level, at: lastData }); pruneTrail(lastData); }
+  $('#azV').textContent = (d.az > 0 ? '+' : '') + d.az.toFixed(0) + '°';
+  $('#dirV').textContent = dirName(d.az);
+  $('#lvlV').textContent = d.levelDb <= -99 ? '-∞' : d.levelDb.toFixed(0);
+  $('#confV').textContent = (d.conf * 100).toFixed(0) + '%';
+  $('#mL').style.transform = `scaleX(${Math.max(0, Math.min(1, d.l))})`;
+  $('#mR').style.transform = `scaleX(${Math.max(0, Math.min(1, d.r))})`;
+  sourceName = d.source || '';
+  $('#state').textContent = d.err ? d.err : t('live');
+  $('#state').classList.toggle('on', !d.err);
+  updateSubline();
+}
+
+// ---- live stream: reopened with backoff when it closes
+let es = null, retry = 1000;
+function connect() {
+  es = new EventSource('stream');
+  es.onopen = () => { retry = 1000; };
+  es.onmessage = (e) => { try { onData(JSON.parse(e.data)); } catch (x) { /* ignore a bad frame */ } };
+  es.onerror = () => {
+    $('#state').textContent = t('reconnecting'); $('#state').classList.remove('on');
+    if (es.readyState === EventSource.CLOSED) { es.close(); setTimeout(connect, retry); retry = Math.min(retry * 2, 10000); }
+  };
+}
+connect();
+setInterval(() => {
+  if (performance.now() - lastData > 3000) {
+    $('#scope').classList.add('stale');
+    state.level = 0; state.conf = 0;
+    if (es && es.readyState === EventSource.OPEN) { $('#state').textContent = t('noData'); $('#state').classList.remove('on'); }
+  }
+}, 1000);
+
+// ---- config, sources and channels
+let cfg = { channels: {} }, srcList = [], strips = [];
+async function api(path, body) {
+  const opt = body === undefined ? { cache: 'no-store' } : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Rcplug': '1' }, body: JSON.stringify(body) };
+  const r = await fetch(path, opt);
+  let d = null;
+  try { d = await r.json(); } catch (e) { /* not JSON */ }
+  if (!r.ok) throw new Error((d && d.error) || 'HTTP ' + r.status);
+  return d;
+}
+async function patch(p) {
+  try { cfg = await api('api/config', p); showErr(''); renderConfig(); }
+  catch (e) { showErr(t('failed', { err: e.message })); loadConfig(); }
+}
+function fillSelect(sel, items, current) {
+  sel.textContent = '';
+  for (const [v, label] of items) { const o = document.createElement('option'); o.value = v; o.textContent = label; o.selected = v === current; sel.appendChild(o); }
+}
+const srcLabel = (s) => s.startsWith('alsa:') ? 'ALSA ' + s.slice(5) : s.startsWith('jack:') ? 'JACK ' + s.slice(5).replace(',', ' + ') : s;
+// Choosing a JACK source changes RØDE's audio graph: ask first.
+const jackOK = (src) => !src.startsWith('jack:') || src === cfg.source || confirm(t('jackWarn', { src: srcLabel(src).slice(5) }));
+function sourceItems(current) {
+  const items = srcList.map((s) => [s, srcLabel(s)]);
+  if (current && !items.some(([v]) => v === current)) items.push([current, current]);
+  return items;
+}
+const chanLabel = (id) => { const s = strips.find((x) => x.sourceId === id); return s ? `${s.label} · ${s.sourceLabel}` : id; };
+function updateSubline() {
+  const parts = [];
+  if (cfg.channel) parts.push(chanLabel(cfg.channel));
+  if (sourceName) parts.push(sourceName);
+  $('#subline').textContent = parts.join(' · ');
+}
+function renderConfig() {
+  fillSelect($('#source'), sourceItems(cfg.source), cfg.source);
+  $('#smoothing').value = cfg.smoothing; $('#smoothingV').textContent = (+cfg.smoothing).toFixed(2);
+  $('#noise').value = cfg.noiseFloor; $('#noiseV').textContent = cfg.noiseFloor + ' dB';
+  for (const id of ['smoothing', 'noise']) { const el = $('#' + id); el.style.setProperty('--p', ((el.value - el.min) / (el.max - el.min) * 100) + '%'); }
+  $('#flip').checked = !!cfg.flip;
+  if (strips.length) {
+    fillSelect($('#channel'), [['', t('noChannel')], ...strips.filter((s) => s.sourceId).map((s) => [s.sourceId, `${s.label} · ${s.sourceLabel}`])], cfg.channel || '');
+  }
+  const ch = cfg.channel, mapped = ch && cfg.channels && cfg.channels[ch];
+  $('#chanInfo').textContent = !strips.length ? t('noConsole') : mapped ? t('mapped', { src: mapped }) : t('chanHint');
+  $('#assignBox').hidden = !ch || !!mapped;
+  $('#chanInfo').hidden = !!ch && !mapped && !!strips.length; // the assignment prompt says it all
+  $('#unassign').hidden = !mapped;
+  if (ch && !mapped) {
+    $('#assignMsg').textContent = t('unmapped', { ch: chanLabel(ch) });
+    fillSelect($('#assignSrc'), sourceItems(cfg.source), cfg.source);
+  }
+  updateSubline();
+}
+async function loadSources() {
+  try { const s = await api('api/sources'); srcList = [...(s.builtin || []), ...(s.alsa || []).map((d) => 'alsa:' + d), ...(s.jack || []).map((p) => 'jack:' + p)]; }
+  catch (e) { showErr(t('failed', { err: e.message })); }
+}
+async function loadConfig() {
+  try { cfg = await api('api/config'); renderConfig(); } catch (e) { /* the stream shows the state */ }
+}
+// The console lists the desk's channels; reachable through the host only.
+async function loadStrips() {
+  try {
+    const r = await fetch('../console/api/summary', { cache: 'no-store' });
+    if (r.ok) strips = (await r.json()).strips || [];
+  } catch (e) { strips = []; }
+  $('#channel').hidden = !strips.length;
+}
+const timers = {};
+function patchSoon(k, p) { clearTimeout(timers[k]); timers[k] = setTimeout(() => patch(p), 150); }
+$('#source').addEventListener('change', (e) => { if (jackOK(e.target.value)) patch({ source: e.target.value }); else renderConfig(); });
+$('#refreshSrc').addEventListener('click', async () => { await loadSources(); renderConfig(); });
+$('#channel').addEventListener('change', (e) => patch({ channel: e.target.value }));
+$('#assignBtn').addEventListener('click', () => { const src = $('#assignSrc').value; if (jackOK(src)) patch({ assign: { channel: cfg.channel, source: src } }); });
+$('#unassign').addEventListener('click', () => patch({ assign: { channel: cfg.channel, source: '' } }));
+$('#smoothing').addEventListener('input', (e) => { $('#smoothingV').textContent = (+e.target.value).toFixed(2); e.target.style.setProperty('--p', (e.target.value / 0.95 * 100) + '%'); patchSoon('s', { smoothing: +e.target.value }); });
+$('#noise').addEventListener('input', (e) => { $('#noiseV').textContent = e.target.value + ' dB'; e.target.style.setProperty('--p', ((e.target.value - -80) / 60 * 100) + '%'); patchSoon('n', { noiseFloor: +e.target.value }); });
+$('#flip').addEventListener('change', (e) => patch({ flip: e.target.checked }));
+
+(async () => {
+  await Promise.all([loadSources(), loadStrips()]);
+  await loadConfig();
+  // Opened from a console action: ?strip=…&source=combo1&label=…
+  const want = new URLSearchParams(location.search).get('source');
+  if (want && /^[a-z][a-z0-9_-]{0,31}$/.test(want) && want !== cfg.channel) await patch({ channel: want });
+})();
+</script>
+</body>
+</html>

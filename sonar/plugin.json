@@ -1,0 +1,33 @@
+{
+  "$schema": "../../plugin.schema.json",
+  "name": "sonar",
+  "title": "Sonar",
+  "description": "Direction finder for a channel's stereo signal: shows where a sound comes from, estimated from level and phase, as a live radar.",
+  "version": "0.5.0",
+  "exec": [
+    "./sonar",
+    "--addr",
+    "127.0.0.1:{{port}}",
+    "--source",
+    "test"
+  ],
+  "httpProxy": "127.0.0.1:{{port}}",
+  "autostart": true,
+  "needsAudio": true,
+  "order": 50,
+  "icon": "◉",
+  "translations": {
+    "de": {
+      "description": "Richtungsanzeige für das Stereosignal eines Kanals: zeigt aus Pegel und Phase, woher ein Geräusch kommt, als Live-Radar."
+    }
+  },
+  "actions": [
+    {
+      "id": "channel",
+      "context": "channel",
+      "title": "Sonar",
+      "icon": "◉",
+      "path": "?strip={strip}&source={source}&label={label}"
+    }
+  ]
+}
