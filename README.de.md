@@ -6,7 +6,7 @@ rcplug startet es auf dem Gerät und zeigt seine Webseite im Dashboard.
 
 | Plugin | Macht |
 |---|---|
-| [Sicherung](backup/README.md) | Sichert die Einstellungen von rcplug und dem Pult, zeigt, was eine Wiederherstellung ändern würde, und spielt Sicherungen zurück; Sicherungen lassen sich als Datei herunter- und hochladen. |
+| [Sicherung](backup/README.md) | Sichert die Einstellungen von rcplug, zeigt, was eine Wiederherstellung ändern würde, und spielt Sicherungen zurück; Sicherungen lassen sich als Datei herunter- und hochladen. |
 | [Sonar](sonar/README.md) | Zeigt als Live-Radar, aus welcher Richtung ein Geräusch auf einem Stereokanal kommt. Entstanden als Spielerei für Versteckspiele unter Freunden. |
 
 English: [README.md](README.md)

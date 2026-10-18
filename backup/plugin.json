@@ -2,8 +2,8 @@
   "$schema": "https://raw.githubusercontent.com/Hustenreizjuengling/rcplug/main/plugin.schema.json",
   "name": "backup",
   "title": "Backup",
-  "description": "Backs up rcplug's settings and the desk's settings, shows what restoring a backup would change and restores it. Backups stay on the device and can be downloaded and uploaded as files.",
-  "version": "0.1.0",
+  "description": "Backs up rcplug's settings (which plugins run, their options, updates, catalogs), shows what restoring a backup would change and restores it. Backups stay on the device and can be downloaded and uploaded as files.",
+  "version": "0.2.0",
   "exec": [
     "./backup",
     "--addr",
@@ -19,7 +19,7 @@
   "translations": {
     "de": {
       "title": "Sicherung",
-      "description": "Sichert die Einstellungen von rcplug und dem Pult, zeigt, was eine Wiederherstellung ändern würde, und spielt Sicherungen zurück. Sicherungen bleiben auf dem Gerät und lassen sich als Datei herunter- und hochladen."
+      "description": "Sichert die Einstellungen von rcplug (welche Plugins laufen, ihre Optionen, Updates, Kataloge), zeigt, was eine Wiederherstellung ändern würde, und spielt Sicherungen zurück. Sicherungen bleiben auf dem Gerät und lassen sich als Datei herunter- und hochladen."
     }
   }
 }

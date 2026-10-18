@@ -1,9 +1,10 @@
-// Command backup is an rcplug plugin: it keeps backups of rcplug's settings
-// and the desk's settings and restores them. The page in the browser does
-// the work against rcplugd's and the console's APIs (GET /api/backup,
-// console api/snapshot and their diff and restore), so the person's control
-// level and PIN apply; this program keeps the backups, gzip-compressed, in
-// the plugin's data directory and hands them out as files.
+// Command backup is an rcplug plugin: it keeps backups of rcplug's own
+// settings and restores them. The page in the browser does the work against
+// rcplugd's API (GET /api/backup, its diff and restore); this program keeps
+// the backups, gzip-compressed, in the plugin's data directory and hands them
+// out as files. The desk's settings, and the console that shows and changes
+// them, are not backed up: they go with the device and its shows (RØDE's),
+// and a firmware update can change what their thousands of values mean.
 package main
 
 import (
@@ -45,39 +46,33 @@ const (
 	Format = 1
 
 	maxBackups = 50
-	maxSize    = 8 << 20 // a backup as JSON
+	maxSize    = 2 << 20 // a backup as JSON
 	maxName    = 80
 )
 
 var validID = regexp.MustCompile(`^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$`)
 
-// Doc is a backup: rcplug's settings (GET /api/backup on rcplugd), the
-// console's own (control level, write protection) and the desk's (the
-// console's api/snapshot); each part may be missing.
+// Doc is a backup: rcplug's settings (GET /api/backup on rcplugd). The
+// "console" and "desk" parts version 0.1.0 wrote are dropped.
 type Doc struct {
 	Kind    string          `json:"kind"`
 	Format  int             `json:"format"`
 	Created string          `json:"created"`
 	Name    string          `json:"name,omitempty"`
 	Rcplug  json.RawMessage `json:"rcplug,omitempty"`
-	Console json.RawMessage `json:"console,omitempty"`
-	Desk    json.RawMessage `json:"desk,omitempty"`
 }
 
 // Summary describes a stored backup.
 type Summary struct {
-	ID       string   `json:"id"`
-	Created  string   `json:"created"`
-	Stored   string   `json:"stored"`
-	Name     string   `json:"name,omitempty"`
-	Parts    []string `json:"parts"`
-	Size     int      `json:"size"`     // as JSON
-	OnDisk   int64    `json:"onDisk"`   // compressed
-	Rcplug   string   `json:"rcplug"`   // rcplug's version when it was made
-	Plugins  int      `json:"plugins"`  // in the rcplug part
-	Model    string   `json:"model"`    // of the desk part
-	Firmware string   `json:"firmware"` // of the desk part
-	Settings int      `json:"settings"` // in the desk part
+	ID      string   `json:"id"`
+	Created string   `json:"created"`
+	Stored  string   `json:"stored"`
+	Name    string   `json:"name,omitempty"`
+	Parts   []string `json:"parts"`
+	Size    int      `json:"size"`    // as JSON
+	OnDisk  int64    `json:"onDisk"`  // compressed
+	Rcplug  string   `json:"rcplug"`  // rcplug's version when it was made
+	Plugins int      `json:"plugins"` // in the rcplug part
 }
 
 type store struct {
@@ -108,6 +103,10 @@ func summarize(raw []byte) (Doc, Summary, error) {
 	if err := json.Unmarshal(raw, &d); err != nil {
 		return d, Summary{}, fmt.Errorf("not a backup: %v", err)
 	}
+	var old struct {
+		Desk json.RawMessage `json:"desk"`
+	}
+	_ = json.Unmarshal(raw, &old)
 	if d.Kind != Kind || d.Format != Format {
 		return d, Summary{}, errors.New("not a backup of this plugin, or in a format this version does not know")
 	}
@@ -125,29 +124,10 @@ func summarize(raw []byte) (Doc, Summary, error) {
 		sum.Parts = append(sum.Parts, "rcplug")
 		sum.Rcplug, sum.Plugins = r.Version, len(r.Plugins)
 	}
-	if len(d.Console) > 0 && string(d.Console) != "null" {
-		var c struct {
-			Control string `json:"control"`
-		}
-		if json.Unmarshal(d.Console, &c) != nil {
-			return d, sum, errors.New("the console part is not the console's settings")
-		}
-		sum.Parts = append(sum.Parts, "console")
-	}
-	if len(d.Desk) > 0 && string(d.Desk) != "null" {
-		var k struct {
-			Format   int               `json:"format"`
-			Model    string            `json:"model"`
-			Firmware string            `json:"firmware"`
-			Settings []json.RawMessage `json:"settings"`
-		}
-		if json.Unmarshal(d.Desk, &k) != nil || k.Format != 1 {
-			return d, sum, errors.New("the desk part is not a snapshot of the desk")
-		}
-		sum.Parts = append(sum.Parts, "desk")
-		sum.Model, sum.Firmware, sum.Settings = k.Model, k.Firmware, len(k.Settings)
-	}
 	if len(sum.Parts) == 0 {
+		if len(old.Desk) > 0 && string(old.Desk) != "null" {
+			return d, sum, errors.New("the backup holds only the desk's or the console's settings, which are not backed up any more")
+		}
 		return d, sum, errors.New("the backup holds nothing")
 	}
 	return d, sum, nil
@@ -272,7 +252,7 @@ func (s *store) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/backups", func(w http.ResponseWriter, r *http.Request) {
 		raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxSize))
 		if err != nil {
-			sdk.WriteError(w, sdk.NewError(http.StatusRequestEntityTooLarge, "too_large", "a backup is at most 8 MB"))
+			sdk.WriteError(w, sdk.NewError(http.StatusRequestEntityTooLarge, "too_large", "a backup is at most 2 MB"))
 			return
 		}
 		sum, err := s.add(raw)

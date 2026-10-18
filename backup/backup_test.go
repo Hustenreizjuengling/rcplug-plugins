@@ -42,8 +42,8 @@ func TestStoreListReadDelete(t *testing.T) {
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &sum) != nil {
 		t.Fatalf("store: %d %s", rec.Code, rec.Body)
 	}
-	if !validID.MatchString(sum.ID) || sum.Name != "Before the show" || strings.Join(sum.Parts, ",") != "rcplug,console,desk" ||
-		sum.Model != "duo" || sum.Settings != 1 || sum.Plugins != 2 || sum.Rcplug != "0.8.5" || sum.OnDisk == 0 {
+	if !validID.MatchString(sum.ID) || sum.Name != "Before the show" || strings.Join(sum.Parts, ",") != "rcplug" ||
+		sum.Plugins != 2 || sum.Rcplug != "0.8.5" || sum.OnDisk == 0 {
 		t.Fatalf("summary: %+v", sum)
 	}
 	if fi, err := os.Stat(s.path(sum.ID, ".json.gz")); err != nil || fi.Mode().Perm() != 0o600 {
@@ -61,8 +61,11 @@ func TestStoreListReadDelete(t *testing.T) {
 
 	rec = call(h, http.MethodGet, "/api/backups/"+sum.ID+"?download=1", "")
 	var d Doc
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.Name != "Before the show" || len(d.Desk) == 0 {
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.Name != "Before the show" || len(d.Rcplug) == 0 {
 		t.Fatalf("read: %d %s", rec.Code, rec.Body)
+	}
+	if strings.Contains(rec.Body.String(), `"desk"`) || strings.Contains(rec.Body.String(), `"console":{`) {
+		t.Fatalf("the desk and console parts (version 0.1.0 wrote them) are dropped: %s", rec.Body)
 	}
 	if cd := rec.Header().Get("Content-Disposition"); !strings.Contains(cd, "rodecaster-backup-") {
 		t.Fatalf("download name: %q", cd)
@@ -82,12 +85,12 @@ func TestStoreListReadDelete(t *testing.T) {
 func TestStoreRefuses(t *testing.T) {
 	_, h := rig(t)
 	for name, body := range map[string]string{
-		"not JSON":     `{`,
-		"other kind":   `{"kind":"x","format":1,"desk":{"format":1}}`,
-		"new format":   `{"kind":"rcplug-backup","format":2,"desk":{"format":1}}`,
-		"empty":        `{"kind":"rcplug-backup","format":1}`,
-		"bad rcplug":   `{"kind":"rcplug-backup","format":1,"rcplug":{"kind":"other"}}`,
-		"bad snapshot": `{"kind":"rcplug-backup","format":1,"desk":{"format":7}}`,
+		"not JSON":   `{`,
+		"other kind": `{"kind":"x","format":1,"desk":{"format":1}}`,
+		"new format": `{"kind":"rcplug-backup","format":2,"desk":{"format":1}}`,
+		"empty":      `{"kind":"rcplug-backup","format":1}`,
+		"bad rcplug": `{"kind":"rcplug-backup","format":1,"rcplug":{"kind":"other"}}`,
+		"desk only":  `{"kind":"rcplug-backup","format":1,"desk":{"format":1}}`,
 	} {
 		if rec := call(h, http.MethodPost, "/api/backups", body); rec.Code != 400 {
 			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)

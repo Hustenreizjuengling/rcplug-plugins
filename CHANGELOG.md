@@ -6,6 +6,15 @@ may break compatibility).
 
 ## 0.5.9 - Unreleased
 
+### Changed
+- **Backup 0.2.0** backs up rcplug's settings only: which plugins run, their
+  options, updates and catalogs. The console and the desk's settings are no longer
+  part of it: they go with the device (RØDE's shows keep them), and a firmware update
+  can change what their thousands of values mean. Backups made with 0.1.0 still
+  restore their rcplug part; the rest is ignored, and dropped when such a file is
+  uploaded. With rcplug 0.8.6, a restore also switches on again a plugin that its
+  autostart had started and that was switched off by hand since.
+
 ## 0.5.8 - 2026-10-18
 
 ### Added

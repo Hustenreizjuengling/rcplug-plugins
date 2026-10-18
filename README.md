@@ -6,7 +6,7 @@ starts it on the device and shows its web page on the dashboard.
 
 | Plugin | Does |
 |---|---|
-| [Backup](backup/README.md) | Backs up rcplug's settings and the desk's settings, shows what restoring a backup would change and restores it; backups can be downloaded and uploaded as files. |
+| [Backup](backup/README.md) | Backs up rcplug's settings, shows what restoring a backup would change and restores it; backups can be downloaded and uploaded as files. |
 | [Sonar](sonar/README.md) | Shows which direction a sound on a stereo channel comes from, as a live radar. It started as a toy for hide-and-seek games among friends. |
 
 Deutsch: [README.de.md](README.de.md)
