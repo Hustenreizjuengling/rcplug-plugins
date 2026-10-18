@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
       - run: make docs-check
@@ -37,7 +37,7 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/rcplug
           path: rcplug
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
       - run: go work init ./rcplug-plugins ./rcplug
@@ -59,7 +59,7 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/rcplug
           path: rcplug
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: rcplug-plugins/go.mod
       - run: go work init ./rcplug-plugins ./rcplug

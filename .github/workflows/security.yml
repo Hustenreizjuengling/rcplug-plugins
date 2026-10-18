@@ -29,7 +29,7 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/rcplug
           path: rcplug
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
       - run: go work init ./rcplug-plugins ./rcplug
@@ -49,7 +49,7 @@ jobs:
         language: [go, javascript-typescript]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         if: matrix.language == 'go'
         with:
           go-version: stable
