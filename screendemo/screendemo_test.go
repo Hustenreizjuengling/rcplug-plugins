@@ -210,3 +210,32 @@ func TestOurs(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A dark or switched-off backlight is turned on for the page and put back
+// afterwards; a bright one is left alone.
+func TestLight(t *testing.T) {
+	root := t.TempDir()
+	write := func(dev, name, v string) {
+		os.MkdirAll(root+"/"+dev, 0o755)
+		os.WriteFile(root+"/"+dev+"/"+name, []byte(v+"\n"), 0o644)
+	}
+	read := func(dev, name string) string {
+		b, _ := os.ReadFile(root + "/" + dev + "/" + name)
+		return strings.TrimSpace(string(b))
+	}
+	write("dark", "max_brightness", "255")
+	write("dark", "brightness", "3")
+	write("dark", "bl_power", "4")
+	write("bright", "max_brightness", "255")
+	write("bright", "brightness", "200")
+	write("bright", "bl_power", "0")
+	restore := light(root)
+	if read("dark", "brightness") != "127" || read("dark", "bl_power") != "0" || read("bright", "brightness") != "200" {
+		t.Fatalf("while shown: %s %s %s", read("dark", "brightness"), read("dark", "bl_power"), read("bright", "brightness"))
+	}
+	restore()
+	if read("dark", "brightness") != "3" || read("dark", "bl_power") != "4" || read("bright", "brightness") != "200" {
+		t.Fatalf("afterwards: %s %s %s", read("dark", "brightness"), read("dark", "bl_power"), read("bright", "brightness"))
+	}
+	light(t.TempDir() + "/none")() // no backlight: nothing to do
+}

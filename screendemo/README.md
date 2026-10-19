@@ -53,8 +53,10 @@ Only the Go standard library and rcplug's SDK, as for every plugin here:
   [tools/fontatlas](../tools/fontatlas/main.go) (`cd tools/fontatlas && go run . -out
   ../../screendemo/font`).
 
-It writes nothing on the device; when it ends, its buffer goes with it and RØDE's
-screen program sets its own.
+It writes nothing on the device but the backlight: if RØDE's screen program had dimmed
+it below a tenth or switched it off, the page turns it up to half and puts the old value
+back when it ends, before RØDE's screen program starts again and sets its own. Its
+buffer goes with it.
 
 ## Development
 

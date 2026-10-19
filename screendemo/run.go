@@ -32,6 +32,7 @@ func run(ctx context.Context, s *session, card, touchDev string) (string, error)
 	if d.W != canvasH || d.H != canvasW {
 		return "", fmt.Errorf("the panel is %d × %d; the page is drawn for the Duo's %d × %d", d.W, d.H, canvasH, canvasW)
 	}
+	defer light(backlights)()
 
 	touches := make(chan touchEvent, 16)
 	if t, err := openTouch(touchDev); err != nil {
