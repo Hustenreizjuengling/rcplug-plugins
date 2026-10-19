@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.10 - Unreleased
+## 0.5.10 - 2026-10-19
 
 ### Changed
 - **Sonar 0.6.4 and Backup 0.2.1 in rcplug's new look:** both pages use the shared
