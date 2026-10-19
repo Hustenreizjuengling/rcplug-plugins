@@ -1,0 +1,51 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Hustenreizjuengling/rcplug/main/plugin.schema.json",
+  "name": "screendemo",
+  "title": "Screen demo",
+  "description": "Experimental: shows a page of its own on the device's screen (rcplug's version, the device, a button back to RØDE). RØDE's screen is stopped meanwhile and comes back when the page ends: by the button, a long press, after a few minutes, or when stopped here. Starts only from here, never by itself.",
+  "version": "0.1.0",
+  "exec": [
+    "./screendemo"
+  ],
+  "autostart": false,
+  "order": 90,
+  "icon": "▣",
+  "permissions": [
+    "screen"
+  ],
+  "options": [
+    {
+      "id": "minutes",
+      "type": "number",
+      "title": "Back to RØDE after (minutes)",
+      "min": 1,
+      "max": 30,
+      "default": 5,
+      "arg": "--minutes={value}"
+    },
+    {
+      "id": "language",
+      "type": "choice",
+      "title": "Language on the screen",
+      "default": "en",
+      "choices": [
+        {"value": "en", "title": "English"},
+        {"value": "de", "title": "Deutsch"}
+      ],
+      "arg": "--lang={value}"
+    }
+  ],
+  "update": {
+    "github": "Hustenreizjuengling/rcplug-plugins"
+  },
+  "translations": {
+    "de": {
+      "title": "Bildschirm-Demo",
+      "description": "Experimentell: zeigt eine eigene Seite auf dem Bildschirm des Geräts (rcplug-Version, Gerät, ein Knopf zurück zu RØDE). RØDEs Bildschirm ist so lange angehalten und kommt zurück, wenn die Seite endet: mit dem Knopf, langem Drücken, nach ein paar Minuten oder beim Stoppen hier. Startet nur von hier, nie von selbst.",
+      "options": {
+        "minutes": {"title": "Zurück zu RØDE nach (Minuten)"},
+        "language": {"title": "Sprache auf dem Bildschirm"}
+      }
+    }
+  }
+}
