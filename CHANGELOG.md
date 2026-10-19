@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.11 - Unreleased
+## 0.5.11 - 2026-10-19
 
 ### Fixed
 - **Sonar 0.6.5:** a long state (an error while switching sources) no longer makes
