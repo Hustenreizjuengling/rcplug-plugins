@@ -85,7 +85,7 @@ const T = {
     rApply: 'Restore now', rWorking: 'Restoring…',
     rDoneRcplug: '{n} changes made.', rDoneRcplug1: '1 change made.', rProblems: 'Problems: {list}',
     rRestart: 'Plugins whose options changed restart now.',
-    on: 'on', off: 'off', dflt: 'default', switchOn: 'switch on', switchOff: 'switch off',
+    on: 'on', off: 'off', dflt: 'default', switchOn: 'switch on', switchOff: 'switch off', svc: 'RØDE service {id}',
     autoCheck: 'Daily search for updates', catAdd: 'Add the catalog {id}', catRemove: 'Remove the catalog {id}', catChange: 'Change the key of the catalog {id}',
     needsNew: 'This needs rcplug 0.8.5 or newer: update rcplug under System.',
   },
@@ -107,7 +107,7 @@ const T = {
     rApply: 'Jetzt wiederherstellen', rWorking: 'Wird wiederhergestellt…',
     rDoneRcplug: '{n} Änderungen übernommen.', rDoneRcplug1: '1 Änderung übernommen.', rProblems: 'Probleme: {list}',
     rRestart: 'Plugins mit geänderten Optionen starten jetzt neu.',
-    on: 'an', off: 'aus', dflt: 'Standard', switchOn: 'einschalten', switchOff: 'ausschalten',
+    on: 'an', off: 'aus', dflt: 'Standard', switchOn: 'einschalten', switchOff: 'ausschalten', svc: 'RØDE-Dienst {id}',
     autoCheck: 'Tägliche Suche nach Updates', catAdd: 'Katalog {id} hinzufügen', catRemove: 'Katalog {id} entfernen', catChange: 'Schlüssel des Katalogs {id} ändern',
     needsNew: 'Dafür braucht es rcplug 0.8.5 oder neuer: rcplug unter System aktualisieren.',
   },
@@ -285,6 +285,9 @@ function pluginTexts(list) {
   return out;
 }
 
+// RØDE's services rcplug 0.8.11 can switch off (a backup has the ones that are off).
+const SERVICES = { callme: 'CallMe', rpcbind: 'rpcbind', modemmanager: 'ModemManager' };
+
 function rcplugLines(plan) {
   const texts = current.texts || {};
   const titles = {};
@@ -301,6 +304,7 @@ function rcplugLines(plan) {
       case 'option': return who + ' · ' + ((o && o.title) || ch.title || ch.id) + ': ' + optVal(o, ch.from) + ' → ' + optVal(o, ch.to);
       case 'autoCheck': return t('autoCheck') + ': ' + valText(ch.from) + ' → ' + valText(ch.to);
       case 'catalog': return t(ch.to === null ? 'catRemove' : ch.from === null ? 'catAdd' : 'catChange', { id: ch.id });
+      case 'service': return t('svc', { id: SERVICES[ch.id] || ch.id }) + ': ' + t(ch.to ? 'switchOn' : 'switchOff');
     }
     return ch.what;
   });

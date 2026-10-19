@@ -12,6 +12,9 @@ Needs rcplug 0.8.6 or later (0.8.5 works, but its backups still include the cons
 - Which plugins are installed and whether they run, and their settings (the options
   on their cards in the dashboard).
 - The daily search for updates and the plugin catalogs added in the dashboard.
+- With rcplug 0.8.11 or later: which of RØDE's services are switched off (System →
+  *RØDE services*); a restore lists them as, for example, *RØDE service CallMe: switch
+  off*.
 
 Never in a backup: the dashboard's password (it is entered again), options that look
 like secrets, the plugins' own data, and **the console and the desk's settings**.

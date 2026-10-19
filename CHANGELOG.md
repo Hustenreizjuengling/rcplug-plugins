@@ -6,6 +6,10 @@ may break compatibility).
 
 ## 0.5.12 - Unreleased
 
+### Added
+- **Backup 0.2.3** lists RØDE's services that a restore switches on or off, as *RØDE
+  service CallMe: switch off* (rcplug 0.8.11 keeps them in its settings).
+
 ## 0.5.11 - 2026-10-19
 
 ### Fixed
