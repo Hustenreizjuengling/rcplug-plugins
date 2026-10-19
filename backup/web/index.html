@@ -28,6 +28,7 @@
   ul.changes li { margin: 3px 0; }
   .file { position: relative; overflow: hidden; }
   .file input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .file:has(input:focus-visible) { box-shadow: var(--ring); } /* the input itself is hidden */
   body.embedded .top { padding: 10px 22px; }
   body.embedded #lang, body.embedded .top .logo, body.embedded .top .dev { display: none; }
   @media (max-width: 640px) { main { padding: 12px; } .item { grid-template-columns: 1fr; } .item .acts { grid-row: auto; grid-column: auto; justify-content: flex-start; } }
@@ -314,8 +315,8 @@ function render() {
   if (lines.length) body.push(el('div', {}, t('rChanges')), el('ul', { class: 'changes' }, ...lines.map((l) => el('li', {}, l))));
   else if (!plan || !plan.missing.length) body.push(el('div', { class: 'muted' }, t('rNothing')));
   if (plan && plan.missing.length) {
-    body.push(el('div', { class: 'banner warn' }, t('rMissing', { list: plan.missing.map((p) => p.title || p.name).join(', ') }), ' ', t('rMissingHint'),
-      el('div', { class: 'row', id: 'installs', style: 'margin-top:6px' })));
+    body.push(el('div', { class: 'banner warn' }, el('div', {}, t('rMissing', { list: plan.missing.map((p) => p.title || p.name).join(', ') }), ' ', t('rMissingHint'),
+      el('div', { class: 'row', id: 'installs', style: 'margin-top:8px' }))));
   }
   if (plan && plan.skipped.length) body.push(el('div', { class: 'small muted' }, t('rSkipped', { list: plan.skipped.map((s) => s.plugin + ' · ' + s.id + ' (' + s.reason + ')').join('; ') })));
   if (c.doc.desk || c.doc.console) body.push(el('div', { class: 'small muted' }, t('rDesk')));

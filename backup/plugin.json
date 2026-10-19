@@ -3,7 +3,7 @@
   "name": "backup",
   "title": "Backup",
   "description": "Backs up rcplug's settings (which plugins run, their options, updates, catalogs), shows what restoring a backup would change and restores it. Backups stay on the device and can be downloaded and uploaded as files.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "exec": [
     "./backup",
     "--addr",

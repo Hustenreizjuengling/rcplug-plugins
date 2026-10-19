@@ -37,6 +37,9 @@
   .row select { flex: 1 1 160px; width: auto; min-width: 0; }
   .sw { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; font-size: 13px; }
   #state.on { background: var(--accent-soft); color: var(--accent); }
+  #state { max-width: min(55%, 360px); } /* an error is cut short; its title has it all */
+  .top > div { min-width: 0; }
+  .top .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   body.embedded .top { padding: 10px 22px; }
   body.embedded #lang, body.embedded .top .logo, body.embedded .top .dev { display: none; }
   @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } main { padding: 12px; } }
@@ -48,7 +51,7 @@
   <svg class="i logo" aria-hidden="true"><use href="ui/icons.svg#radar"/></svg>
   <div><div class="dev">Sonar</div><div class="sub" id="subline" aria-live="polite"></div></div>
   <span class="spacer"></span>
-  <span class="pill" id="state"></span>
+  <span class="pill" id="state"><span></span></span>
   <button type="button" class="btn ghost sm" id="lang"></button>
 </header>
 <main>
@@ -147,7 +150,14 @@ if (embedded) document.body.classList.add('embedded');
 document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
 document.querySelectorAll('[data-t-title]').forEach((el) => { el.title = t(el.dataset.tTitle); el.setAttribute('aria-label', el.title); });
 $('#cv').setAttribute('aria-label', t('radar'));
-$('#state').textContent = t('connecting');
+// The state pill: short, an error in full in its title (the pill keeps to one line).
+function setState(text, live) {
+  const el = $('#state');
+  el.firstElementChild.textContent = text;
+  el.title = text;
+  el.classList.toggle('on', live);
+}
+setState(t('connecting'), false);
 $('#lang').textContent = t('switchLang');
 $('#lang').addEventListener('click', () => {
   try { localStorage.setItem('rcplug-lang', lang === 'de' ? 'en' : 'de'); } catch (e) { /* ignore */ }
@@ -196,7 +206,8 @@ function draw(now) {
   }
   ctx.textAlign = 'left';
   ctx.fillText(t('near'), cx + R * 0.14, cy - 4);
-  ctx.fillText(t('far2'), cx + R * 0.72, cy - 4);
+  ctx.textAlign = 'right';
+  ctx.fillText(t('far2'), cx + R - 30, cy - 4); // ends before the +90° label
   ctx.textAlign = 'center';
   pruneTrail(now);
   for (const p of trail) {
@@ -252,8 +263,7 @@ function onData(d) {
   $('#mL').style.transform = `scaleX(${Math.max(0, Math.min(1, d.l))})`;
   $('#mR').style.transform = `scaleX(${Math.max(0, Math.min(1, d.r))})`;
   const tapsOff = !!d.err && /audio taps/.test(d.err);
-  $('#state').textContent = tapsOff ? t('noData') : d.err ? d.err : t('live');
-  $('#state').classList.toggle('on', !d.err);
+  setState(tapsOff ? t('noData') : d.err ? d.err : t('live'), !d.err);
   if ((d.err || '') !== srcErr) { srcErr = d.err || ''; renderListen(); }
 }
 
@@ -264,7 +274,7 @@ function connect() {
   es.onopen = () => { retry = 1000; };
   es.onmessage = (e) => { try { onData(JSON.parse(e.data)); } catch (x) { /* ignore a bad frame */ } };
   es.onerror = () => {
-    $('#state').textContent = t('reconnecting'); $('#state').classList.remove('on');
+    setState(t('reconnecting'), false);
     if (es.readyState === EventSource.CLOSED) { es.close(); setTimeout(connect, retry); retry = Math.min(retry * 2, 10000); }
   };
 }
@@ -273,7 +283,7 @@ setInterval(() => {
   if (performance.now() - lastData > 3000) {
     $('#scope').classList.add('stale');
     state.level = 0; state.conf = 0;
-    if (es && es.readyState === EventSource.OPEN) { $('#state').textContent = t('noData'); $('#state').classList.remove('on'); }
+    if (es && es.readyState === EventSource.OPEN) setState(t('noData'), false);
   }
 }, 1000);
 
@@ -360,7 +370,7 @@ function renderListen() {
   note.textContent = '';
   if (/audio taps/.test(srcErr)) {
     const a = document.createElement('a');
-    a.href = '/#/system'; a.target = '_top'; a.textContent = t('tapsLink');
+    a.href = '/#/system/audio'; a.target = '_top'; a.textContent = t('tapsLink');
     note.append(t('noteTaps') + ' ', a);
   } else if (deskNote) note.textContent = deskNote;
   note.hidden = !note.textContent;

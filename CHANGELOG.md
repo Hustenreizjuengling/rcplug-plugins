@@ -6,6 +6,15 @@ may break compatibility).
 
 ## 0.5.11 - Unreleased
 
+### Fixed
+- **Sonar 0.6.5:** a long state (an error while switching sources) no longer makes
+  the page wider than a phone's screen: the pill shows the start, its tooltip the
+  whole text. *Switch them on* opens the dashboard's audio settings directly, and the
+  radar's “far” label no longer runs into the 90° mark on small screens.
+- **Backup 0.2.2:** the buttons for installing missing plugins sit under the text
+  again, and *Choose a file…* shows the keyboard focus.
+- Both use rcplug 0.8.9's shared look, which pages now load fresh after an update.
+
 ## 0.5.10 - 2026-10-19
 
 ### Changed
