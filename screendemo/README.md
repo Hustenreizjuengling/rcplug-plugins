@@ -8,9 +8,11 @@ Duo*.
 
 ![PlugRain on the device's screen](screendemo.png)
 
-The first version (0.1.0, a page with rcplug's version) ran on a real Duo with
-firmware 1.7.6: upright, touches where the finger was, RØDE's screen back with the
-button. Until PlugRain has run there too, it is not in the catalog.
+It ran on a real Duo with firmware 1.7.6: upright, touches where the finger was, page
+flips at 60 Hz, about 40 frames a second, RØDE's screen back with the button and by
+its time. **It stays on this branch and is never part of a release or the catalog**;
+its manifest has no update source. Build it with `make build-arm64` and add the folder
+`dist/linux-arm64/screendemo` with the toolkit's *Add plugin*.
 
 ## How it starts and ends
 

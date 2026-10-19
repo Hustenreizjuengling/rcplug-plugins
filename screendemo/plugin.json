@@ -35,9 +35,6 @@
       "arg": "--lang={value}"
     }
   ],
-  "update": {
-    "github": "Hustenreizjuengling/rcplug-plugins"
-  },
   "translations": {
     "de": {
       "title": "PlugRain",
