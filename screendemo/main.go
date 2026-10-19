@@ -1,14 +1,16 @@
-// Command screendemo is an rcplug plugin that takes over the device's screen
-// for a few minutes and shows a page of its own: rcplug's version, the
-// device, and a button back to RØDE. It shows that a plugin can draw on the
-// screen and read the touchscreen while RØDE's screen program is stopped
-// (permission "screen": the host stops it before and starts it again after).
+// Command screendemo is PlugRain, an rcplug plugin that takes over the
+// device's screen for a few minutes and shows a page of its own: green rain
+// falling as smoothly as the display can show it, a proof that it runs as
+// root on the device, and a button back to RØDE. It shows that a plugin can
+// draw on the screen and read the touchscreen while RØDE's screen program
+// is stopped (permission "screen": the host stops it before and starts it
+// again after).
 //
-// It draws with the kernel's DRM interface into a buffer of its own and reads
-// the touchscreen through evdev, with the Go standard library only; its text
-// comes from glyph atlases made from the Go fonts (font/, tools/fontatlas).
-// With --png it draws the page into an image file instead, for development
-// without the device.
+// It draws with the kernel's DRM interface into buffers of its own (two,
+// flipped at the panel's refresh) and reads the touchscreen through evdev,
+// with the Go standard library only; its text comes from glyph atlases made
+// from the Go fonts (font/, tools/fontatlas). With --png it draws the page
+// into an image file instead, for development without the device.
 package main
 
 import (
@@ -41,7 +43,7 @@ const longPress = 3 * time.Second
 func main() {
 	pngOut := flag.String("png", "", "draw the page into this PNG file and exit (development)")
 	card := flag.String("card", "/dev/dri/card0", "the display's DRM device")
-	touchDev := flag.String("touch", "/dev/input/event0", "the touchscreen's event device")
+	touchDev := flag.String("touch", "", "the touchscreen's event device (default: found by its name)")
 	minutes := flag.Int("minutes", 5, "give the screen back after this many minutes, 1 to 30")
 	lang := flag.String("lang", "en", "language of the page: en | de")
 	showVer := flag.Bool("version", false, "print version and exit")
@@ -60,10 +62,11 @@ func main() {
 	defer stop()
 	s := newSession(time.Now(), time.Duration(*minutes)*time.Minute, *lang == "de")
 	s.info.Rcplug = os.Getenv("RCPLUG_VERSION")
+	s.info.Title, s.info.Prompt, s.info.Proof = thisSystem().proof()
 	s.apply(readDesk(ctx, s.info.German))
 
 	if *pngOut != "" {
-		if err := writePNG(*pngOut, s.view(time.Now())); err != nil {
+		if err := writePNG(*pngOut, s.view(time.Now()), 4*time.Second); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -79,11 +82,10 @@ func main() {
 type session struct {
 	info     Info
 	end      time.Time
-	touches  []image.Point // the last few, on the page
-	downAt   time.Time     // when the finger went down (zero: up)
-	downOn   bool          // it went down on the button
-	pressing bool          // it is on the button now
-	deskErr  string        // the console's last error, logged once
+	downAt   time.Time // when the finger went down (zero: up)
+	downOn   bool      // it went down on the button
+	pressing bool      // it is on the button now
+	deskErr  string    // the console's last error, logged once
 }
 
 func newSession(now time.Time, d time.Duration, german bool) *session {
@@ -98,7 +100,6 @@ func (s *session) view(now time.Time) Info {
 	if in.Leave = 0; left >= 60 {
 		in.Leave = (left + 59) / 60 * 60
 	}
-	in.Touches = append([]image.Point(nil), s.touches...)
 	in.Pressed = s.pressing
 	return in
 }
@@ -110,10 +111,6 @@ func (s *session) touch(down bool, p image.Point, now time.Time) string {
 	if down {
 		if s.downAt.IsZero() {
 			s.downAt, s.downOn = now, on
-			s.touches = append(s.touches, p)
-			if len(s.touches) > 8 {
-				s.touches = s.touches[1:]
-			}
 		}
 		s.pressing = s.downOn && on
 		return s.held(now)
@@ -148,7 +145,7 @@ func (s *session) apply(d desk) {
 		log.Printf("screendemo: console: %s", d.Error)
 	}
 	s.deskErr = d.Error
-	s.info.Device, s.info.Model, s.info.Firmware, s.info.Mode = d.Device, d.Model, d.Firmware, d.Mode
+	s.info.Model, s.info.Firmware, s.info.Mode = d.Model, d.Firmware, d.Mode
 }
 
 // readDesk asks the console about the device.
@@ -191,16 +188,27 @@ func consoleMode(st *capi.Status, german bool) string {
 	return c.State
 }
 
-func writePNG(path string, in Info) error {
-	img, err := page(in)
+// writePNG draws the page as the panel would show it after the rain has
+// fallen for a while (landscape, as it is seen on the device).
+func writePNG(path string, in Info, after time.Duration) error {
+	p, err := renderPage(in, canvasH*4)
 	if err != nil {
 		return err
 	}
+	r, err := newRain(rainArea, 1)
+	if err != nil {
+		return err
+	}
+	for t := time.Duration(0); t < after; t += time.Second / 30 {
+		r.step(time.Second / 30)
+	}
+	r.draw(p.canvas)
+	drawCursor(p.canvas, p.cursor, true)
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
-	if err := png.Encode(f, img); err != nil {
+	if err := png.Encode(f, p.canvas); err != nil {
 		f.Close()
 		return err
 	}

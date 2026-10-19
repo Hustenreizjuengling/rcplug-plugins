@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"image"
-	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,8 +13,10 @@ import (
 )
 
 func sample() Info {
-	return Info{Rcplug: "0.8.11", Device: "Studio", Model: "RØDECaster Duo", Firmware: "1.7.6",
-		Mode: "connected, holds the mixer alone", Leave: 300, Touches: []image.Point{{200, 300}}}
+	title, prompt, proof := system{uid: 0, gid: 0, groups: []int{0}, host: "rodecaster-pro-ii-mini",
+		uname: "Linux 5.10.17-rt32-yocto-preempt-rt aarch64", model: "RODECaster DUO", rcplug: "0.8.11"}.proof()
+	return Info{Rcplug: "0.8.11", Model: "RØDECaster Duo", Firmware: "1.7.6",
+		Mode: "connected, holds the mixer alone", Leave: 300, Title: title, Prompt: prompt, Proof: proof}
 }
 
 // The page draws, the button is where the code says, and the texts fit
@@ -42,11 +43,10 @@ func TestPage(t *testing.T) {
 			t.Fatalf("pressed button colour %v", got)
 		}
 		if p := os.Getenv("SCREENDEMO_PNG"); p != "" && !german { // the README's picture
-			in.Pressed, in.Touches = false, nil
-			img, _ = page(in)
-			f, _ := os.Create(p)
-			png.Encode(f, img)
-			f.Close()
+			in.Pressed = false
+			if err := writePNG(p, in, 4*time.Second); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 	fs, _ := loadFaces()
@@ -60,8 +60,152 @@ func TestPage(t *testing.T) {
 			t.Errorf("no glyph for %q", r)
 		}
 	}
+	for _, r := range rainGlyphs {
+		if _, ok := fs["rain"].Glyphs[string(r)]; !ok {
+			t.Errorf("no rain glyph for %q", r)
+		}
+	}
+	// The terminal's lines fit without being cut, and the cursor is in it.
+	in := sample()
+	m := fs["mono"]
+	for _, l := range in.Proof {
+		w := m.width(l.Text)
+		if l.Cmd {
+			w += m.width(in.Prompt)
+		}
+		if w > termArea.Dx()-2*termPad {
+			t.Errorf("%q is %d px wide, the terminal %d", l.Text, w, termArea.Dx()-2*termPad)
+		}
+	}
+	if cr := cursorRect(in); !cr.In(termArea.Inset(4)) {
+		t.Errorf("cursor %v outside the terminal %v", cr, termArea)
+	}
 	if s := fs["big"].fit(strings.Repeat("Studio ", 40), 500); fs["big"].width(s) > 500 || !strings.HasSuffix(s, "…") {
 		t.Errorf("fit: %q", s)
+	}
+}
+
+// The proof says what a shell would: root with "#", anyone else with "$"
+// and their own ids.
+func TestProof(t *testing.T) {
+	title, prompt, lines := system{uid: 0, gid: 0, host: "duo", uname: "Linux 5.10 aarch64", model: "RODECaster DUO", rcplug: "0.8.11"}.proof()
+	var text []string
+	for _, l := range lines {
+		if l.Cmd {
+			text = append(text, prompt+l.Text)
+		} else {
+			text = append(text, l.Text)
+		}
+	}
+	want := "# id|uid=0(root) gid=0(root) groups=0(root)|# uname -srm|Linux 5.10 aarch64|# cat /proc/device-tree/model|RODECaster DUO|# rcplugd --version|0.8.11"
+	if title != "root@duo" || strings.Join(text, "|") != want {
+		t.Fatalf("%s\n%s", title, strings.Join(text, "\n"))
+	}
+	_, prompt, lines = system{uid: 4242, gid: 4343, groups: []int{4343, 4444}, host: "duo"}.proof()
+	if prompt != "$ " || len(lines) != 2 || !strings.HasPrefix(lines[1].Text, "uid=4242") || !strings.HasSuffix(lines[1].Text, "groups=4343,4444") {
+		t.Fatalf("not root: %q %+v", prompt, lines)
+	}
+	if s := thisSystem(); s.uname == "" || s.host == "" {
+		t.Errorf("this system: %+v", s)
+	}
+}
+
+// The rain falls by time, stays in its area and starts again above it.
+func TestRain(t *testing.T) {
+	r, err := newRain(rainArea, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.drops) < 15 {
+		t.Fatalf("%d columns", len(r.drops))
+	}
+	before := r.drops[0].head
+	r.step(100 * time.Millisecond)
+	if moved := r.drops[0].head - before; moved < 0.1*90-0.01 || moved > 0.1*350+0.01 {
+		t.Fatalf("moved %.1f px in 0.1 s", moved)
+	}
+	img := image.NewNRGBA(image.Rect(0, 0, canvasW, canvasH))
+	fill(img, img.Rect, colBg)
+	for i := 0; i < 30*20; i++ { // 20 s at 30 frames a second
+		r.step(time.Second / 30)
+	}
+	r.draw(img)
+	outside, green := 0, 0
+	for y := 0; y < canvasH; y++ {
+		for x := 0; x < canvasW; x++ {
+			c := img.NRGBAAt(x, y)
+			in := image.Pt(x, y).In(rainArea)
+			if !in && c != colBg {
+				outside++
+			}
+			if in && c.G > 0x80 {
+				green++
+			}
+		}
+	}
+	if outside != 0 || green < 1000 {
+		t.Fatalf("%d pixels outside, %d green inside", outside, green)
+	}
+	for _, d := range r.drops {
+		if d.head-float64(len(d.glyphs)*r.cell) > float64(rainArea.Dy()) {
+			t.Fatalf("a drop fell out: %+v", d)
+		}
+	}
+}
+
+// Frames made of the page and the parts that move over it, copied in
+// parts, are the same as the whole picture turned at once, in both
+// buffers.
+func TestScene(t *testing.T) {
+	pitch := canvasH*4 + 64
+	t0 := time.Unix(1000, 0)
+	sc, err := newScene(pitch, t0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := sample()
+	p, err := renderPage(in, pitch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc.setPage(p, 2)
+	bufs := [2][]byte{make([]byte, pitch*canvasW), make([]byte, pitch*canvasW)}
+	now := t0
+	for i := 0; i < 12; i++ {
+		if i == 5 { // a new page: the countdown changed
+			in.Leave = 240
+			p, _ = renderPage(in, pitch)
+			sc.setPage(p, 2)
+		}
+		now = now.Add(time.Second / 7)
+		changed := sc.step(now, time.Second/7)
+		back := bufs[i%2]
+		sc.copyTo(back, changed)
+
+		whole := image.NewNRGBA(image.Rect(0, 0, canvasW, canvasH))
+		copy(whole.Pix, sc.canvas.Pix) // the page with the rain and cursor of this frame
+		want := make([]byte, pitch*canvasW)
+		turn(whole, want, pitch, panelTurn)
+		for y := 0; y < canvasW; y++ {
+			a, b := back[y*pitch:y*pitch+canvasH*4], want[y*pitch:y*pitch+canvasH*4]
+			if string(a) != string(b) {
+				t.Fatalf("frame %d: row %d differs from the whole picture", i, y)
+			}
+		}
+	}
+}
+
+func TestFindTouch(t *testing.T) {
+	sys := t.TempDir()
+	for _, d := range []struct{ ev, name string }{{"event0", "gpio-keys"}, {"event1", "Goodix Capacitive TouchScreen"}} {
+		os.MkdirAll(sys+"/"+d.ev+"/device", 0o755)
+		os.WriteFile(sys+"/"+d.ev+"/device/name", []byte(d.name+"\n"), 0o644)
+	}
+	if got := findTouch(sys); got != "/dev/input/event1" {
+		t.Fatalf("got %s", got)
+	}
+	if got := findTouch(t.TempDir()); got != "/dev/input/event0" {
+		t.Fatalf("without names: %s", got)
 	}
 }
 
@@ -139,9 +283,6 @@ func TestSession(t *testing.T) {
 	if why := s.touch(false, in, t0); why != "" {
 		t.Fatalf("slid on: %q", why)
 	}
-	if len(s.view(t0).Touches) != 2 {
-		t.Fatalf("touches %v", s.touches)
-	}
 	// A long press anywhere, and the time.
 	s.touch(true, out, t0)
 	if why := s.held(t0.Add(2 * time.Second)); why != "" {
@@ -153,13 +294,6 @@ func TestSession(t *testing.T) {
 	s = newSession(t0, time.Minute, false)
 	if why := s.held(t0.Add(time.Minute)); why != "its time was up" {
 		t.Fatalf("time: %q", why)
-	}
-	for i := 0; i < 20; i++ {
-		s.touch(true, image.Pt(i, i), t0)
-		s.touch(false, image.Pt(i, i), t0)
-	}
-	if len(s.touches) != 8 {
-		t.Fatalf("%d touches kept", len(s.touches))
 	}
 }
 

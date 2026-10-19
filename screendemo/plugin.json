@@ -1,9 +1,9 @@
 {
   "$schema": "https://raw.githubusercontent.com/Hustenreizjuengling/rcplug/main/plugin.schema.json",
   "name": "screendemo",
-  "title": "Screen demo",
-  "description": "Experimental: shows a page of its own on the device's screen (rcplug's version, the device, a button back to RØDE). RØDE's screen is stopped meanwhile and comes back when the page ends: by the button, a long press, after a few minutes, or when stopped here. Starts only from here, never by itself.",
-  "version": "0.1.0",
+  "title": "PlugRain",
+  "description": "Experimental screen demo: takes over the device's screen for a few minutes with green rain, falling as smoothly as the display can show it, and the proof that it runs as root on the device. RØDE's screen comes back with the button, a long press, after the set time or when stopped here. Starts only from here, never by itself.",
+  "version": "0.2.0",
   "exec": [
     "./screendemo"
   ],
@@ -40,8 +40,8 @@
   },
   "translations": {
     "de": {
-      "title": "Bildschirm-Demo",
-      "description": "Experimentell: zeigt eine eigene Seite auf dem Bildschirm des Geräts (rcplug-Version, Gerät, ein Knopf zurück zu RØDE). RØDEs Bildschirm ist so lange angehalten und kommt zurück, wenn die Seite endet: mit dem Knopf, langem Drücken, nach ein paar Minuten oder beim Stoppen hier. Startet nur von hier, nie von selbst.",
+      "title": "PlugRain",
+      "description": "Experimentelle Bildschirm-Demo: übernimmt für ein paar Minuten den Bildschirm des Geräts mit grünem Regen, so flüssig, wie das Display ihn zeigen kann, und dem Beweis, dass sie als root auf dem Gerät läuft. RØDEs Bildschirm kommt mit dem Knopf, langem Drücken, nach der eingestellten Zeit oder beim Stoppen hier zurück. Startet nur von hier, nie von selbst.",
       "options": {
         "minutes": {"title": "Zurück zu RØDE nach (Minuten)"},
         "language": {"title": "Sprache auf dem Bildschirm"}

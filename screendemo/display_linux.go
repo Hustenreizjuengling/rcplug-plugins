@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -25,21 +26,35 @@ const (
 	ioctlCreateDumb  = 0xc02064b2
 	ioctlMapDumb     = 0xc01064b3
 	ioctlDestroyDumb = 0xc00464b4
+	ioctlPageFlip    = 0xc01864b0 // struct drm_mode_crtc_page_flip, 24 bytes
+
+	pageFlipEvent     = 0x01 // DRM_MODE_PAGE_FLIP_EVENT
+	eventFlipComplete = 0x02 // DRM_EVENT_FLIP_COMPLETE
 
 	modeInfoSize = 68 // struct drm_mode_modeinfo
 )
 
 var le = binary.LittleEndian
 
-// display is the panel with our buffer on it.
+// display is the panel with our buffers on it: two, shown in turn with a
+// page flip at the panel's refresh (no tearing), or one drawn into directly
+// where flipping does not work.
 type display struct {
-	f              *os.File
-	W, H, pitch    int
-	crtc, conn, fb uint32
-	handle         uint32
-	mode           []byte // the mode we set (drm_mode_modeinfo)
-	mem            []byte // the buffer, mapped
-	ModeName       string
+	f           *os.File
+	W, H, pitch int
+	Refresh     int // the mode's refresh rate (Hz)
+	crtc, conn  uint32
+	mode        []byte // the mode we set (drm_mode_modeinfo)
+	ModeName    string
+	bufs        []buffer
+	front       int  // the buffer on the panel
+	Flips       bool // two buffers, flipped
+}
+
+// buffer is a dumb buffer, mapped.
+type buffer struct {
+	handle, fb uint32
+	mem        []byte
 }
 
 // ioctl calls the kernel on f (through SyscallConn, which leaves the file
@@ -159,7 +174,8 @@ func cstr(b []byte) string {
 	return string(b)
 }
 
-// openDisplay takes the panel: a buffer in its mode, shown on its CRTC.
+// openDisplay takes the panel: buffers in its mode, the first shown on its
+// CRTC.
 func openDisplay(card string) (*display, error) {
 	f, err := os.OpenFile(card, os.O_RDWR|syscall.O_CLOEXEC, 0)
 	if err != nil {
@@ -177,72 +193,94 @@ func (d *display) setup() error {
 	// Master: the first program to open the card has it anyway; RØDE's
 	// screen program has ended, so nobody else holds it.
 	_ = ioctl(d.f, ioctlSetMaster, make([]byte, 8))
-	if err := d.buffer(); err != nil {
+	if err := d.buffers(2); err != nil {
 		return err
 	}
-	return d.show()
+	return d.show(d.bufs[0].fb)
 }
 
-// buffer finds the panel and makes a buffer in its mode, mapped and black.
-func (d *display) buffer() error {
+// buffers finds the panel and makes up to n buffers in its mode, mapped and
+// black (at least one, or an error).
+func (d *display) buffers(n int) error {
 	p, err := probe(d.f)
 	if err != nil {
 		return err
 	}
 	d.W, d.H, d.conn, d.crtc, d.mode, d.ModeName = p.w, p.h, p.conn, p.crtc, p.mode, p.name
+	d.Refresh = int(le.Uint32(p.mode[24:]))
+	for len(d.bufs) < n {
+		b, pitch, err := d.newBuffer()
+		if err != nil {
+			if len(d.bufs) > 0 {
+				break // one is enough to draw
+			}
+			return err
+		}
+		d.pitch = pitch
+		d.bufs = append(d.bufs, b)
+	}
+	d.Flips = len(d.bufs) > 1
+	return nil
+}
 
+func (d *display) newBuffer() (buffer, int, error) {
+	var b buffer
 	cd := make([]byte, 32) // drm_mode_create_dumb
 	le.PutUint32(cd[0:], uint32(d.H))
 	le.PutUint32(cd[4:], uint32(d.W))
 	le.PutUint32(cd[8:], 32)
 	if err := ioctl(d.f, ioctlCreateDumb, cd); err != nil {
-		return fmt.Errorf("buffer: %w", err)
+		return b, 0, fmt.Errorf("buffer: %w", err)
 	}
-	d.handle, d.pitch = le.Uint32(cd[16:]), int(le.Uint32(cd[20:]))
-	size := int(le.Uint64(cd[24:]))
+	b.handle = le.Uint32(cd[16:])
+	pitch, size := int(le.Uint32(cd[20:])), int(le.Uint64(cd[24:]))
 
 	fb := make([]byte, 28) // drm_mode_fb_cmd
 	le.PutUint32(fb[4:], uint32(d.W))
 	le.PutUint32(fb[8:], uint32(d.H))
-	le.PutUint32(fb[12:], uint32(d.pitch))
+	le.PutUint32(fb[12:], uint32(pitch))
 	le.PutUint32(fb[16:], 32)
 	le.PutUint32(fb[20:], 24)
-	le.PutUint32(fb[24:], d.handle)
+	le.PutUint32(fb[24:], b.handle)
 	if err := ioctl(d.f, ioctlAddFB, fb); err != nil {
-		return fmt.Errorf("frame buffer: %w", err)
+		d.free(b)
+		return buffer{}, 0, fmt.Errorf("frame buffer: %w", err)
 	}
-	d.fb = le.Uint32(fb[0:])
+	b.fb = le.Uint32(fb[0:])
 
 	md := make([]byte, 16) // drm_mode_map_dumb
-	le.PutUint32(md[0:], d.handle)
+	le.PutUint32(md[0:], b.handle)
 	if err := ioctl(d.f, ioctlMapDumb, md); err != nil {
-		return fmt.Errorf("map: %w", err)
+		d.free(b)
+		return buffer{}, 0, fmt.Errorf("map: %w", err)
 	}
 	rc, err := d.f.SyscallConn()
 	if err != nil {
-		return err
+		d.free(b)
+		return buffer{}, 0, err
 	}
 	if cerr := rc.Control(func(fd uintptr) {
-		d.mem, err = syscall.Mmap(int(fd), int64(le.Uint64(md[8:])), size, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+		b.mem, err = syscall.Mmap(int(fd), int64(le.Uint64(md[8:])), size, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	}); cerr != nil {
 		err = cerr
 	}
 	if err != nil {
-		return fmt.Errorf("map: %w", err)
+		d.free(b)
+		return buffer{}, 0, fmt.Errorf("map: %w", err)
 	}
-	clear(d.mem)
-	return nil
+	clear(b.mem)
+	return b, pitch, nil
 }
 
-// show puts our buffer on the panel.
-func (d *display) show() error {
+// show puts a frame buffer on the panel (and sets the mode).
+func (d *display) show(fb uint32) error {
 	conns := make([]byte, 8)
 	le.PutUint32(conns, d.conn)
 	c := make([]byte, 104) // drm_mode_crtc
 	le.PutUint64(c[0:], ptr(conns))
 	le.PutUint32(c[8:], 1)
 	le.PutUint32(c[12:], d.crtc)
-	le.PutUint32(c[16:], d.fb)
+	le.PutUint32(c[16:], fb)
 	le.PutUint32(c[32:], 1) // mode_valid
 	copy(c[36:], d.mode)
 	if err := ioctl(d.f, ioctlSetCrtc, c); err != nil {
@@ -251,28 +289,92 @@ func (d *display) show() error {
 	return nil
 }
 
-// Draw copies a whole frame (pitch × H bytes, as turn writes it) to the
-// panel at once.
-func (d *display) Draw(frame []byte) { copy(d.mem, frame) }
+// Back is the buffer to draw the next frame into: the one not on the panel,
+// or the only one.
+func (d *display) Back() []byte {
+	if d.Flips {
+		return d.bufs[1-d.front].mem
+	}
+	return d.bufs[d.front].mem
+}
+
+// Present shows what was drawn into Back: a page flip, waited for until the
+// panel shows it (at its next refresh). If flipping fails, the display goes
+// on with the one buffer on the panel; full then says that buffer must be
+// drawn again whole.
+func (d *display) Present() (full bool, err error) {
+	if !d.Flips {
+		return false, nil
+	}
+	back := 1 - d.front
+	pf := make([]byte, 24) // drm_mode_crtc_page_flip
+	le.PutUint32(pf[0:], d.crtc)
+	le.PutUint32(pf[4:], d.bufs[back].fb)
+	le.PutUint32(pf[8:], pageFlipEvent)
+	if err := ioctl(d.f, ioctlPageFlip, pf); err != nil {
+		d.Flips = false
+		return true, fmt.Errorf("page flip: %w; drawing into one buffer", err)
+	}
+	if err := d.waitFlip(); err != nil {
+		d.Flips = false
+		// The flip may still happen: show the buffer just drawn for good.
+		d.front = back
+		_ = d.show(d.bufs[back].fb)
+		return true, fmt.Errorf("page flip: %w; drawing into one buffer", err)
+	}
+	d.front = back
+	return false, nil
+}
+
+// waitFlip reads the DRM events until the flip is done (struct drm_event:
+// type, length; DRM_EVENT_FLIP_COMPLETE is 2).
+func (d *display) waitFlip() error {
+	if err := d.f.SetReadDeadline(time.Now().Add(250 * time.Millisecond)); err != nil {
+		return err
+	}
+	buf := make([]byte, 1024)
+	for {
+		n, err := d.f.Read(buf)
+		if err != nil {
+			return err
+		}
+		for o := 0; o+8 <= n; {
+			typ, length := le.Uint32(buf[o:]), int(le.Uint32(buf[o+4:]))
+			if typ == eventFlipComplete {
+				return nil
+			}
+			if length < 8 {
+				break
+			}
+			o += length
+		}
+	}
+}
 
 // Pitch is the length of a row in bytes.
 func (d *display) Pitch() int { return d.pitch }
 
-// Close gives the panel up: the buffer goes; RØDE's screen program sets
-// its own when it starts again.
+func (d *display) free(b buffer) {
+	if b.mem != nil {
+		_ = syscall.Munmap(b.mem)
+	}
+	if b.fb != 0 {
+		x := make([]byte, 4)
+		le.PutUint32(x, b.fb)
+		_ = ioctl(d.f, ioctlRmFB, x)
+	}
+	if b.handle != 0 {
+		x := make([]byte, 4)
+		le.PutUint32(x, b.handle)
+		_ = ioctl(d.f, ioctlDestroyDumb, x)
+	}
+}
+
+// Close gives the panel up: the buffers go; RØDE's screen program sets its
+// own when it starts again.
 func (d *display) Close() {
-	if d.mem != nil {
-		_ = syscall.Munmap(d.mem)
-	}
-	if d.fb != 0 {
-		b := make([]byte, 4)
-		le.PutUint32(b, d.fb)
-		_ = ioctl(d.f, ioctlRmFB, b)
-	}
-	if d.handle != 0 {
-		b := make([]byte, 4)
-		le.PutUint32(b, d.handle)
-		_ = ioctl(d.f, ioctlDestroyDumb, b)
+	for _, b := range d.bufs {
+		d.free(b)
 	}
 	_ = d.f.Close()
 }

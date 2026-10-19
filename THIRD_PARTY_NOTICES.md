@@ -7,8 +7,8 @@ device's own firmware (`jack_lsp`, `jack_connect`, `alsa_out`, `arecord`, the
 
 ## Go fonts
 
-Screen demo draws its text with glyph atlases made from the Go fonts (Go Regular and
-Go Bold) by [tools/fontatlas](tools/fontatlas/main.go), which reads them from
+PlugRain (the screen demo) draws its text with glyph atlases made from the Go fonts
+(Go Regular, Go Bold, Go Mono and Go Mono Bold) by [tools/fontatlas](tools/fontatlas/main.go), which reads them from
 `golang.org/x/image` (only that tool, not the plugins, depends on it). The atlases are
 in [screendemo/font](screendemo/font) and built into the plugin's program.
 

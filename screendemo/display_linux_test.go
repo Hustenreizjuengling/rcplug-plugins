@@ -8,27 +8,31 @@ import (
 )
 
 // The DRM calls against a real card, where this machine has one: finding
-// the panel and making, mapping and freeing a buffer. Nothing is shown
+// the panel and making, mapping and freeing two buffers. Nothing is shown
 // (that needs the card's master, which a desktop holds).
-func TestDisplayBuffer(t *testing.T) {
+func TestDisplayBuffers(t *testing.T) {
 	f, err := os.OpenFile("/dev/dri/card0", os.O_RDWR|syscall.O_CLOEXEC, 0)
 	if err != nil {
 		t.Skip(err)
 	}
 	d := &display{f: f}
 	defer d.Close()
-	if err := d.buffer(); err != nil {
+	if err := d.buffers(2); err != nil {
 		t.Skip(err) // no connected output, or no dumb buffers
 	}
-	t.Logf("%s: %d × %d, connector %d, CRTC %d, pitch %d", d.ModeName, d.W, d.H, d.conn, d.crtc, d.pitch)
-	if d.W <= 0 || d.H <= 0 || d.pitch < d.W*4 || len(d.mem) < d.pitch*d.H || d.crtc == 0 || d.fb == 0 {
+	t.Logf("%s: %d × %d at %d Hz, connector %d, CRTC %d, pitch %d, %d buffers", d.ModeName, d.W, d.H, d.Refresh, d.conn, d.crtc, d.pitch, len(d.bufs))
+	if d.W <= 0 || d.H <= 0 || d.pitch < d.W*4 || d.crtc == 0 || len(d.bufs) != 2 || !d.Flips || d.Refresh <= 0 {
 		t.Fatalf("%+v", d)
 	}
-	frame := make([]byte, d.pitch*d.H)
-	frame[len(frame)-1] = 0xff
-	d.Draw(frame)
-	if d.mem[len(frame)-1] != 0xff {
-		t.Fatal("not drawn")
+	for _, b := range d.bufs {
+		if len(b.mem) < d.pitch*d.H || b.fb == 0 {
+			t.Fatalf("buffer %+v", b.fb)
+		}
+	}
+	back := d.Back()
+	back[len(back)-1] = 0xff
+	if d.bufs[1].mem[len(back)-1] != 0xff || d.bufs[0].mem[len(back)-1] != 0 {
+		t.Fatal("the back buffer is not the one off the panel")
 	}
 }
 

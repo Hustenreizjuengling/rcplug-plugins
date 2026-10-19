@@ -28,13 +28,16 @@ func run(ctx context.Context, s *session, card, touchDev string) (string, error)
 		return "", err
 	}
 	defer d.Close()
-	log.Printf("screendemo: drawing on %s (%s, %d × %d)", card, d.ModeName, d.W, d.H)
+	log.Printf("screendemo: drawing on %s (%s, %d × %d, %d Hz, %s)", card, d.ModeName, d.W, d.H, d.Refresh, bufferText(d.Flips))
 	if d.W != canvasH || d.H != canvasW {
 		return "", fmt.Errorf("the panel is %d × %d; the page is drawn for the Duo's %d × %d", d.W, d.H, canvasH, canvasW)
 	}
 	defer light(backlights)()
 
 	touches := make(chan touchEvent, 16)
+	if touchDev == "" {
+		touchDev = findTouch(sysInput)
+	}
 	if t, err := openTouch(touchDev); err != nil {
 		log.Printf("screendemo: no touch (%v); the page ends by itself", err)
 	} else {
@@ -63,48 +66,128 @@ func run(ctx context.Context, s *session, card, touchDev string) (string, error)
 		}
 	}()
 
-	frame := make([]byte, d.Pitch()*d.H)
-	var shown *Info
-	draw := func() error {
-		in := s.view(time.Now())
-		if shown != nil && reflect.DeepEqual(*shown, in) {
-			return nil
-		}
-		img, err := page(in)
-		if err != nil {
-			return err
-		}
-		turn(img, frame, d.Pitch(), panelTurn)
-		d.Draw(frame)
-		shown = &in
-		return nil
+	// The page is drawn again (in the background, while the rain goes on)
+	// whenever what it shows changes.
+	start := time.Now()
+	sc, err := newScene(d.Pitch(), start)
+	if err != nil {
+		return "", err
 	}
-	tick := time.NewTicker(200 * time.Millisecond)
-	defer tick.Stop()
-	for {
-		if err := draw(); err != nil {
-			return "", err
-		}
-		why := ""
-		select {
-		case <-parent.Done():
-			return "it was stopped", nil
-		case ev, ok := <-touches:
-			if !ok {
-				log.Printf("screendemo: the touchscreen went away; the page ends by itself")
-				touches = nil
+	shown := s.view(start)
+	first, err := renderPage(shown, d.Pitch())
+	if err != nil {
+		return "", err
+	}
+	sc.setPage(first, len(d.bufs))
+	want, pages := make(chan Info, 1), make(chan renderedPage, 1)
+	go func() {
+		for in := range want {
+			p, err := renderPage(in, d.Pitch())
+			if err != nil {
+				log.Printf("screendemo: %v", err)
 				continue
 			}
-			why = s.touch(ev.Down, untouch(ev.At, panelTurn), time.Now())
-		case dk := <-desks:
-			s.apply(dk)
-		case <-tick.C:
-			why = s.held(time.Now())
+			select {
+			case pages <- p:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	defer close(want)
+
+	st := stats{since: start, next: 10 * time.Second}
+	last := start
+	for {
+		now := time.Now()
+		why := ""
+	events:
+		for why == "" {
+			select {
+			case <-parent.Done():
+				return "it was stopped", nil
+			case ev, ok := <-touches:
+				if !ok {
+					log.Printf("screendemo: the touchscreen went away; the page ends by itself")
+					touches = nil
+					continue
+				}
+				why = s.touch(ev.Down, untouch(ev.At, panelTurn), now)
+			case dk := <-desks:
+				s.apply(dk)
+			case p := <-pages:
+				sc.setPage(p, len(d.bufs))
+			default:
+				break events
+			}
+		}
+		if why == "" {
+			why = s.held(now)
 		}
 		if why != "" {
+			st.log(now, d.Flips)
 			return why, nil
 		}
+		if in := s.view(now); !reflect.DeepEqual(in, shown) {
+			shown = in
+			select { // the newest wins
+			case <-want:
+			default:
+			}
+			want <- in
+		}
+
+		changed := sc.step(now, now.Sub(last))
+		last = now
+		sc.copyTo(d.Back(), changed)
+		st.drawn(time.Since(now))
+		if full, err := d.Present(); err != nil {
+			log.Printf("screendemo: %v", err)
+			if full {
+				sc.full = 1
+			}
+		}
+		if !d.Flips { // one buffer: about 30 frames a second
+			time.Sleep(time.Until(now.Add(time.Second / 30)))
+		}
+		st.frame(time.Now(), d.Flips)
 	}
+}
+
+func bufferText(flips bool) string {
+	if flips {
+		return "two buffers, flipped at the refresh"
+	}
+	return "one buffer"
+}
+
+// stats logs how smoothly the page runs: after ten seconds, then every
+// minute.
+type stats struct {
+	since  time.Time
+	next   time.Duration
+	frames int
+	busy   time.Duration
+}
+
+func (st *stats) drawn(d time.Duration) { st.busy += d }
+
+func (st *stats) frame(now time.Time, flips bool) {
+	st.frames++
+	if now.Sub(st.since) >= st.next {
+		st.log(now, flips)
+		st.next = time.Minute
+	}
+}
+
+func (st *stats) log(now time.Time, flips bool) {
+	el := now.Sub(st.since)
+	if st.frames == 0 || el <= 0 {
+		return
+	}
+	log.Printf("screendemo: %.1f frames a second, %.1f ms drawing each (%s)",
+		float64(st.frames)/el.Seconds(), float64(st.busy.Microseconds())/1000/float64(st.frames), bufferText(flips))
+	st.since, st.frames, st.busy = now, 0, 0
 }
 
 // screenMarker is where rcplugd writes the name of the plugin it gave the

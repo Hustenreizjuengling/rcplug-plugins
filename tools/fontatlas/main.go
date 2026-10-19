@@ -20,6 +20,8 @@ import (
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/gobold"
+	"golang.org/x/image/font/gofont/gomono"
+	"golang.org/x/image/font/gofont/gomonobold"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
@@ -56,6 +58,7 @@ func main() {
 	faces := []face{
 		{"small", goregular.TTF, 24}, {"text", goregular.TTF, 30},
 		{"big", gobold.TTF, 40}, {"title", gobold.TTF, 60},
+		{"mono", gomono.TTF, 22}, {"rain", gomonobold.TTF, 24},
 	}
 	all := map[string]Face{}
 	for _, f := range faces {

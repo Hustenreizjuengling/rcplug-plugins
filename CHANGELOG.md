@@ -7,13 +7,16 @@ may break compatibility).
 ## 0.5.12 - Unreleased
 
 ### Added
-- **Screen demo 0.1.0 (experimental):** a plugin that takes over the device's screen
-  for a few minutes with a page of its own (rcplug's version, the device, how the
-  console holds the mixer) and gives it back to RØDE with a button, a long press, after
-  the set time or when stopped. It starts only from the dashboard and needs rcplug
-  0.8.11 (permission `screen`). It draws through the kernel's DRM interface and reads
-  the touchscreen through evdev, with the standard library only; its text comes from
-  glyph atlases of the Go fonts, made by the new `tools/fontatlas`.
+- **PlugRain 0.2.0 (experimental screen demo):** a plugin that takes over the
+  device's screen for a few minutes and gives it back to RØDE with a button, a long
+  press, after the set time or when stopped. Green rain falls on it as smoothly as the
+  display can show it (two buffers flipped at the panel's refresh, only what moves
+  drawn every frame), and a terminal shows that it runs as root (`id`, `uname`, the
+  device tree's model, read by the plugin itself). It starts only from the dashboard
+  and needs rcplug 0.8.11 (permission `screen`). It draws through the kernel's DRM
+  interface and reads the touchscreen through evdev, with the standard library only;
+  its text comes from glyph atlases of the Go fonts, made by the new `tools/fontatlas`.
+  Its first version (a page with rcplug's version) ran on a real Duo.
 - **Backup 0.2.3** lists RØDE's services that a restore switches on or off (rcplug
   0.8.11 keeps them in its settings).
 

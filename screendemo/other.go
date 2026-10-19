@@ -13,14 +13,18 @@ import (
 var errNotLinux = errors.New("the device's screen needs Linux; use --png")
 
 type display struct {
-	W, H     int
-	ModeName string
+	W, H, Refresh int
+	ModeName      string
+	Flips         bool
+	bufs          [][]byte
 }
 
 func openDisplay(string) (*display, error) { return nil, errNotLinux }
-func (d *display) Draw([]byte)             {}
+func (d *display) Back() []byte            { return nil }
+func (d *display) Present() (bool, error)  { return false, nil }
 func (d *display) Pitch() int              { return 0 }
 func (d *display) Close()                  {}
+func unameSRM() string                     { return "" }
 
 type touchscreen struct{}
 

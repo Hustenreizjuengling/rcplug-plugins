@@ -8,7 +8,7 @@ starts it on the device and shows its web page on the dashboard.
 |---|---|
 | [Backup](backup/README.md) | Backs up rcplug's settings, shows what restoring a backup would change and restores it; backups can be downloaded and uploaded as files. |
 | [Sonar](sonar/README.md) | Shows which direction a sound on a stereo channel comes from, as a live radar. It started as a toy for hide-and-seek games among friends. |
-| [Screen demo](screendemo/README.md) | Experimental: takes over the device's screen for a few minutes with a page of its own, then gives it back to RØDE. Shows that plugins can draw on the screen. |
+| [PlugRain](screendemo/README.md) | Experimental screen demo: takes over the device's screen for a few minutes with green rain and a proof of root, then gives it back to RØDE. Shows that plugins can draw on the screen. |
 
 Deutsch: [README.de.md](README.de.md)
 
