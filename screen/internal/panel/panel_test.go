@@ -17,7 +17,7 @@ func TestTurnAndPageOf(t *testing.T) {
 	// A landscape page 1280 × 720; the panel is 720 × 1280.
 	page := gfx.NewImage(1280, 720)
 	page.Set(page.Bounds(), gfx.Hex(0x111111))
-	page.Pix[0] = gfx.Hex(0xff0000).Premul()                       // page top left
+	page.Pix[0] = gfx.Hex(0xff0000).Premul()                               // page top left
 	page.Pix[(page.H-1)*page.Stride+page.W-1] = gfx.Hex(0x00ff00).Premul() // page bottom right
 	for _, turn := range []int{90, 270} {
 		pw, ph := 720, 1280
