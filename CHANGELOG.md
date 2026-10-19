@@ -6,6 +6,13 @@ may break compatibility).
 
 ## 0.5.10 - Unreleased
 
+### Changed
+- **Sonar 0.6.4 and Backup 0.2.1 in rcplug's new look:** both pages use the shared
+  design of rcplug 0.8.8 (`sdk/ui`, served by each plugin under `ui/`), so they read as
+  part of the dashboard; inside it they leave out their own title. Building them needs
+  rcplug 0.8.8; on the device Sonar runs with rcplug 0.6.11 or later, Backup with 0.8.6
+  or later, as before.
+
 ## 0.5.9 - 2026-10-18
 
 ### Changed

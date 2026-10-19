@@ -25,6 +25,7 @@ import (
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/sonar/internal/dsp"
 	"github.com/Hustenreizjuengling/rcplug/sdk"
+	"github.com/Hustenreizjuengling/rcplug/sdk/ui"
 )
 
 // version is Sonar's own (its plugin.json), release the rcplug-plugins
@@ -79,6 +80,7 @@ func main() {
 
 	sub, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
+	mux.Handle("GET /ui/", ui.Handler("/ui/")) // rcplug's shared look
 	mux.Handle("GET /", http.FileServer(http.FS(sub)))
 	mux.HandleFunc("GET /stream", h.handleStream)
 	mux.HandleFunc("GET /api/sources", h.handleSources)

@@ -31,6 +31,7 @@ import (
 	"unicode"
 
 	"github.com/Hustenreizjuengling/rcplug/sdk"
+	"github.com/Hustenreizjuengling/rcplug/sdk/ui"
 )
 
 // version is the plugin's own (its plugin.json), release the rcplug-plugins
@@ -313,6 +314,7 @@ func main() {
 	defer stop()
 	sub, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
+	mux.Handle("GET /ui/", ui.Handler("/ui/")) // rcplug's shared look
 	mux.Handle("GET /", http.FileServer(http.FS(sub)))
 	s.routes(mux)
 	log.Printf("backup %s (rcplug-plugins %s) on %s, backups in %s", version, release, *addr, s.dir)
