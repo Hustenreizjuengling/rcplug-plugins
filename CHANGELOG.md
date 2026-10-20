@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.16 - Unreleased
+## 0.5.16 - 2026-10-20
 
 ### Fixed
 - **Screen 0.2.1**, after the second test on a Duo: the main knob counts detents as the
