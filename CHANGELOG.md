@@ -6,6 +6,13 @@ may break compatibility).
 
 ## 0.5.21 - Unreleased
 
+### Changed
+- **Screen 0.3.3:** while a Bluetooth device is connected, its output's level ring sits
+  beside the monitor's in the status bar (drag to set, as on RØDE's screen); a tap on a
+  pad tile of the mixer opens that pad (its options, or the new-pad page for an empty
+  slot) instead of playing it — the hardware buttons play; the equaliser's gain/Q
+  choice is kept where RØDE's screen keeps it (`GUI.eqParamMode…`), so both agree.
+
 ## 0.5.20 - 2026-10-20
 
 ### Added

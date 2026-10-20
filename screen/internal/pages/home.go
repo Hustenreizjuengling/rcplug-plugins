@@ -108,10 +108,16 @@ func (p *HomePage) statusBar(env *Env, bar image.Rectangle) []ui.View {
 	st.SetBounds(image.Rect(bar.Min.X+488, bar.Min.Y+34, bar.Min.X+640, bar.Min.Y+84))
 	out = append(out, st)
 
-	// The monitor knob.
+	// The monitor knob, and the Bluetooth output's ring while a device is
+	// connected.
 	mon := &monitorKnob{env: env, page: p}
 	mon.SetBounds(image.Rect(bar.Min.X+712, bar.Min.Y+16, bar.Min.X+798, bar.Min.Y+102))
 	out = append(out, mon)
+	if env.Desk.Str(desk.NetworkNode, 0, "btConnectedAddress") != "" {
+		bt := &monitorKnob{env: env, page: p, bt: true}
+		bt.SetBounds(image.Rect(bar.Min.X+646, bar.Min.Y+28, bar.Min.X+708, bar.Min.Y+90))
+		out = append(out, bt)
+	}
 
 	// Master meter L/R with its scale.
 	mm := &masterMeter{env: env}
@@ -247,25 +253,57 @@ type monitorKnob struct {
 	ui.Base
 	env   *Env
 	page  *HomePage
+	bt    bool // the Bluetooth output's ring instead (shown while a device is connected)
 	last  string
 	lastY int
 	drag  bool
 	moved bool
 }
 
+// level, muted and autoMuted read the output the ring stands for.
+func (k *monitorKnob) level() float64 {
+	if k.bt {
+		return k.env.Desk.Num(desk.OutputNode, 0, "outputBTLevel")
+	}
+	return k.env.Desk.MonitorLevel()
+}
+
+func (k *monitorKnob) setLevel(v float64) {
+	if k.bt {
+		k.env.Desk.SetFloat(desk.OutputNode, 0, "outputBTLevel", math.Max(0, math.Min(1, v)))
+		return
+	}
+	k.env.Desk.SetMonitorLevel(v)
+}
+
+func (k *monitorKnob) muted() bool {
+	if k.bt {
+		return k.env.Desk.Bool(desk.OutputNode, 0, "outputBTMute")
+	}
+	return k.env.Desk.MonitorMuted()
+}
+
+func (k *monitorKnob) autoMuted() bool {
+	if k.bt {
+		return k.env.Desk.Bool(desk.OutputNode, 0, "outputBTAutoMuteActive")
+	}
+	return k.env.Desk.MonitorAutoMuted()
+}
+
+func (k *monitorKnob) focused() bool { return !k.bt && k.page.knobOn && k.page.knob == 0 }
+
 func (k *monitorKnob) state() string {
-	d := k.env.Desk
 	s := ""
-	if d.MonitorMuted() {
+	if k.muted() {
 		s += "m"
 	}
-	if d.MonitorAutoMuted() {
+	if k.autoMuted() {
 		s += "a"
 	}
-	if k.page.knobOn && k.page.knob == 0 {
+	if k.focused() {
 		s += "f"
 	}
-	return s + pct(d.MonitorLevel())
+	return s + pct(k.level())
 }
 
 func (k *monitorKnob) Dirty() []image.Rectangle {
@@ -284,14 +322,18 @@ func (k *monitorKnob) Touch(phase ui.TouchPhase, p image.Point) bool {
 		if k.drag {
 			if dy := k.lastY - p.Y; dy != 0 {
 				k.moved = true
-				k.env.Desk.SetMonitorLevel(k.env.Desk.MonitorLevel() + float64(dy)/200)
+				k.setLevel(k.level() + float64(dy)/200)
 				k.lastY = p.Y
 			}
 		}
 	case ui.Up:
 		if k.drag && !k.moved {
-			k.page.knob, k.page.knobOn = 0, true
-			k.env.Nav.Toast(k.env.T("MONITOR") + ": " + pct(k.env.Desk.MonitorLevel()))
+			if k.bt {
+				k.env.Nav.Toast(k.env.T("BLUETOOTH") + ": " + pct(k.level()))
+			} else {
+				k.page.knob, k.page.knobOn = 0, true
+				k.env.Nav.Toast(k.env.T("MONITOR") + ": " + pct(k.level()))
+			}
 		}
 		k.drag = false
 	}
@@ -303,24 +345,28 @@ func (k *monitorKnob) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) 
 	r := ui.Square(k.Bounds())
 	cx, cy := float64(r.Min.X+r.Max.X)/2, float64(r.Min.Y+r.Max.Y)/2
 	rad := float64(r.Dx()) / 2
-	d := k.env.Desk
 	ui.Circle(dst, cx, cy, rad-4, gfx.Hex(0x101010), clip)
 	ring := th.Accent
 	switch {
-	case d.MonitorMuted():
+	case k.muted():
 		ring = th.Record
-	case d.MonitorAutoMuted():
+	case k.autoMuted():
 		ring = th.Warn
 	}
 	// The track and the level arc, from the bottom around.
 	const start = math.Pi * 0.5
 	ui.Arc(dst, cx, cy, rad-6, 6, start, start+2*math.Pi-0.001, gfx.Hex(0x3a3a3a), clip)
-	if lv := d.MonitorLevel(); lv > 0 {
+	if lv := k.level(); lv > 0 {
 		ui.Arc(dst, cx, cy, rad-6, 6, start, start+2*math.Pi*lv, ring, clip)
 	}
-	ic := image.Rect(int(cx)-18, int(cy)-18, int(cx)+18, int(cy)+18)
-	c.Icon(dst, "IconSpeaker", ic, th.Text)
-	if d.MonitorMuted() || d.MonitorAutoMuted() {
+	half := int(rad * 0.42)
+	ic := image.Rect(int(cx)-half, int(cy)-half, int(cx)+half, int(cy)+half)
+	icon := "IconSpeaker"
+	if k.bt {
+		icon = "bluetooth"
+	}
+	c.Icon(dst, icon, ic, th.Text)
+	if k.muted() || k.autoMuted() {
 		cross := &gfx.Path{}
 		cross.MoveTo(cx-16, cy-16)
 		cross.LineTo(cx+16, cy+16)
@@ -328,7 +374,7 @@ func (k *monitorKnob) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) 
 		cross.LineTo(cx-16, cy+16)
 		dst.StrokePath(cross, gfx.Identity, gfx.Stroke{Width: 5, Cap: gfx.RoundCap}, gfx.Solid(ring), clip)
 	}
-	if k.page.knobOn && k.page.knob == 0 {
+	if k.focused() {
 		ui.Ring(dst, cx, cy, rad-1, 3, th.Text, clip)
 	}
 }

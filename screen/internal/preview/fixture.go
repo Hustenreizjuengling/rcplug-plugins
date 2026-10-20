@@ -268,7 +268,7 @@ func BuildTree() []byte {
 		kids = append(kids, leaf("PADBUTTON", map[string]interface{}{"padButtonPressed": false, "padButtonPreview": false}))
 	}
 	kids = append(kids, leaf("NETWORK", map[string]interface{}{
-		"wiredConnected": true, "wifi": false, "ipAddress": "192.168.0.50", "btConnectedAddress": "", "btConnectedType": 0,
+		"wiredConnected": true, "wifi": false, "ipAddress": "192.168.0.50", "btConnectedAddress": "00:11:22:33:44:55", "btConnectedType": 0,
 	}))
 	kids = append(kids, leaf("RECORDINGS", map[string]interface{}{"recordingTotalCount": 3, "recordingTotalDuration": 7200}))
 

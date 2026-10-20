@@ -101,6 +101,32 @@ func (p *RackPage) procs() []processor {
 	return channelProcessors
 }
 
+// eqModeProps are the device's own record of which knobs the EQ shows
+// (0 gain, 1 Q), one per band; RØDE's screen keeps them in the GUI node.
+var eqModeProps = []string{"eqParamModeLow", "eqParamModeMid", "eqParamModeHigh"}
+
+// altOn reports whether the second set of knobs is shown: the device's EQ
+// mode when it has one, else the page's own.
+func (p *RackPage) altOn(env *Env) bool {
+	if env.Desk.Has(desk.GUINode, 0, eqModeProps[0]) {
+		return env.Desk.Int(desk.GUINode, 0, eqModeProps[0]) == 1
+	}
+	return p.alt
+}
+
+func (p *RackPage) setAlt(env *Env, v bool) {
+	p.alt = v
+	for _, prop := range eqModeProps {
+		if env.Desk.Has(desk.GUINode, 0, prop) {
+			mode := int64(0)
+			if v {
+				mode = 1
+			}
+			env.Desk.SetInt(desk.GUINode, 0, prop, mode)
+		}
+	}
+}
+
 // Content builds the rack alone, without a page frame (the effects pad's
 // editor places it under its own controls).
 func (p *RackPage) Content(env *Env, r image.Rectangle) ui.View { return p.Build(env, r) }
@@ -178,8 +204,8 @@ func (p *RackPage) Build(env *Env, r image.Rectangle) ui.View {
 		y += 66
 	}
 	if len(pr.alt) > 0 {
-		t := ui.NewRingToggle(pr.altKey, func() bool { return p.alt }, func(v bool) {
-			p.alt = v
+		t := ui.NewRingToggle(pr.altKey, func() bool { return p.altOn(env) }, func(v bool) {
+			p.setAlt(env, v)
 			env.Nav.Refresh()
 		})
 		t.SetBounds(image.Rect(r.Min.X+488, y, r.Min.X+578, y+64))
@@ -204,7 +230,7 @@ func (p *RackPage) Build(env *Env, r image.Rectangle) ui.View {
 	}
 	var knobs []procParam
 	src := pr.params
-	if p.alt && len(pr.alt) > 0 {
+	if len(pr.alt) > 0 && p.altOn(env) {
 		src = pr.alt
 	}
 	for _, par := range src {

@@ -113,22 +113,21 @@ type padTile struct {
 	last    string
 }
 
-func (t *padTile) CanFocus() bool {
-	return t.menu || t.env.Desk.PadAt(int(t.env.Desk.PadBank()), t.slot).Exists
-}
+func (t *padTile) CanFocus() bool { return true }
 
 func (t *padTile) act() {
 	d := t.env.Desk
 	bank := int(d.PadBank())
 	pad := d.PadAt(bank, t.slot)
+	// On the device the pads play from the hardware buttons; the tiles on
+	// the screen open the pad (its options, or a new pad for an empty slot).
 	switch {
-	case t.menu && pad.Exists:
-		t.env.Nav.Push(newPadOptions(pad.Idx))
-	case t.menu:
-		t.env.Nav.Push(newPadNew(pad.Idx))
 	case pad.Exists:
-		d.TriggerPad(bank, t.slot)
+		t.env.Nav.Push(newPadOptions(pad.Idx))
+	default:
+		t.env.Nav.Push(newPadNew(pad.Idx))
 	}
+	_ = bank
 }
 
 func (t *padTile) Activate() bool {
@@ -140,12 +139,9 @@ func (t *padTile) Touch(phase ui.TouchPhase, p image.Point) bool {
 	switch phase {
 	case ui.Down:
 		t.pressed = true
-		if !t.menu {
-			t.act() // a pad plays on the press, as the hardware button
-		}
 		t.MarkDirty()
 	case ui.Up:
-		if t.menu && t.pressed {
+		if t.pressed {
 			t.act()
 		}
 		t.pressed = false
