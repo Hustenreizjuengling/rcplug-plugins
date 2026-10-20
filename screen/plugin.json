@@ -3,7 +3,7 @@
   "name": "screen",
   "title": "Screen",
   "description": "An alternative interface on the device's touchscreen: a mixer, channel and processing pages, SMART pads, the menus and settings, and pages for rcplug and other plugins — built to look and work like RØDE's own screen. It reads RØDE's icons and text from the device at run time (no RØDE files are shipped). RØDE's screen comes back with the “Back to RØDE” button or when the plugin is stopped. Starts from the dashboard.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "exec": [
     "./screen"
   ],
@@ -33,10 +33,7 @@
   "translations": {
     "de": {
       "title": "Bildschirm",
-      "description": "Eine alternative Oberfläche auf dem Touchscreen des Geräts: Mischpult, Kanal- und Bearbeitungsseiten, SMART Pads, die Menüs und Einstellungen sowie Seiten für rcplug und andere Plugins – im Aussehen und in der Bedienung wie RØDEs eigener Bildschirm. Sie liest RØDEs Symbole und Texte zur Laufzeit vom Gerät (es werden keine RØDE-Dateien mitgeliefert). RØDEs Bildschirm kommt mit der Schaltfläche „Zurück zu RØDE“ oder beim Stoppen des Plugins zurück. Startet vom Dashboard.",
-      "options": {
-        "language": {"title": "Sprache"}
-      }
+      "description": "Eine alternative Oberfläche auf dem Touchscreen des Geräts: Mischpult, Kanal- und Bearbeitungsseiten, SMART Pads, die Menüs und Einstellungen sowie Seiten für rcplug und andere Plugins – im Aussehen und in der Bedienung wie RØDEs eigener Bildschirm. Sie liest RØDEs Symbole und Texte zur Laufzeit vom Gerät (es werden keine RØDE-Dateien mitgeliefert). RØDEs Bildschirm kommt mit der Schaltfläche „Zurück zu RØDE“ oder beim Stoppen des Plugins zurück. Startet vom Dashboard."
     }
   }
 }

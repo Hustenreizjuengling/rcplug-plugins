@@ -6,6 +6,12 @@ may break compatibility).
 
 ## 0.5.14 - Unreleased
 
+### Fixed
+- **Screen 0.1.1** shows its title, description, icon and permissions in the
+  catalog again and installs from it: its manifest no longer translates the option
+  title, which the release tool could not read and so left out the plugin's whole
+  catalog card.
+
 ## 0.5.13 - 2026-10-20
 
 ### Added
