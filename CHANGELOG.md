@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.23 - Unreleased
+## 0.5.23 - 2026-10-20
 
 ### Added
 - **PlugRain 0.3.0** joins the catalog as the demo of a plugin with the device's screen:
