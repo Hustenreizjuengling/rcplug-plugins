@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.19 - Unreleased
+## 0.5.19 - 2026-10-20
 
 ### Added
 - **Screen 0.3.1**, more of RØDE's screen: turning a headphone knob shows the level
