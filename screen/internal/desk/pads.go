@@ -123,6 +123,19 @@ func (m *Model) TriggerPad(bank, slot int) {
 	m.Press(PadButtonNode, slot, "padButtonPressed", 120)
 }
 
+// PreviewPad plays a pad's sound for the editor (PADBUTTON[slot].padButtonPreview,
+// held for a moment), selecting its bank first as TriggerPad does.
+func (m *Model) PreviewPad(bank, slot int) {
+	if int(m.PadBank()) != bank {
+		m.SetPadBank(int64(bank))
+	}
+	if m.Has(PadButtonNode, slot, "padButtonPreview") {
+		m.Press(PadButtonNode, slot, "padButtonPreview", 120)
+		return
+	}
+	m.Press(PadButtonNode, slot, "padButtonPressed", 120)
+}
+
 // PadEditing is the pad RØDE's screen (or this one) is editing, -1 when
 // none (GUI.padActiveEdit).
 func (m *Model) PadEditing() int64 { return m.Int(GUINode, 0, "padActiveEdit") }

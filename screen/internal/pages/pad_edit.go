@@ -380,7 +380,7 @@ func (p *padSoundPage) Build(env *Env, r image.Rectangle) ui.View {
 	sl.SetBounds(ui.Inset(card.Bounds(), 16))
 	c.Add(sl)
 	bank, slot := p.idx/d.PadsPerBank(), p.idx%d.PadsPerBank()
-	play := ui.NewButton("", func() { d.TriggerPad(bank, slot) })
+	play := ui.NewButton("", func() { d.PreviewPad(bank, slot) })
 	play.Icon = "IconPlay"
 	play.Style = ui.StyleRound
 	play.SetBounds(centred(image.Rect(bottom.Max.X-120, bottom.Min.Y, bottom.Max.X, bottom.Max.Y), 96, 96))

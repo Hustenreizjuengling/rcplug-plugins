@@ -3,6 +3,7 @@ package pages
 import (
 	"image"
 
+	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/desk"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
 )
 
@@ -21,9 +22,10 @@ type tile struct {
 }
 
 type menuPage struct {
-	title string
-	tiles []tile
-	cols  int
+	title  string
+	tiles  []tile
+	cols   int
+	banner func(env *Env) string // a line above the tiles when not empty
 }
 
 func (m *menuPage) Title() string { return m.title }
@@ -31,6 +33,18 @@ func (m *menuPage) Title() string { return m.title }
 func (m *menuPage) Build(env *Env, r image.Rectangle) ui.View {
 	c := &ui.Container{}
 	c.SetBounds(r)
+	if m.banner != nil {
+		if text := m.banner(env); text != "" {
+			th := env.Ctx.Theme
+			card := ui.NewPanelView(th.Warn)
+			card.Radius = th.Radius
+			card.SetBounds(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+64))
+			lbl := ui.NewLabel(text, th.Fonts.Label, th.TextOnLight, ui.AlignCenter)
+			lbl.SetBounds(card.Bounds())
+			c.Add(card, lbl)
+			r.Min.Y += 80
+		}
+	}
 	cols := m.cols
 	if cols == 0 {
 		cols = 4
@@ -69,7 +83,13 @@ func (m *menuPage) Build(env *Env, r image.Rectangle) ui.View {
 
 func init() {
 	register(IDSettings, func() Page {
-		return &menuPage{title: "CONFIGURATION", cols: 4, tiles: []tile{
+		return &menuPage{title: "CONFIGURATION", cols: 4, banner: func(env *Env) string {
+			// The device's own notice when a firmware update is waiting.
+			if env.Desk.Bool(desk.SystemNode, 0, "osUpdateAvailable") || env.Desk.Bool(desk.SystemNode, 0, "appUpdateAvailable") {
+				return env.T("FIRMWARE UPDATE AVAILABLE")
+			}
+			return ""
+		}, tiles: []tile{
 			{key: "FADERS", icon: "IconFaders", push: func() Page { return newFadersPage() }},
 			{key: "OUTPUTS", icon: "IconOutputs", open: IDOutputs},
 			{key: "SMART PADS", icon: "smart_pads_sound", open: IDPads},

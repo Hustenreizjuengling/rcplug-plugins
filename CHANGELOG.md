@@ -6,6 +6,12 @@ may break compatibility).
 
 ## 0.5.22 - Unreleased
 
+### Changed
+- **Screen 0.3.4:** the configuration menu shows the device's own *Firmware update
+  available* notice; the sound pad editor's play button previews the pad
+  (`padButtonPreview`) instead of playing it into the mix; the README notes that with
+  rcplug 0.8.17 the plugin comes back after a reboot once started.
+
 ## 0.5.21 - 2026-10-20
 
 ### Changed

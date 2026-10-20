@@ -35,6 +35,10 @@ this plugin's own code.
   plugin through the desk's tree (`ENCODER.encoderSignal`, `encoderPressed`).
 - RØDE's screen comes back with the **Back to RØDE** button, when the plugin
   is stopped from the dashboard, or if it exits for any reason.
+- It is started in the dashboard the first time. With rcplug 0.8.17 or later
+  it then comes back at every start of the device (once RØDE's screen program
+  is up) until it is stopped there; if it should ever crash three times in ten
+  minutes, rcplug switches it off and RØDE's screen stays.
 
 ## Safety
 
