@@ -36,7 +36,7 @@ func (f *Fader) track() image.Rectangle {
 	if f.Label != "" {
 		r.Max.Y -= 22
 	}
-	w := min(r.Dx(), 48)
+	w := min(r.Dx(), 22)
 	x := r.Min.X + (r.Dx()-w)/2
 	return image.Rect(x, r.Min.Y, x+w, r.Max.Y)
 }
@@ -77,10 +77,12 @@ func (f *Fader) Draw(dst *gfx.Image, c *Context, clip image.Rectangle) {
 	v := f.val()
 	fillTop := tr.Max.Y - int(v*float64(tr.Dy()))
 	Panel(dst, image.Rect(tr.Min.X, fillTop, tr.Max.X, tr.Max.Y), tr.Dx()/2, t.Accent, clip)
-	// The handle.
+	// The handle: a cap wider than the track, with a centre line.
 	hy := tr.Max.Y - int(v*float64(tr.Dy()))
-	hh := 10
-	Panel(dst, image.Rect(tr.Min.X-3, hy-hh/2, tr.Max.X+3, hy+hh/2), 4, gfx.Hex(0xffffff), clip)
+	hh, over := 18, 10
+	handle := image.Rect(tr.Min.X-over, hy-hh/2, tr.Max.X+over, hy+hh/2)
+	Panel(dst, handle, 5, gfx.Hex(0xf2f2f2), clip)
+	Fill(dst, image.Rect(handle.Min.X+4, hy-1, handle.Max.X-4, hy+1), t.Line, clip)
 	if f.Label != "" {
 		Text(dst, t.Fonts.Tiny, f.Label, image.Rect(f.bounds.Min.X, tr.Max.Y+2, f.bounds.Max.X, f.bounds.Max.Y), font.Center, t.TextDim, clip)
 	}

@@ -220,6 +220,27 @@ func newAphex(strip int) Page {
 
 func pctFmt(v float64) string { return pct(v) }
 
+// Processor returns a processor page by name (for previews and tests).
+func Processor(strip int, name string) Page {
+	switch name {
+	case "hpf":
+		return newHPF(strip)
+	case "gate":
+		return newGate(strip)
+	case "comp":
+		return newComp(strip)
+	case "deesser":
+		return newDeEsser(strip)
+	case "eq":
+		return newEQ(strip)
+	case "aphex":
+		return newAphex(strip)
+	case "pan":
+		return newPanning(strip)
+	}
+	return newComp(strip)
+}
+
 // PanningPage is a slider between left and right (and a stereo pair).
 type PanningPage struct{ strip int }
 
