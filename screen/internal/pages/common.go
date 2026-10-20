@@ -48,24 +48,24 @@ func pct(v float64) string {
 // intText formats a whole number.
 func intText(v int64) string { return strconv.FormatInt(v, 10) }
 
-// sourceIcon maps a source id to one of the device's icons, or "" when there
-// is no obvious one (the UI then shows the label alone).
+// sourceIcon maps a source id to the device's strip icon (its own names), or
+// "" when there is none (the UI then shows the label alone).
+var sourceIcons = map[string]string{
+	"combo1": "IconStripMic1", "combo2": "IconStripMic2", "combo3": "IconStripMic3", "combo4": "IconStripMic4",
+	"combo1_2": "IconStripMics12", "combo2_3": "IconStripMics23", "combo3_4": "IconStripMics34",
+	"usb1": "IconStripUsb1Main", "chat": "IconStripUsb1Comms", "usb2": "IconStripUsb2Main",
+	"bluetooth": "bluetooth", "soundpad": "smart_pads_sound",
+	"game": "VirtualInput_Game", "music": "VirtualInput_Music",
+	"virtuala": "IconStripUsb2Main", "virtualb": "IconStripUsb2Main",
+	"callme1": "IconCallMe1", "callme2": "IconCallMe2", "callme3": "IconCallMe3",
+}
+
 func sourceIcon(id string) string {
-	switch {
-	case strings.HasPrefix(id, "combo"):
-		return "IconMicrophone"
-	case strings.HasPrefix(id, "usb"):
-		return "IconUSB"
-	case id == "bluetooth":
-		return "IconBluetooth"
-	case id == "soundpad":
-		return "IconSmartPad"
-	case id == "chat":
-		return "IconChat"
-	case strings.HasPrefix(id, "callme"):
-		return "IconCallMe"
-	case id == "game", id == "music", strings.HasPrefix(id, "virtual"):
-		return "IconUSB"
+	if ic, ok := sourceIcons[id]; ok {
+		return ic
+	}
+	if strings.HasPrefix(id, "combo") {
+		return "IconStripMic1"
 	}
 	return ""
 }

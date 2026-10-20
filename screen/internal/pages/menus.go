@@ -62,10 +62,10 @@ func (m *menuPage) Build(env *Env, r image.Rectangle) ui.View {
 
 func init() {
 	register(IDSettings, func() Page {
-		return &menuPage{title: "SETTINGS", cols: 4, tiles: []tile{
+		return &menuPage{title: "CONFIGURATION", cols: 4, tiles: []tile{
 			{key: "FADERS", icon: "IconFaders", push: func() Page { return newFadersPage() }},
 			{key: "OUTPUTS", icon: "IconHeadphones", open: IDOutputs},
-			{key: "SMART PADS", icon: "IconSmartPad", open: IDPads},
+			{key: "SMART PADS", icon: "smart_pads_sound", open: IDPads},
 			{key: "DISPLAY", icon: "IconDisplay", open: IDDisplay},
 			{key: "SHOWS", icon: "IconShows", open: IDShows},
 			{key: "SYSTEM", icon: "IconSystem", open: IDSystem},

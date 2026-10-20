@@ -33,7 +33,7 @@ func (p *HomePage) Build(env *Env, r image.Rectangle) ui.View {
 	area := image.Rect(r.Min.X+12, bar.Max.Y+8, r.Max.X-12, r.Max.Y-8)
 	n := env.Desk.StripCount()
 	if n == 0 {
-		lbl := ui.NewLabel(env.T("CONNECTING"), th.Fonts.Title, th.TextDim, font.Center)
+		lbl := ui.NewLabel(env.TR("CONNECTING TO", "Verbinde …", "Connecting …"), th.Fonts.Title, th.TextDim, font.Center)
 		lbl.SetBounds(area)
 		c.Add(lbl)
 		return c

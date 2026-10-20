@@ -29,8 +29,9 @@ func (p *rcplugPage) Build(env *Env, r image.Rectangle) ui.View {
 	tiles := grid(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+160), 3, 1, 12)
 	plugins := menuTile(env.T("Plugins"), "IconSystem", func() { env.Nav.Open(IDPlugins) })
 	plugins.SetBounds(tiles[0])
-	rode := menuTile(env.T("Back to RØDE"), "IconHome", func() {
-		env.Nav.Confirm(env.T("Back to RØDE"), "Zurück zur RØDE-Oberfläche?", env.T("OK"), false, env.Nav.RodeScreen)
+	rodeLabel := env.TR("", "Zurück zu RØDE", "Back to RØDE")
+	rode := menuTile(rodeLabel, "IconHome", func() {
+		env.Nav.Confirm(rodeLabel, env.TR("", "Zurück zur RØDE-Oberfläche?", "Switch back to RØDE's interface?"), env.T("OK"), false, env.Nav.RodeScreen)
 	})
 	rode.SetBounds(tiles[1])
 	c.Add(plugins, rode)

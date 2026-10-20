@@ -25,6 +25,19 @@ type Env struct {
 // T is a shortcut for a localized label.
 func (e *Env) T(key string) string { return e.Text.T(key) }
 
+// TR is T for the few strings the device has no key for: it uses RØDE's
+// translation when there is one, else the German or English fallback given
+// here, by the chosen language.
+func (e *Env) TR(key, de, en string) string {
+	if e.Text.Has(key) {
+		return e.Text.T(key)
+	}
+	if e.Text.German() {
+		return de
+	}
+	return en
+}
+
 // Nav lets a page move between screens and hand control back to RØDE.
 type Nav interface {
 	// Push shows a page on top of the current one (with a back button).

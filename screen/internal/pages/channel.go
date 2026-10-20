@@ -164,15 +164,16 @@ func (p *ChannelPage) processing(env *Env, strip int, area image.Rectangle) []ui
 	procArea := image.Rect(area.Min.X, knobRow.Max.Y+12, area.Max.X, area.Max.Y-60)
 	procs := []struct {
 		key  string
+		icon string
 		make func() Page
 	}{
-		{"HIGH-PASS FILTER", func() Page { return newHPF(strip) }},
-		{"NOISE GATE", func() Page { return newGate(strip) }},
-		{"COMPRESSOR", func() Page { return newComp(strip) }},
-		{"DE-ESSER", func() Page { return newDeEsser(strip) }},
-		{"EQUALIZER", func() Page { return newEQ(strip) }},
-		{"EXCITER", func() Page { return newAphex(strip) }},
-		{"PANNING", func() Page { return newPanning(strip) }},
+		{"HIGH-PASS FILTER", "procHighPass", func() Page { return newHPF(strip) }},
+		{"NOISE GATE", "procNoiseGate", func() Page { return newGate(strip) }},
+		{"COMPRESSOR", "procCompressor", func() Page { return newComp(strip) }},
+		{"DE-ESSER", "procDeesser", func() Page { return newDeEsser(strip) }},
+		{"EQUALIZER", "procEq", func() Page { return newEQ(strip) }},
+		{"EXCITER", "procAuralExciter", func() Page { return newAphex(strip) }},
+		{"PANNING", "procLR", func() Page { return newPanning(strip) }},
 	}
 	cells := grid(procArea, 4, 2, 8)
 	for i, pr := range procs {
@@ -181,6 +182,7 @@ func (p *ChannelPage) processing(env *Env, strip int, area image.Rectangle) []ui
 		}
 		mk := pr.make
 		b := ui.NewButton(env.T(pr.key), func() { env.Nav.Push(mk()) })
+		b.Icon = pr.icon
 		b.TileLayout = true
 		b.SetBounds(cells[i])
 		out = append(out, b)

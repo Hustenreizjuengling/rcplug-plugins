@@ -44,7 +44,8 @@ func (b *recButton) Touch(phase ui.TouchPhase, p image.Point) bool {
 func (b *recButton) toggle() {
 	st := b.state()
 	if st == 2 || st == 1 { // recording or paused → stop
-		b.env.Nav.Confirm(b.env.T("REC"), b.env.T("HOLD REC TO STOP"), b.env.T("STOP"), false, func() {
+		msg := b.env.TR("HOLD REC TO STOP RECORDING", "Aufnahme stoppen?", "Stop the recording?")
+		b.env.Nav.Confirm(b.env.T("REC"), msg, b.env.TR("STOP", "Stoppen", "Stop"), false, func() {
 			b.env.Desk.SetInt(desk.RecorderNode, 0, "requestRecordState", 0)
 		})
 		return

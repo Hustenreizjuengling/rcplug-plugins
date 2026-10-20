@@ -22,9 +22,11 @@ func noteCard(env *Env, r image.Rectangle, text string) []ui.View {
 // rodeButton offers to hand the screen back to RØDE (where a denied setting
 // lives). The caller places it.
 func rodeButton(env *Env, r image.Rectangle) ui.View {
-	b := ui.NewButton(env.T("Back to RØDE"), func() {
-		env.Nav.Confirm(env.T("Back to RØDE"),
-			"Diese Einstellung wird auf RØDEs eigenem Bildschirm vorgenommen. Zurück zur RØDE-Oberfläche?",
+	label := env.TR("", "Zurück zu RØDE", "Back to RØDE")
+	b := ui.NewButton(label, func() {
+		env.Nav.Confirm(label,
+			env.TR("", "Diese Einstellung wird auf RØDEs eigenem Bildschirm vorgenommen. Zurück zur RØDE-Oberfläche?",
+				"This setting is made on RØDE's own screen. Switch back to RØDE's interface?"),
 			env.T("OK"), false, func() { env.Nav.RodeScreen() })
 	})
 	b.Icon = "IconHome"
@@ -74,7 +76,7 @@ func init() {
 			kv.SetBounds(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+62))
 			c.Add(kv)
 			c.Add(noteCard(env, image.Rect(r.Min.X, r.Min.Y+74, r.Max.X, r.Min.Y+74+120),
-				"Netzwerk und WLAN werden auf RØDEs eigenem Bildschirm eingerichtet.")...)
+				env.TR("", "Netzwerk und WLAN werden auf RØDEs eigenem Bildschirm eingerichtet.", "Network and Wi-Fi are set up on RØDE's own screen."))...)
 			c.Add(rodeButton(env, image.Rect(r.Min.X, r.Min.Y+74+132, r.Min.X+300, r.Min.Y+74+132+56)))
 			return c
 		}}
@@ -94,7 +96,7 @@ func init() {
 			kv.SetBounds(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+62))
 			c.Add(kv)
 			c.Add(noteCard(env, image.Rect(r.Min.X, r.Min.Y+74, r.Max.X, r.Min.Y+74+120),
-				"Bluetooth-Geräte werden auf RØDEs eigenem Bildschirm gekoppelt.")...)
+				env.TR("", "Bluetooth-Geräte werden auf RØDEs eigenem Bildschirm gekoppelt.", "Bluetooth devices are paired on RØDE's own screen."))...)
 			c.Add(rodeButton(env, image.Rect(r.Min.X, r.Min.Y+74+132, r.Min.X+300, r.Min.Y+74+132+56)))
 			return c
 		}}
@@ -126,7 +128,7 @@ func init() {
 			total.SetBounds(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+62))
 			c.Add(total)
 			c.Add(noteCard(env, image.Rect(r.Min.X, r.Min.Y+74, r.Max.X, r.Min.Y+74+120),
-				"Aufnahmen werden auf RØDEs eigenem Bildschirm verwaltet.")...)
+				env.TR("", "Aufnahmen werden auf RØDEs eigenem Bildschirm verwaltet.", "Recordings are managed on RØDE's own screen."))...)
 			return c
 		}}
 	})
@@ -141,7 +143,7 @@ func init() {
 			ver.SetBounds(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+40))
 			c.Add(ver)
 			c.Add(noteCard(env, image.Rect(r.Min.X, r.Min.Y+52, r.Max.X, r.Min.Y+52+150),
-				"Firmware-Aktualisierungen laufen über RØDEs eigenen Bildschirm. Achtung: Eine Firmware-Aktualisierung entfernt rcplug vom Gerät.")...)
+				env.TR("", "Firmware-Aktualisierungen laufen über RØDEs eigenen Bildschirm. Achtung: Eine Firmware-Aktualisierung entfernt rcplug vom Gerät.", "Firmware updates run on RØDE's own screen. Note: a firmware update removes rcplug from the device."))...)
 			c.Add(rodeButton(env, image.Rect(r.Min.X, r.Min.Y+52+162, r.Min.X+300, r.Min.Y+52+162+56)))
 			return c
 		}}
