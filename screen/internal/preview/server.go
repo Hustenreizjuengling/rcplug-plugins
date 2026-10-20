@@ -19,7 +19,10 @@ type Server struct {
 }
 
 // NewServer wraps an app for the browser.
-func NewServer(a *app.App) *Server { return &Server{app: a} }
+func NewServer(a *app.App) *Server {
+	a.RenderOnce() // build the first view so a touch before the first frame is not lost
+	return &Server{app: a}
+}
 
 // Handler is the preview's HTTP handler.
 func (s *Server) Handler() http.Handler {
@@ -89,7 +92,7 @@ function at(e){
   const y = Math.round((e.clientY - r.top)  / r.height * H);
   return {x: Math.max(0, Math.min(W-1, x)), y: Math.max(0, Math.min(H-1, y))};
 }
-async function send(phase, p){ await fetch('/touch?phase='+phase+'&x='+p.x+'&y='+p.y, {method:'POST'}); refresh(); }
+async function send(phase, p){ await fetch('/touch?phase='+phase+'&x='+p.x+'&y='+p.y, {method:'POST', headers:{'X-Rcplug':'1'}}); refresh(); }
 let busy = false, again = false;
 async function refresh(){
   if (busy){ again = true; return; }

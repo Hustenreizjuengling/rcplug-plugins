@@ -52,6 +52,20 @@ func (a *App) env() *pages.Env {
 // Root is the drawing root (for tests and the preview).
 func (a *App) Root() *ui.Root { return a.root }
 
+// PageTitle is the current page's title (for tests and diagnostics).
+func (a *App) PageTitle() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.stack[len(a.stack)-1].Title()
+}
+
+// Depth is how deep the navigation stack is (for tests).
+func (a *App) Depth() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return len(a.stack)
+}
+
 // Rebuild forces the view tree to be rebuilt before the next frame.
 func (a *App) Rebuild() {
 	a.mu.Lock()
