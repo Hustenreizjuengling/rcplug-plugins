@@ -52,9 +52,9 @@ func (r *Root) Render() []image.Rectangle {
 	}
 	if r.first {
 		r.first = false
+		r.root.Dirty() // the views pull their state (and the marks clear)
 		r.img.Set(r.img.Bounds(), r.ctx.Theme.Bg)
 		r.root.Draw(r.img, r.ctx, r.img.Bounds())
-		r.root.Dirty() // clear marks
 		return []image.Rectangle{r.img.Bounds()}
 	}
 	dirty := r.root.Dirty()

@@ -68,27 +68,37 @@ func (p *routingMix) Build(env *Env, r image.Rectangle) ui.View {
 	c.SetBounds(r)
 	th := env.Ctx.Theme
 	o := p.output
+	mode := func() int { return int(env.Desk.Int(desk.MixMinusNode, o, "outputMixMinus")) }
 	seg := ui.NewSegmented([]string{env.T("MAIN MIX"), env.T("MIX MINUS"), env.T("CUSTOM")},
-		func() int { return int(env.Desk.Int(desk.MixMinusNode, o, "outputMixMinus")) },
-		func(i int) { env.Desk.SetInt(desk.MixMinusNode, o, "outputMixMinus", int64(i)) })
+		mode, func(i int) {
+			env.Desk.SetInt(desk.MixMinusNode, o, "outputMixMinus", int64(i))
+			env.Nav.Refresh()
+		})
 	seg.Blue = true
 	seg.SetBounds(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+124))
 	c.Add(seg)
+	// The body follows the mode; a change from elsewhere rebuilds the page.
+	shown := mode()
+	c.Add(&updater{get: func() {
+		if m := mode(); m != shown {
+			shown = m
+			env.Nav.Refresh()
+		}
+	}})
+	body := image.Rect(r.Min.X, r.Min.Y+150, r.Max.X, r.Max.Y)
+	if shown == 2 {
+		c.Add(customMix(env, body, o)...)
+		return c
+	}
 
 	descs := []string{
 		env.TR("ALL CHANNELS WILL BE INCLUDED", "Alle Kanäle sind in dieser Ausgabe enthalten.", "All channels are included in this output."),
 		env.TR("", "Alle Kanäle außer dem eigenen Rückweg dieser Ausgabe.", "Every channel except this output's own return."),
-		env.TR("", "Eine eigene Mischung je Kanal. Die Pegel werden auf RØDEs eigenem Bildschirm gesetzt.", "A custom mix per channel. The levels are set on RØDE's own screen."),
 	}
-	desc := ui.NewParagraph("", th.Fonts.Body, th.TextDim)
+	desc := ui.NewParagraph(descs[min(shown, 1)], th.Fonts.Body, th.TextDim)
 	desc.Align = font.Center
-	desc.SetBounds(image.Rect(r.Min.X+40, r.Min.Y+150, r.Max.X-40, r.Min.Y+230))
-	c.Add(&updater{get: func() {
-		if i := int(env.Desk.Int(desk.MixMinusNode, o, "outputMixMinus")); i >= 0 && i < len(descs) && desc.Text != descs[i] {
-			desc.Text = descs[i]
-			desc.MarkDirty()
-		}
-	}}, desc)
+	desc.SetBounds(image.Rect(r.Min.X+40, body.Min.Y, r.Max.X-40, body.Min.Y+80))
+	c.Add(desc)
 
 	// The strips, for orientation: icon and name.
 	n := env.Desk.StripCount()

@@ -8,6 +8,7 @@ package preview
 import (
 	"encoding/json"
 	"math"
+	"strconv"
 )
 
 // node is one tree node in the console's {t,p,c} shape.
@@ -130,7 +131,7 @@ func BuildTree() []byte {
 		"selectedBank": 0, "metering": 0, "broadcastMeters": false, "lang": "de",
 		"screenBrightness": 200, "activeButtonsBrightness": 180, "inactiveButtonsBrightness": 60,
 		"autoBrightness": false, "screenDimAfterSeconds": false,
-		"eqParamModeLow": 0, "eqParamModeMid": 0, "eqParamModeHigh": 0, "padActiveEdit": -1, "screenTouched": false,
+		"eqParamModeLow": 0, "eqParamModeMid": 0, "eqParamModeHigh": 0, "padActiveEdit": int64(-1), "screenTouched": false,
 	}))
 	kids = append(kids, leaf("SYSTEM", map[string]interface{}{
 		"systemFirmwareVersion": "1.7.6", "systemSerialNumber": "", "systemName": "RODECaster",
@@ -146,7 +147,7 @@ func BuildTree() []byte {
 		"masterCompellorOn": true, "masterCompellorThreshold": 0.5, "masterCompellorAttack": 0.4,
 		"masterCompellorRelease": 0.5, "masterCompellorGain": 0.3, "masterDelayOn": false, "masterDelaySeconds": 0.0,
 	}))
-	kids = append(kids, leaf("DUCKER", map[string]interface{}{"duckerDepth": 0.3}))
+	kids = append(kids, leaf("DUCKER", map[string]interface{}{"duckerDepth": -9.0}))
 	// The main knob (idle: int 0 + true) and the recording storage.
 	kids = append(kids, leaf("ENCODER", map[string]interface{}{"encoderSignal": "0105010000000001" + "0102", "encoderPressed": false, "encoderColour": 7}))
 	kids = append(kids, leaf("STORAGEVOLUME", map[string]interface{}{
@@ -176,35 +177,89 @@ func BuildTree() []byte {
 		}
 		kids = append(kids, leaf("INPUTSOURCE", p))
 	}
-	// 18 effects slots, one per source.
-	for i := 0; i < 18; i++ {
+	// 11 effects slots, one per strip (as the Duo keeps them).
+	for i := 0; i < 11; i++ {
 		kids = append(kids, leaf("EFFECTS_PARAMETERS", map[string]interface{}{
-			"channelInputSource": int64(i), "effectsIdx": int64(i), "channelOutputMute": false,
-			"reverbOn": i == 0, "reverbMix": 0.5, "reverbLowCut": 0.6661, "reverbHighCut": 0.3333, "reverbModel": 0.6,
+			"effectsIdx": int64(i),
+			"reverbOn":   i == 0, "reverbMix": 0.5, "reverbLowCut": 0.6661, "reverbHighCut": 0.3333, "reverbModel": 0.6,
 			"echoOn": false, "echoMix": 0.5, "echoDelay": 0.165, "echoDecay": 0.5, "echoLowCut": 0.5, "echoHighCut": 0.5,
 			"distortionOn": false, "distortionIntensity": 0.7, "robotOn": false, "robotLevel": 0.0, "robotMix": 0.0,
 			"voiceDisguiseOn": false, "pitchShiftOn": false, "pitchShiftSemitones": 0.0,
 		}))
 	}
-	// 13 mix-minus modes (one per output).
+	// 13 mix-minus modes (one per output): Headphones 1 is a custom mix.
 	for i := 0; i < 13; i++ {
-		kids = append(kids, leaf("MIXMINUSES", map[string]interface{}{"outputMixMinus": 0}))
+		mode := 0
+		if i == 0 {
+			mode = 2
+		}
+		kids = append(kids, leaf("MIXMINUSES", map[string]interface{}{"outputMixMinus": mode}))
 	}
-	// 21 pads: a few named in bank 0.
-	padNames := []string{"Intro", "Applaus", "Lacher", "Jingle", "Stinger", "Outro"}
+	// The send matrix: 19 sources × 13 outputs; the custom Headphones 1 mix
+	// has an unlinked, lower USB 1 and a muted chat.
+	for s := 0; s < len(fixtureSources); s++ {
+		for o := 0; o < 13; o++ {
+			lv := 0.708661
+			link, mute, dis := true, false, false
+			if o == 0 && s == 7 {
+				lv, link = 0.45, false
+			}
+			if o == 0 && s == 8 {
+				mute = true
+			}
+			if (o == 7 && s == 7) || (o == 9 && s == 9) || (o == 6 && s == 10) {
+				dis = true
+			}
+			kids = append(kids, leaf("MIX", map[string]interface{}{
+				"mixLevelWithAnchor": fmtMix(lv) + "|" + fmtMix(0.708661), "mixLink": link,
+				"mixLinkRequest": false, "mixUnlinkRequest": false, "mixMute": mute, "mixDisabled": dis,
+			}))
+		}
+	}
+	// 21 pads with every field the device keeps: bank 0 named, bank 1 the
+	// factory effects and mixer actions, the rest empty.
+	padNames := []string{"Intro", "Applaus", "Lacher", "Jingle", "Stinger", "Outro",
+		"Nachhall", "Roboter", "Zensur", "Ducking", "MIDI", "Ausblenden"}
+	padTypes := []int64{1, 1, 1, 2, 3, 1, 2, 2, 3, 3, 4, 3}
+	padMixerModes := []int64{0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 2}
 	for i := 0; i < 21; i++ {
-		p := map[string]interface{}{"padIdx": i, "padColourIndex": int64(i % 6), "padActive": false}
+		p := map[string]interface{}{
+			"padIdx": i, "padColourIndex": int64(i % 12), "padActive": false, "padName": "", "padType": int64(0),
+			"padLoop": false, "padReplay": true, "padPlayMode": int64(0), "padProgress": 0.0, "padGain": -12.0,
+			"padEnvStart": 0.0, "padEnvFadeIn": 0.0, "padEnvFadeOut": 1.0, "padEnvStop": 1.0,
+			"padMixerMode": int64(0), "padMixerTriggerMode": int64(0), "padMixerCensorCustom": false,
+			"padMixerFadeInSeconds": 2.0, "padMixerFadeOutSeconds": 5.0, "padMixerFadeExcludeHost": false,
+			"padMixerBackChannelMic2": false, "padMixerBackChannelMic3": false, "padMixerBackChannelMic4": false,
+			"padMixerBackChannelUsb1Comms": false, "padMixerBackChannelUsb2Main": false, "padMixerBackChannelBluetooth": false,
+			"padMixerBackChannelCallMe1": false, "padMixerBackChannelCallMe2": false, "padMixerBackChannelCallMe3": false,
+			"padEffectInput": int64(0), "padEffectTriggerMode": int64(1),
+			"padTriggerMode": int64(1), "padTriggerSend": int64(2), "padTriggerType": int64(0), "padTriggerControl": int64(i),
+			"padTriggerChannel": int64(1), "padTriggerOn": int64(127), "padTriggerOff": int64(0), "padTriggerCustom": false,
+		}
 		if i < len(padNames) {
 			p["padName"] = padNames[i]
-			p["padType"] = int64([]int{1, 1, 1, 2, 3, 1}[i])
-		} else {
-			p["padName"] = ""
-			p["padType"] = 0
+			p["padType"] = padTypes[i]
+			p["padMixerMode"] = padMixerModes[i]
+			if i == 2 {
+				p["padEnvStart"], p["padEnvFadeIn"], p["padEnvFadeOut"], p["padEnvStop"] = 0.1, 0.25, 0.8, 0.95
+				p["padPlayMode"], p["padLoop"] = int64(0), true
+			}
 		}
 		kids = append(kids, leaf("PAD", p))
 	}
-	// 48 pad buttons.
-	for i := 0; i < 48; i++ {
+	// The effects pads' settings (under PADEFFECTS on the device).
+	var padFx []node
+	for _, i := range []int64{3, 6, 7} {
+		padFx = append(padFx, leaf("EFFECTS_PARAMETERS", map[string]interface{}{
+			"effectsIdx": i, "reverbOn": i == 3 || i == 6, "reverbMix": 0.5, "reverbLowCut": 0.6661, "reverbHighCut": 0.3333, "reverbModel": 0.4,
+			"echoOn": i == 3, "echoMix": 0.3, "echoDelay": 0.165, "echoDecay": 0.5, "echoLowCut": 0.5, "echoHighCut": 0.5,
+			"distortionOn": false, "distortionIntensity": 0.7, "robotOn": i == 7, "robotLevel": 0.2, "robotMix": 0.6667,
+			"voiceDisguiseOn": false, "pitchShiftOn": false, "pitchShiftSemitones": 7.0,
+		}))
+	}
+	kids = append(kids, node{T: "PADEFFECTS", P: map[string]interface{}{}, C: padFx})
+	// The pad buttons (one per slot, as the Duo's eight).
+	for i := 0; i < 8; i++ {
 		kids = append(kids, leaf("PADBUTTON", map[string]interface{}{"padButtonPressed": false, "padButtonPreview": false}))
 	}
 	kids = append(kids, leaf("NETWORK", map[string]interface{}{
@@ -218,7 +273,7 @@ func BuildTree() []byte {
 		"meta": map[string]interface{}{
 			"layout": map[string]interface{}{
 				"model": "duo", "modelName": "RØDECaster Duo", "firmware": "1.7.6",
-				"physicalFaders": 4, "padsPerBank": 6, "padBanks": 8,
+				"physicalFaders": 4, "padsPerBank": 6, "padBanks": 8, "mixPerSource": 13, "sourceCount": 19, "micInputs": 2,
 			},
 			"faders": fixtureFaders, "sources": fixtureSources, "outputs": fixtureOutputs, "unityFader": 90,
 		},
@@ -227,3 +282,6 @@ func BuildTree() []byte {
 	b, _ := json.Marshal(doc)
 	return b
 }
+
+// fmtMix formats one half of a send level as the desk does.
+func fmtMix(v float64) string { return strconv.FormatFloat(v, 'f', 6, 64) }

@@ -116,11 +116,15 @@ func (m *Model) Storage() Storage {
 	vols := m.runs.byType["STORAGEVOLUME"]
 	rate := m.nth(tRec, 0).Num("recordBytesPerSecond")
 	for i, v := range vols {
+		// The third volume is the pads' own storage, never a destination.
+		if v.Has("storageVolumeRecDestination") && !v.Bool("storageVolumeRecDestination") {
+			continue
+		}
 		if !v.Bool("storageVolumeInserted") && !v.Bool("storageVolumeMounted") {
 			continue
 		}
 		out.Present = true
-		out.USB = i > 0
+		out.USB = i == 1
 		capacity, free := v.Num("storageVolumeCapacity"), v.Num("storageVolumeFree")
 		if capacity > 0 {
 			out.Used = clamp01(1 - free/capacity)

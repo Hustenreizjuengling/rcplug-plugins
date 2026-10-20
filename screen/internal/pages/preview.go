@@ -24,5 +24,17 @@ func Detail(name string) Page {
 	return newMeteringPage()
 }
 
+// PadPage returns a pad's options, new-pad or colour page by name (previews
+// and tests).
+func PadPage(idx int, name string) Page {
+	switch name {
+	case "new":
+		return newPadNew(idx)
+	case "colour":
+		return newPadColour(idx)
+	}
+	return newPadOptions(idx)
+}
+
 // RoutingMix returns the mix page of an output (previews and tests).
 func RoutingMix(output int) Page { return newRoutingMix(output) }

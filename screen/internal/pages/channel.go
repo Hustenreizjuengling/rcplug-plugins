@@ -92,15 +92,19 @@ func (p *ChannelPage) inputCard(env *Env, strip int, area image.Rectangle) []ui.
 	}
 
 	// Gain (microphones) or level (digital sources).
+	// Every input node carries all three gains; the kind of input says
+	// which one counts: a microphone (inputType 0), an instrument or line
+	// (1), or a digital source (−1) with its level.
 	gainProp, label, unit := "", "GAIN", "dB"
-	for _, cand := range []string{"inputMicrophoneGain", "inputInstrumentGain", "inputDigitalGain"} {
-		if d.Has(desk.InputNode, input, cand) {
-			gainProp = cand
-			break
-		}
-	}
-	if gainProp == "inputDigitalGain" {
-		label = "LEVEL"
+	switch kind := d.Int(desk.InputNode, input, "inputType"); {
+	case kind < 0 && d.Has(desk.InputNode, input, "inputDigitalGain"):
+		gainProp, label = "inputDigitalGain", "LEVEL"
+	case kind == 1 && d.Has(desk.InputNode, input, "inputInstrumentGain"):
+		gainProp = "inputInstrumentGain"
+	case d.Has(desk.InputNode, input, "inputMicrophoneGain"):
+		gainProp = "inputMicrophoneGain"
+	case d.Has(desk.InputNode, input, "inputDigitalGain"):
+		gainProp, label = "inputDigitalGain", "LEVEL"
 	}
 	if gainProp != "" {
 		gp := gainProp

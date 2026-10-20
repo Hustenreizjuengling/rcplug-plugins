@@ -20,7 +20,12 @@ this plugin's own code.
 - It controls the desk through the **console** plugin's HTTP API (package
   `internal/desk`): it loads the state tree, follows the live stream of
   changes, and writes single properties back optimistically. It needs the
-  `desk:write` permission, and the console must be running.
+  `desk:write` permission, and the console must be running. With rcplug
+  0.8.16 or later it writes at the console's expert level, as RØDE's screen
+  does (older hosts refuse the settings beyond the basic rules: metering,
+  haptics, the clock, the pads' names and modes, and more).
+- The buttons above the physical faders open the strip's channel page
+  (`SYSTEM.systemChannelSelected`), as on RØDE's screen.
 - The main knob works as on RØDE's screen (package `internal/app`, the
   focus): on the mixer it sets the monitor level, a press moves it on to the
   virtual faders (and back), holding it mutes the focused one. On every other
@@ -37,7 +42,9 @@ If the plugin exits — on purpose, on an error or on a crash — the host start
 RØDE's screen program again. The audio engine is independent of the screen, so
 the sound is never interrupted. Settings that rcplug does not change (network,
 Bluetooth, firmware, shows, storage, recordings) are shown read-only, with a
-button that hands the screen back to RØDE where they are made.
+button that hands the screen back to RØDE where they are made. The plugin
+never records on the device: a SMART pad's sound comes from the RØDE app, and
+its editor trims, fades and levels it.
 
 ## Development without a device
 
@@ -51,7 +58,8 @@ resources, passed with `--resources`:
     go run ./screen --serve 127.0.0.1:8099 --resources <folder> --lang de
 
 `--page` is one of: `settings`, `outputs`, `display`, `system`, `pads`,
-`routing`, `mix`, `rcplug`, `info`, `channel`, `channel:<n>`, `assign`,
+`pad:<n>` (a pad's editor), `pad:<n>:options|new|colour`, `routing`, `mix`,
+`mix:<output>`, `rcplug`, `info`, `channel`, `channel:<n>`, `assign`, `fx`,
 `proc:<hpf|gate|comp|deesser|eq|aphex|pan>`, `master`, `metering`, `listen`,
 `faders`, `language`, `datetime`, `brightness`, `keyboard`, `dialog` (or
 omitted for the mixer). In the browser the main knob is the mouse wheel over

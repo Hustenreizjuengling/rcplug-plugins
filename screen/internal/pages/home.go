@@ -656,8 +656,10 @@ func (p *HomePage) pads(env *Env, r image.Rectangle) []ui.View {
 	cells := grid(r, cols, rows, 14)
 	var out []ui.View
 	for slot := 0; slot < per && slot < len(cells); slot++ {
+		// Slots run down the left column first, as the device numbers them.
+		col, row := slot/rows, slot%rows
 		t := &padTile{env: env, slot: slot, compact: true}
-		t.SetBounds(cells[slot])
+		t.SetBounds(cells[row*cols+col])
 		out = append(out, t)
 	}
 	return out

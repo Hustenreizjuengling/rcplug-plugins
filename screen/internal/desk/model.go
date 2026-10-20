@@ -37,6 +37,9 @@ type Model struct {
 	unity     int64
 	physical  int
 	perBank   int
+	perSource int    // outputs per source in the send matrix
+	mics      int    // microphone inputs
+	banks     int    // pad banks
 	offline   bool   // no console: writes stay local (the preview)
 	reloading bool   // a resync reload is in flight (single-flight)
 	rev       uint64 // bumps on every change, so the UI can tell something moved
@@ -149,6 +152,15 @@ func (m *Model) adopt(raw []byte) error {
 	}
 	if td.Meta.Layout.PadsPerBank > 0 {
 		m.perBank = td.Meta.Layout.PadsPerBank
+	}
+	if td.Meta.Layout.MixPerSource > 0 {
+		m.perSource = td.Meta.Layout.MixPerSource
+	}
+	if td.Meta.Layout.MicInputs > 0 {
+		m.mics = td.Meta.Layout.MicInputs
+	}
+	if td.Meta.Layout.PadBanks > 0 {
+		m.banks = td.Meta.Layout.PadBanks
 	}
 	m.rev++
 	m.mu.Unlock()

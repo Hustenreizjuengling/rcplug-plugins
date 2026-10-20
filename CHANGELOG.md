@@ -6,6 +6,33 @@ may break compatibility).
 
 ## 0.5.18 - Unreleased
 
+### Added
+- **Screen 0.3.0** edits the SMART pads and the custom mixes, as RØDE's screen does:
+  - The pad menu shows a bank's six pads in the device's two columns with their names
+    beside them; a tap opens the pad's options (edit, rename with the keyboard, colour
+    from the twelve-colour picker, clear after a question), an empty slot the new-pad
+    page (sound, effects, mixer action, MIDI trigger). The editors: a sound's trim and
+    fades on four handles, play mode, loop, replay and level; an effects pad's input,
+    latching and its own effects rack; a mixer action's latching, mode (censor, trash
+    talk, fade with its times and the host, back channel with its members, ducking with
+    the depth); a trigger's mode, type, control, channel, values and what is sent. The
+    plugin never records on the device, so sounds come from the RØDE app.
+  - A **custom mix** (Routing → output → Custom) shows one fader per strip with its
+    meter and the link button under it: linked sends follow the channel fader (marked
+    ▸◂), dragging frees a send, the button cycles linked → unlinked → muted.
+  - Needs **rcplug 0.8.16** for these writes: the host now lets the plugin that stands
+    in for RØDE's screen write at the console's expert level. On older hosts the
+    settings beyond the basic rules (metering, haptics, the clock, pads, …) are refused.
+
+### Fixed
+- **Screen 0.3.0:** a strip's gain editor follows the kind of input (microphones:
+  gain; USB, chat, Bluetooth and calls: level), the effects rack opens the strip's own
+  slot (the device keeps one per strip, not per source), the output delay knob covers
+  its 0–2 s range, pads play from every bank (the buttons act on the bank shown, which
+  is selected first), the storage indicator ignores the pads' internal volume, the
+  mixer's pads run down the columns as the device numbers them, and values pulled from
+  the desk show on a page's first frame (some labels stayed empty before).
+
 ## 0.5.17 - 2026-10-20
 
 ### Fixed

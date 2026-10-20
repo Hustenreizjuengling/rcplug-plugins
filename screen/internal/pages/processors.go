@@ -24,6 +24,7 @@ type procParam struct {
 	fmt    func(float64) string
 	lo     float64 // with span: the property's own range (not 0…1)
 	span   float64
+	res    float64 // the step of such a property (0: whole numbers)
 }
 
 type processor struct {
@@ -31,6 +32,7 @@ type processor struct {
 	onProp string
 	params []procParam
 	graph  func(env *Env, strip int, node string) graphFunc
+	icon   string // shown in the graph box when there is no response to draw
 }
 
 // graphFunc gives the response in dB at a frequency (Hz) or the output level
@@ -55,6 +57,8 @@ type RackPage struct {
 	strip int
 	idx   int
 	node  string
+	pad   int // with isPad: the pad whose effects slot is edited
+	isPad bool
 }
 
 // NewEffectsRack makes the effects rack of a strip, opened at effect idx.
@@ -65,22 +69,10 @@ func NewEffectsRack(strip, idx int) Page {
 // effectsIndex finds the EFFECTS_PARAMETERS node of a strip's source (−1 if
 // there is none): the node carries the source it belongs to.
 func effectsIndex(env *Env, strip int) int {
-	src := env.Desk.SourceOf(strip)
-	if src < 0 {
+	if env.Desk.SourceOf(strip) < 0 {
 		return -1
 	}
-	n := env.Desk.Count(desk.EffectsNode)
-	for i := 0; i < n; i++ {
-		if env.Desk.Int(desk.EffectsNode, i, "channelInputSource") == src {
-			return i
-		}
-	}
-	for i := 0; i < n; i++ {
-		if env.Desk.Int(desk.EffectsNode, i, "effectsIdx") == src {
-			return i
-		}
-	}
-	return -1
+	return env.Desk.EffectsSlot(strip)
 }
 
 // NewRack makes the rack page for a strip, opened at processor idx.
@@ -106,8 +98,12 @@ func (p *RackPage) procs() []processor {
 	return channelProcessors
 }
 
+// Content builds the rack alone, without a page frame (the effects pad's
+// editor places it under its own controls).
+func (p *RackPage) Content(env *Env, r image.Rectangle) ui.View { return p.Build(env, r) }
+
 func (p *RackPage) Header(env *Env, bar image.Rectangle) ([]ui.View, bool) {
-	if p.node == desk.MasterNode {
+	if p.node == desk.MasterNode || p.isPad {
 		return nil, false
 	}
 	idx, node := p.idx, p.node
@@ -130,9 +126,13 @@ func (p *RackPage) Build(env *Env, r image.Rectangle) ui.View {
 	}
 	pr := procs[p.idx]
 	node, strip := p.node, p.strip
-	if node == desk.EffectsNode {
+	if p.isPad {
+		strip = d.PadEffectsNode(p.pad)
+	} else if node == desk.EffectsNode {
 		// The effects node is the one of the strip's source.
 		strip = effectsIndex(env, p.strip)
+	}
+	if node == desk.EffectsNode {
 		if strip < 0 {
 			lbl := ui.NewLabel(env.T("NOT ASSIGNED"), th.Fonts.Title, th.TextDim, font.Center)
 			lbl.SetBounds(r)
@@ -146,7 +146,11 @@ func (p *RackPage) Build(env *Env, r image.Rectangle) ui.View {
 	c.Add(rack)
 
 	// The graph.
-	graph := &graphView{env: env, strip: strip, node: node, fn: pr.graph}
+	meter := p.strip
+	if p.isPad || p.node == desk.MasterNode {
+		meter = -1
+	}
+	graph := &graphView{env: env, strip: strip, meter: meter, node: node, fn: pr.graph, icon: pr.icon}
 	graph.SetBounds(image.Rect(r.Min.X+24, r.Min.Y+40, r.Min.X+424, r.Max.Y-40))
 	c.Add(graph)
 
@@ -203,10 +207,13 @@ func (p *RackPage) Build(env *Env, r image.Rectangle) ui.View {
 		var k *ui.Knob
 		if par.span != 0 {
 			// A property in its own unit (semitones): mapped onto the knob's 0…1.
-			lo, span := par.lo, par.span
+			lo, span, res := par.lo, par.span, par.res
+			if res <= 0 {
+				res = 1
+			}
 			k = ui.NewKnob(func() float64 { return (d.Num(node, strip, prop) - lo) / span },
-				func(v float64) { d.SetFloat(node, strip, prop, math.Round(lo+v*span)) })
-			k.Step = 1 / span
+				func(v float64) { d.SetFloat(node, strip, prop, math.Round((lo+v*span)/res)*res) })
+			k.Step = res / span
 		} else {
 			k = ui.NewKnob(func() float64 { return d.Num(node, strip, prop) },
 				func(v float64) { d.SetFloat(node, strip, prop, v) })
@@ -384,8 +391,10 @@ type graphView struct {
 	ui.Base
 	env   *Env
 	strip int
+	meter int // the strip whose level the side bars show (-1: none)
 	node  string
 	fn    func(env *Env, strip int, node string) graphFunc
+	icon  string
 	last  uint64
 	lastM float64
 }
@@ -404,8 +413,14 @@ func (g *graphView) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
 	th := c.Theme
 	r := g.Bounds()
 	ui.Panel(dst, r, 10, gfx.Hex(0x080808), clip)
+	if g.fn == nil && g.icon != "" {
+		c.Icon(dst, g.icon, centred(r, r.Dx()/2, r.Dy()/2), gfx.Hex(0x3a3a3a))
+	}
 	// Input and output level bars at the sides.
-	in := g.env.Desk.MeterFrac(g.strip)
+	in := 0.0
+	if g.meter >= 0 {
+		in = g.env.Desk.MeterFrac(g.meter)
+	}
 	bars := func(x int, v float64) {
 		col := image.Rect(x, r.Min.Y+14, x+10, r.Max.Y-14)
 		ui.Fill(dst, col, gfx.Hex(0x1e1e1e), clip)
@@ -685,28 +700,28 @@ func tenths(v float64) string { return strconv.FormatFloat(v*10, 'f', 1, 64) }
 // effectsProcessors are the voice effects of a source, as the device's
 // effects page lists them.
 var effectsProcessors = []processor{
-	{key: "REVERB", onProp: "reverbOn", params: []procParam{
+	{key: "REVERB", icon: "IconFxReverb", onProp: "reverbOn", params: []procParam{
 		{key: "LEVEL", prop: "reverbMix", fmt: tenths},
 		{key: "LOW CUT", prop: "reverbLowCut", fmt: hz(20, 500)},
 		{key: "HIGH CUT", prop: "reverbHighCut", fmt: hz(1000, 20000)},
 		{key: "SIZE", prop: "reverbModel"},
 	}},
-	{key: "ECHO", onProp: "echoOn", params: []procParam{
+	{key: "ECHO", icon: "IconFxEcho", onProp: "echoOn", params: []procParam{
 		{key: "LEVEL", prop: "echoMix", fmt: tenths},
 		{key: "DELAY", prop: "echoDelay", fmt: func(v float64) string { return strconv.Itoa(int(v*1000+0.5)) + " ms" }},
 		{key: "DECAY", prop: "echoDecay", fmt: tenths},
 		{key: "LOW CUT", prop: "echoLowCut", fmt: hz(20, 500)},
 		{key: "HIGH CUT", prop: "echoHighCut", fmt: hz(1000, 20000)},
 	}},
-	{key: "MEGAPHONE", onProp: "distortionOn", params: []procParam{
+	{key: "MEGAPHONE", icon: "IconMegaphone", onProp: "distortionOn", params: []procParam{
 		{key: "INTENSITY", prop: "distortionIntensity", fmt: tenths},
 	}},
-	{key: "ROBOT", onProp: "robotOn", params: []procParam{
+	{key: "ROBOT", icon: "IconFxRobot", onProp: "robotOn", params: []procParam{
 		{key: "LEVEL", prop: "robotLevel", fmt: tenths},
 		{key: "TYPE", prop: "robotMix"},
 	}},
-	{key: "VOICE DISGUISE", onProp: "voiceDisguiseOn"},
-	{key: "PITCH SHIFT", onProp: "pitchShiftOn", params: []procParam{
+	{key: "VOICE DISGUISE", icon: "IconFxVoiceDisguise", onProp: "voiceDisguiseOn"},
+	{key: "PITCH SHIFT", icon: "IconFxPitchShift", onProp: "pitchShiftOn", params: []procParam{
 		{key: "SEMITONES", prop: "pitchShiftSemitones", lo: -12, span: 24,
 			fmt: func(v float64) string { return strconv.Itoa(int(math.Round(v*24 - 12))) }},
 	}},
@@ -733,7 +748,7 @@ var masterProcessors = []processor{
 		}}
 	}},
 	{key: "OUTPUT DELAY", onProp: "masterDelayOn", params: []procParam{
-		{key: "DELAY", prop: "masterDelaySeconds", fmt: func(v float64) string { return strconv.FormatFloat(v*2, 'f', 2, 64) + " s" }},
+		{key: "DELAY", prop: "masterDelaySeconds", lo: 0, span: 2, res: 0.01, fmt: func(v float64) string { return strconv.FormatFloat(v*2000, 'f', 0, 64) + " ms" }},
 	}},
 }
 
