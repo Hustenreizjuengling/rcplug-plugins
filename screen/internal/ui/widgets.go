@@ -50,12 +50,14 @@ func (i *Icon) Draw(dst *gfx.Image, c *Context, clip image.Rectangle) {
 // Button is a tappable card with an optional icon and label.
 type Button struct {
 	Base
-	Label   string
-	Icon    string
-	OnTap   func()
-	Toggle  bool // stays on
-	On      bool
-	Enabled bool
+	Label      string
+	Icon       string
+	OnTap      func()
+	Toggle     bool // stays on
+	On         bool
+	Enabled    bool
+	TileLayout bool      // icon centred above the label (a menu tile)
+	Fill       gfx.Color // override the card colour (alpha 0: the theme's)
 
 	pressed bool
 }
@@ -106,6 +108,8 @@ func (b *Button) Draw(dst *gfx.Image, c *Context, clip image.Rectangle) {
 		fill = t.PanelHi
 	case b.On:
 		fill = t.Accent
+	case b.Fill.A() != 0:
+		fill = b.Fill
 	}
 	Panel(dst, b.bounds, t.Radius, fill, clip)
 	text := t.Text
@@ -115,6 +119,16 @@ func (b *Button) Draw(dst *gfx.Image, c *Context, clip image.Rectangle) {
 		text = gfx.Hex(0x101010)
 	}
 	r := inset(b.bounds, t.Gap)
+	if b.TileLayout {
+		// Icon centred above the label.
+		side := min(min(r.Dx(), r.Dy()-24), 56)
+		if b.Icon != "" {
+			ir := image.Rect(r.Min.X+(r.Dx()-side)/2, r.Min.Y+8, r.Min.X+(r.Dx()-side)/2+side, r.Min.Y+8+side)
+			c.Icon(dst, b.Icon, ir, text)
+		}
+		Text(dst, t.Fonts.Small, b.Label, image.Rect(r.Min.X, r.Max.Y-30, r.Max.X, r.Max.Y), font.Center, text, clip)
+		return
+	}
 	if b.Icon != "" {
 		side := min(r.Dy(), 40)
 		ir := image.Rect(r.Min.X, r.Min.Y+(r.Dy()-side)/2, r.Min.X+side, r.Min.Y+(r.Dy()-side)/2+side)
