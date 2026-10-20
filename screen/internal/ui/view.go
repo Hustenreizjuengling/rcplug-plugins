@@ -33,10 +33,12 @@ const (
 	Up
 )
 
-// Base is embedded by views: it keeps the bounds and the dirty mark.
+// Base is embedded by views: it keeps the bounds, the dirty mark and the
+// encoder focus. On its own it takes no focus (CanFocus is false).
 type Base struct {
-	bounds image.Rectangle
-	dirty  bool
+	bounds  image.Rectangle
+	dirty   bool
+	focused bool
 }
 
 func (b *Base) SetBounds(r image.Rectangle) {
@@ -60,6 +62,26 @@ func (b *Base) Dirty() []image.Rectangle {
 	return nil
 }
 
+// SetFocus gives or takes the encoder focus (the view redraws with a ring).
+func (b *Base) SetFocus(on bool) {
+	if on != b.focused {
+		b.focused = on
+		b.dirty = true
+	}
+}
+
+// Focused reports whether the view has the encoder focus.
+func (b *Base) Focused() bool { return b.focused }
+
+// CanFocus is false for a plain view; controls override it.
+func (b *Base) CanFocus() bool { return false }
+
+// Activate does nothing for a plain view.
+func (b *Base) Activate() bool { return false }
+
+// Adjust does nothing for a plain view.
+func (b *Base) Adjust(int) {}
+
 // Container holds child views in a fixed layout set by the embedding view.
 type Container struct {
 	Base
@@ -74,6 +96,13 @@ func (c *Container) Add(v ...View) { c.Children = append(c.Children, v...) }
 func (c *Container) Clear() {
 	c.Children = nil
 	c.MarkDirty()
+}
+
+// Walk visits the children in order (and theirs).
+func (c *Container) Walk(fn func(View)) {
+	for _, ch := range c.Children {
+		Walk(ch, fn)
+	}
 }
 
 func (c *Container) Draw(dst *gfx.Image, ctx *Context, clip image.Rectangle) {
@@ -123,4 +152,22 @@ func (c *Container) Dirty() []image.Rectangle {
 		out = append(out, ch.Dirty()...)
 	}
 	return out
+}
+
+// Backdrop is a container that paints a background behind its children: the
+// theme's page gradient, or a plain colour.
+type Backdrop struct {
+	Container
+	Fill  gfx.Color // alpha 0: the page gradient
+	Plain bool      // fill with Fill even if alpha 0 (the mixer's black)
+}
+
+func (b *Backdrop) Draw(dst *gfx.Image, ctx *Context, clip image.Rectangle) {
+	switch {
+	case b.Plain || b.Fill.A() != 0:
+		Fill(dst, b.bounds, b.Fill, clip)
+	default:
+		PageBackground(dst, b.bounds, ctx.Theme, clip)
+	}
+	b.Container.Draw(dst, ctx, clip)
 }

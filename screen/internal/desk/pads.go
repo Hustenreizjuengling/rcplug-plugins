@@ -44,6 +44,7 @@ type Pad struct {
 	Name   string
 	Colour int64
 	Active bool
+	Type   int64 // the pad's kind (padType)
 }
 
 // PadAt returns the pad at (bank, slot).

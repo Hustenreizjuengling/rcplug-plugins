@@ -7,6 +7,7 @@ package preview
 
 import (
 	"encoding/json"
+	"math"
 )
 
 // node is one tree node in the console's {t,p,c} shape.
@@ -54,7 +55,7 @@ var fixtureFaders = []map[string]string{
 var fixtureChannelSources = []int64{0, 1, 7, 10, 11, 17, -1, -1, -1, -1}
 var fixtureColours = []string{"ff7ad43a", "ff33a3ff", "ffe5322d", "fff0a830", "ffb060ff", "ff30d0c0"}
 var fixtureFaderLevels = []int64{96, 90, 104, 80, 90, 64, 40, 90, 90}
-var fixtureMeterL = []float64{0.72, 0.55, 0.30, 0.10, 0.62, 0.0, 0.0, 0.0, 0.0}
+var fixtureMeterL = []float64{0.35, 0.12, 0.06, 0.02, 0.2, 0.0, 0.0, 0.0, 0.0}
 
 // BuildTree returns a representative Duo tree document for the offline model.
 func BuildTree() []byte {
@@ -106,8 +107,15 @@ func BuildTree() []byte {
 		if i == 9 {
 			l = 0.6
 		}
+		if i >= 13 {
+			l = 1
+			if i == 13 {
+				l = 0.5 // 6 dB of gain reduction on strip 0
+			}
+		}
+		stereo := i == 9 || i == 2 || i == 4
 		kids = append(kids, leaf("METER", map[string]interface{}{
-			"meterLevelL": l, "meterLevelR": l * 0.9, "meterPeakL": l, "meterPeakR": l * 0.9, "meterStereo": i == 9,
+			"meterLevelL": l, "meterLevelR": l * 0.8, "meterPeakL": math.Min(1, l*1.3), "meterPeakR": l, "meterStereo": stereo,
 		}))
 	}
 	// Output, GUI, System, Recorder, Master.
@@ -132,13 +140,23 @@ func BuildTree() []byte {
 		"disableAllHeadphoneOutputs": false,
 	}))
 	kids = append(kids, leaf("RECORDER", map[string]interface{}{
-		"recordState": 0, "recordTimeMs": 0, "requestDropMarker": 0, "requestRecordState": 255, "recordBytesPerSecond": 0,
+		"recordState": 0, "recordTimeMs": 0, "requestDropMarker": 0, "requestRecordState": 255, "recordBytesPerSecond": 384000,
 	}))
 	kids = append(kids, leaf("MASTERCHANNEL", map[string]interface{}{
 		"masterCompellorOn": true, "masterCompellorThreshold": 0.5, "masterCompellorAttack": 0.4,
 		"masterCompellorRelease": 0.5, "masterCompellorGain": 0.3, "masterDelayOn": false, "masterDelaySeconds": 0.0,
 	}))
 	kids = append(kids, leaf("DUCKER", map[string]interface{}{"duckerDepth": 0.3}))
+	// The main knob (idle: int 0 + true) and the recording storage.
+	kids = append(kids, leaf("ENCODER", map[string]interface{}{"encoderSignal": "0105010000000001" + "0102", "encoderPressed": false, "encoderColour": 7}))
+	kids = append(kids, leaf("STORAGEVOLUME", map[string]interface{}{
+		"storageVolumeInserted": true, "storageVolumeMounted": true, "storageVolumeFormatted": true,
+		"storageVolumeCapacity": 64e9, "storageVolumeFree": 41e9, "storageVolumeRecDestination": true,
+	}))
+	kids = append(kids, leaf("STORAGEVOLUME", map[string]interface{}{
+		"storageVolumeInserted": false, "storageVolumeMounted": false, "storageVolumeFormatted": false,
+		"storageVolumeCapacity": 0, "storageVolumeFree": 0, "storageVolumeRecDestination": false,
+	}))
 	// 30 input sources with gain/power/colour.
 	for i := 0; i < 30; i++ {
 		p := map[string]interface{}{"inputId": i, "inputType": 0}
@@ -168,7 +186,7 @@ func BuildTree() []byte {
 		p := map[string]interface{}{"padIdx": i, "padColourIndex": int64(i % 6), "padActive": false}
 		if i < len(padNames) {
 			p["padName"] = padNames[i]
-			p["padType"] = 1
+			p["padType"] = int64([]int{1, 1, 1, 2, 3, 1}[i])
 		} else {
 			p["padName"] = ""
 			p["padType"] = 0

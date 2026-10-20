@@ -9,8 +9,8 @@ import (
 )
 
 // Keyboard is a full-screen on-screen keyboard with a text field, letters,
-// a shift and a symbols layer, and done/cancel. It calls OnDone with the
-// text, or OnCancel.
+// a shift and a symbols layer, and done/cancel (the green tick and the red
+// cross, as on RØDE's screen). It calls OnDone with the text, or OnCancel.
 type Keyboard struct {
 	Base
 	Prompt   string
@@ -46,8 +46,8 @@ func (k *Keyboard) SetBounds(r image.Rectangle) {
 func (k *Keyboard) build() {
 	k.keys = nil
 	r := k.bounds
-	top := r.Min.Y + 90 // the field takes the top
-	gap := 6
+	top := r.Min.Y + 120 // the field and the X / tick take the top
+	gap := 8
 	rowH := (r.Max.Y - top - 16) / 5
 	rows := kbRowsLower
 	if k.symbols {
@@ -56,11 +56,11 @@ func (k *Keyboard) build() {
 	add := func(rc image.Rectangle, label, ins, action string) {
 		k.keys = append(k.keys, key{r: rc, label: label, ins: ins, action: action})
 	}
+	kw := (r.Dx() - 24) / 10
 	for ri := 0; ri < 3; ri++ {
 		chars := rows[ri]
 		n := len(chars)
-		kw := (r.Dx() - 16) / 10
-		x0 := r.Min.X + 8 + (10-n)*kw/2
+		x0 := r.Min.X + 12 + (10-n)*kw/2
 		y := top + ri*rowH
 		for i, ch := range chars {
 			rc := image.Rect(x0+i*kw+gap/2, y+gap/2, x0+(i+1)*kw-gap/2, y+rowH-gap/2)
@@ -73,12 +73,11 @@ func (k *Keyboard) build() {
 	}
 	// Row 3: shift, letters, backspace.
 	y := top + 3*rowH
-	kw := (r.Dx() - 16) / 10
 	wide := kw * 3 / 2
-	add(image.Rect(r.Min.X+8+gap/2, y+gap/2, r.Min.X+8+wide-gap/2, y+rowH-gap/2), shiftLabel(k), "", "shift")
+	add(image.Rect(r.Min.X+12+gap/2, y+gap/2, r.Min.X+12+wide-gap/2, y+rowH-gap/2), "⇧", "", "shift")
 	chars := rows[3]
 	n := len(chars)
-	x0 := r.Min.X + 8 + wide + (7-n)*kw/2
+	x0 := r.Min.X + 12 + wide + (7-n)*kw/2
 	for i, ch := range chars {
 		rc := image.Rect(x0+i*kw+gap/2, y+gap/2, x0+(i+1)*kw-gap/2, y+rowH-gap/2)
 		s := string(ch)
@@ -87,19 +86,19 @@ func (k *Keyboard) build() {
 		}
 		add(rc, s, s, "")
 	}
-	add(image.Rect(r.Max.X-8-wide+gap/2, y+gap/2, r.Max.X-8-gap/2, y+rowH-gap/2), "Del", "", "back")
-	// Row 4: symbols, space, cancel, done.
+	add(image.Rect(r.Max.X-12-wide+gap/2, y+gap/2, r.Max.X-12-gap/2, y+rowH-gap/2), "⌫", "", "back")
+	// Row 4: symbols, space.
 	y = top + 4*rowH
 	symW := kw * 3 / 2
-	add(image.Rect(r.Min.X+8+gap/2, y+gap/2, r.Min.X+8+symW-gap/2, y+rowH-gap/2), symLabel(k), "", "sym")
-	spaceR := image.Rect(r.Min.X+8+symW+gap/2, y+gap/2, r.Max.X-8-2*symW-gap/2, y+rowH-gap/2)
-	add(spaceR, "", " ", "space")
-	add(image.Rect(r.Max.X-8-2*symW+gap/2, y+gap/2, r.Max.X-8-symW-gap/2, y+rowH-gap/2), "X", "", "cancel")
-	add(image.Rect(r.Max.X-8-symW+gap/2, y+gap/2, r.Max.X-8-gap/2, y+rowH-gap/2), "OK", "", "done")
+	add(image.Rect(r.Min.X+12+gap/2, y+gap/2, r.Min.X+12+symW-gap/2, y+rowH-gap/2), symLabel(k), "", "sym")
+	add(image.Rect(r.Min.X+12+symW+gap/2, y+gap/2, r.Max.X-12-symW-gap/2, y+rowH-gap/2), "", " ", "space")
+	add(image.Rect(r.Max.X-12-symW+gap/2, y+gap/2, r.Max.X-12-gap/2, y+rowH-gap/2), "⏎", "", "done")
+	// The X and the tick beside the field.
+	add(image.Rect(r.Min.X+24, r.Min.Y+22, r.Min.X+24+76, r.Min.Y+22+76), "", "", "cancel")
+	add(image.Rect(r.Max.X-24-76, r.Min.Y+22, r.Max.X-24, r.Min.Y+22+76), "", "", "done")
 	k.MarkDirty()
 }
 
-func shiftLabel(k *Keyboard) string { return "Aa" }
 func symLabel(k *Keyboard) string {
 	if k.symbols {
 		return "ABC"
@@ -170,34 +169,117 @@ func (k *Keyboard) hit(ky key) {
 
 func (k *Keyboard) Draw(dst *gfx.Image, c *Context, clip image.Rectangle) {
 	t := c.Theme
-	Fill(dst, k.bounds, t.Bg, clip)
-	// The field.
-	fr := image.Rect(k.bounds.Min.X+16, k.bounds.Min.Y+16, k.bounds.Max.X-16, k.bounds.Min.Y+76)
-	Panel(dst, fr, t.Radius, t.Panel, clip)
+	PageBackground(dst, k.bounds, t, clip)
+	// The field between the X and the tick.
+	fr := image.Rect(k.bounds.Min.X+120, k.bounds.Min.Y+24, k.bounds.Max.X-120, k.bounds.Min.Y+96)
+	Panel(dst, fr, t.Radius, t.Black, clip)
+	PanelOutline(dst, fr, t.Radius, 2, t.Line, clip)
 	txt := string(k.text)
 	if txt == "" && k.Prompt != "" {
-		Text(dst, t.Fonts.Body, k.Prompt, inset(fr, 12), font.Left, t.TextMuted, clip)
+		Text(dst, t.Fonts.Body, k.Prompt, inset(fr, 16), font.Left, t.TextMuted, clip)
 	} else {
-		Text(dst, t.Fonts.Title, txt+"|", inset(fr, 12), font.Left, t.Text, clip)
+		Text(dst, t.Fonts.Title, txt+"|", inset(fr, 16), font.Left, t.Text, clip)
 	}
 	for i, ky := range k.keys {
-		fill := t.Panel
+		switch ky.action {
+		case "cancel":
+			col := gfx.Hex(0xb81e1e)
+			if i == k.pressed {
+				col = gfx.Hex(0xe03a3a)
+			}
+			Circle(dst, centre(ky.r).X, centre(ky.r).Y, float64(ky.r.Dx())/2, col, clip)
+			drawCross(dst, ky.r, t.Text, clip)
+			continue
+		case "done":
+			if ky.label == "" {
+				col := t.Accent
+				if i == k.pressed {
+					col = gfx.Hex(0x6ae06a)
+				}
+				Circle(dst, centre(ky.r).X, centre(ky.r).Y, float64(ky.r.Dx())/2, col, clip)
+				drawTick(dst, ky.r, t.TextOnLight, clip)
+				continue
+			}
+		}
 		fg := t.Text
 		switch {
 		case i == k.pressed:
-			fill = t.Accent
-			fg = gfx.Hex(0x101010)
-		case ky.action == "done":
-			fill = t.Accent
-			fg = gfx.Hex(0x101010)
+			LightCard(dst, ky.r, t, clip)
+			fg = t.TextOnLight
 		case ky.action == "shift" && k.shift, ky.action == "sym" && k.symbols:
-			fill = t.PanelHi
+			Panel(dst, ky.r, 10, t.PanelHi, clip)
+		case ky.action == "done":
+			Gradient(dst, ky.r, 10, gfx.Hex(0x4ad64a), gfx.Hex(0x2a9a2a), clip)
+		default:
+			Gradient(dst, ky.r, 10, t.CardTop, t.CardBottom, clip)
 		}
-		Panel(dst, ky.r, 8, fill, clip)
-		label := ky.label
-		if ky.action == "space" {
-			label = ""
+		switch ky.action {
+		case "shift":
+			drawShift(dst, ky.r, fg, clip)
+		case "back":
+			drawBackspace(dst, ky.r, fg, clip)
+		case "done":
+			drawTick(dst, inset(ky.r, 14), fg, clip)
+		case "space":
+		default:
+			Text(dst, t.Fonts.Title, ky.label, ky.r, font.Center, fg, clip)
 		}
-		Text(dst, t.Fonts.Label, label, ky.r, font.Center, fg, clip)
 	}
+}
+
+// Glyphs drawn as paths (the device's font has no arrows).
+
+func drawCross(dst *gfx.Image, r image.Rectangle, col gfx.Color, clip image.Rectangle) {
+	c := centre(r)
+	a := float64(r.Dx()) * 0.2
+	p := &gfx.Path{}
+	p.MoveTo(c.X-a, c.Y-a)
+	p.LineTo(c.X+a, c.Y+a)
+	p.MoveTo(c.X+a, c.Y-a)
+	p.LineTo(c.X-a, c.Y+a)
+	dst.StrokePath(p, gfx.Identity, gfx.Stroke{Width: 7, Cap: gfx.RoundCap}, gfx.Solid(col), clip)
+}
+
+func drawTick(dst *gfx.Image, r image.Rectangle, col gfx.Color, clip image.Rectangle) {
+	c := centre(r)
+	s := float64(r.Dx())
+	p := &gfx.Path{}
+	p.MoveTo(c.X-s*0.26, c.Y+s*0.02)
+	p.LineTo(c.X-s*0.07, c.Y+s*0.2)
+	p.LineTo(c.X+s*0.28, c.Y-s*0.2)
+	dst.StrokePath(p, gfx.Identity, gfx.Stroke{Width: 7, Cap: gfx.RoundCap, Join: gfx.RoundJoin}, gfx.Solid(col), clip)
+}
+
+func drawShift(dst *gfx.Image, r image.Rectangle, col gfx.Color, clip image.Rectangle) {
+	c := centre(r)
+	s := float64(min(r.Dx(), r.Dy())) * 0.22
+	p := &gfx.Path{}
+	p.MoveTo(c.X, c.Y-s)
+	p.LineTo(c.X+s, c.Y)
+	p.LineTo(c.X+s/2, c.Y)
+	p.LineTo(c.X+s/2, c.Y+s)
+	p.LineTo(c.X-s/2, c.Y+s)
+	p.LineTo(c.X-s/2, c.Y)
+	p.LineTo(c.X-s, c.Y)
+	p.Close()
+	dst.StrokePath(p, gfx.Identity, gfx.Stroke{Width: 4, Join: gfx.RoundJoin}, gfx.Solid(col), clip)
+}
+
+func drawBackspace(dst *gfx.Image, r image.Rectangle, col gfx.Color, clip image.Rectangle) {
+	c := centre(r)
+	s := float64(min(r.Dx(), r.Dy())) * 0.24
+	p := &gfx.Path{}
+	p.MoveTo(c.X-s*1.2, c.Y)
+	p.LineTo(c.X-s*0.4, c.Y-s*0.8)
+	p.LineTo(c.X+s*1.2, c.Y-s*0.8)
+	p.LineTo(c.X+s*1.2, c.Y+s*0.8)
+	p.LineTo(c.X-s*0.4, c.Y+s*0.8)
+	p.Close()
+	dst.StrokePath(p, gfx.Identity, gfx.Stroke{Width: 4, Join: gfx.RoundJoin}, gfx.Solid(col), clip)
+	x := &gfx.Path{}
+	x.MoveTo(c.X-s*0.1, c.Y-s*0.35)
+	x.LineTo(c.X+s*0.6, c.Y+s*0.35)
+	x.MoveTo(c.X+s*0.6, c.Y-s*0.35)
+	x.LineTo(c.X-s*0.1, c.Y+s*0.35)
+	dst.StrokePath(x, gfx.Identity, gfx.Stroke{Width: 4, Cap: gfx.RoundCap}, gfx.Solid(col), clip)
 }

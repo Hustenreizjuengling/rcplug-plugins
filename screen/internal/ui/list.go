@@ -8,7 +8,8 @@ import (
 
 // ScrollList is a vertical list of fixed-height rows that scrolls when there
 // are more than fit. A short press on a row is passed to it; a drag scrolls
-// instead of pressing.
+// instead of pressing. The encoder reaches the rows through Walk, and the
+// list scrolls a focused row into sight (Reveal).
 type ScrollList struct {
 	Base
 	Rows   []View
@@ -40,6 +41,34 @@ func (l *ScrollList) SetRows(rows []View) {
 func (l *ScrollList) SetBounds(r image.Rectangle) {
 	l.Base.SetBounds(r)
 	l.layout()
+}
+
+// Walk visits the rows.
+func (l *ScrollList) Walk(fn func(View)) {
+	for _, row := range l.Rows {
+		Walk(row, fn)
+	}
+}
+
+// Reveal scrolls so that row v is in sight, if it is one of ours.
+func (l *ScrollList) Reveal(v View) {
+	for _, row := range l.Rows {
+		if row != v {
+			continue
+		}
+		b := row.Bounds()
+		switch {
+		case b.Min.Y < l.bounds.Min.Y:
+			l.offset -= l.bounds.Min.Y - b.Min.Y
+		case b.Max.Y > l.bounds.Max.Y:
+			l.offset += b.Max.Y - l.bounds.Max.Y
+		default:
+			return
+		}
+		l.layout()
+		l.MarkDirty()
+		return
+	}
 }
 
 // content is the full height of all rows.
@@ -85,10 +114,10 @@ func (l *ScrollList) Touch(phase TouchPhase, p image.Point) bool {
 		l.grab = l.rowAt(p)
 		return true
 	case Move:
-		if !l.scrolling && abs(p.Y-l.startY) > 8 && l.max > 0 {
+		if !l.scrolling && abs(p.Y-l.startY) > 10 && l.max > 0 {
 			l.scrolling = true
 			if l.grab != nil {
-				l.grab.Touch(Up, p) // cancel the press we may have begun
+				l.grab.Touch(Up, image.Pt(-1, -1)) // cancel the press we may have begun
 				l.grab = nil
 			}
 		}
@@ -127,10 +156,10 @@ func (l *ScrollList) Draw(dst *gfx.Image, c *Context, clip image.Rectangle) {
 	}
 	// A hint that there is more below or above.
 	if l.offset > 0 {
-		Fill(dst, image.Rect(l.bounds.Min.X, l.bounds.Min.Y, l.bounds.Max.X, l.bounds.Min.Y+2), c.Theme.Line, clip)
+		Fill(dst, image.Rect(l.bounds.Min.X, l.bounds.Min.Y, l.bounds.Max.X, l.bounds.Min.Y+3), c.Theme.Line, clip)
 	}
 	if l.offset < l.max {
-		Fill(dst, image.Rect(l.bounds.Min.X, l.bounds.Max.Y-2, l.bounds.Max.X, l.bounds.Max.Y), c.Theme.Line, clip)
+		Fill(dst, image.Rect(l.bounds.Min.X, l.bounds.Max.Y-3, l.bounds.Max.X, l.bounds.Max.Y), c.Theme.Line, clip)
 	}
 }
 

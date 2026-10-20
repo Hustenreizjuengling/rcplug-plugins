@@ -7,10 +7,10 @@ import (
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
 )
 
-// The rcplug pages: the plugin's own tiles (status, plugins, back to RØDE)
-// and the declarative pages other plugins provide. A plugin never draws
-// pixels; it describes its controls and the UI renders them in the RØDE
-// style, so a plugin cannot break the screen.
+// The rcplug pages: the plugin's own tiles (plugins, back to RØDE, the
+// dashboard address) and the declarative pages other plugins provide. A
+// plugin never draws pixels; it describes its controls and the UI renders
+// them in the RØDE style, so a plugin cannot break the screen.
 
 func init() {
 	register(IDRcplug, func() Page { return &rcplugPage{} })
@@ -26,26 +26,28 @@ func (p *rcplugPage) Build(env *Env, r image.Rectangle) ui.View {
 	c.SetBounds(r)
 	th := env.Ctx.Theme
 
-	tiles := grid(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+160), 3, 1, 12)
-	plugins := menuTile(env.T("Plugins"), "IconSystem", func() { env.Nav.Open(IDPlugins) })
-	plugins.SetBounds(tiles[0])
+	cells := tileGrid(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+280), 2, 2, 200, 40)
+	plugins := ui.NewTile(env.T("Plugins"), "IconSystem", func() { env.Nav.Open(IDPlugins) })
+	plugins.SetBounds(cells[0])
 	rodeLabel := env.TR("", "Zurück zu RØDE", "Back to RØDE")
-	rode := menuTile(rodeLabel, "IconHome", func() {
+	rode := ui.NewTile(rodeLabel, "IconHome", func() {
 		env.Nav.Confirm(rodeLabel, env.TR("", "Zurück zur RØDE-Oberfläche?", "Switch back to RØDE's interface?"), env.T("OK"), false, env.Nav.RodeScreen)
 	})
-	rode.SetBounds(tiles[1])
+	rode.SetBounds(cells[1])
 	c.Add(plugins, rode)
 
 	// The dashboard address (open it on a phone to manage rcplug).
+	url := ""
 	if env.Plugins != nil {
-		if url := env.Plugins.DashboardURL(); url != "" {
-			card := ui.NewPanelView(th.Panel)
-			card.SetBounds(tiles[2])
-			lbl := ui.NewParagraph("Dashboard:\n"+url, th.Fonts.Small, th.TextDim)
-			lbl.SetBounds(image.Rect(tiles[2].Min.X+12, tiles[2].Min.Y+12, tiles[2].Max.X-12, tiles[2].Max.Y-12))
-			c.Add(card, lbl)
-		}
+		url = env.Plugins.DashboardURL()
 	}
+	if url == "" {
+		url = "—"
+	}
+	infoCard(env, c, image.Rect(r.Min.X+100, r.Min.Y+320, r.Max.X-100, r.Min.Y+420), [][2]func() string{
+		{func() string { return "Dashboard" }, func() string { return url }},
+	})
+	_ = th
 	return c
 }
 
@@ -63,7 +65,7 @@ func (p *pluginsPage) Build(env *Env, r image.Rectangle) ui.View {
 		c.Add(lbl)
 		return c
 	}
-	list := ui.NewScrollList(64, 8)
+	list := ui.NewScrollList(th.Row, th.Gap)
 	var rows []ui.View
 	for _, pi := range env.Plugins.Plugins() {
 		pi := pi
@@ -79,9 +81,15 @@ func (p *pluginsPage) Build(env *Env, r image.Rectangle) ui.View {
 			}
 		})
 		b.Enabled = hasPage
-		if pi.Running {
-			b.Icon = "IconListen"
+		switch {
+		case pi.Running && hasPage:
+			b.Sub = env.TR("", "läuft · Seite öffnen", "running · open page")
+		case pi.Running:
+			b.Sub = env.TR("", "läuft", "running")
+		default:
+			b.Sub = env.TR("", "gestoppt", "stopped")
 		}
+		b.Icon = "IconSystem"
 		rows = append(rows, b)
 	}
 	list.SetRows(rows)
@@ -111,40 +119,40 @@ func (p *pluginPage) Build(env *Env, r image.Rectangle) ui.View {
 		c.Add(lbl)
 		return c
 	}
-	y := r.Min.Y
+	list := ui.NewScrollList(th.Row, th.Gap)
+	var rows []ui.View
 	for _, ctl := range spec.Controls {
 		ctl := ctl
-		h := 64
-		rr := image.Rect(r.Min.X, y, r.Max.X, y+h)
 		switch ctl.Type {
 		case "toggle":
-			card := ui.NewPanelView(th.Panel)
-			card.SetBounds(rr)
-			lbl := ui.NewLabel(ctl.Label, th.Fonts.Body, th.Text, font.Left)
-			lbl.SetBounds(image.Rect(rr.Min.X+16, rr.Min.Y, rr.Max.X-90, rr.Max.Y))
 			on := ctl.On
 			id := ctl.ID
+			row := &ui.Container{}
+			card := ui.NewCard()
 			tog := ui.NewToggle(func() bool { return on }, func(v bool) {
 				on = v
 				_ = env.Plugins.Submit(p.name, id, v)
 			})
-			tog.SetBounds(image.Rect(rr.Max.X-84, rr.Min.Y+12, rr.Max.X-12, rr.Max.Y-12))
-			c.Add(card, lbl, tog)
+			tog.Label = ctl.Label
+			row.Add(card, tog)
+			rows = append(rows, &fitRow{Container: row, card: card, inner: tog})
 		case "slider":
 			id, lo, hi := ctl.ID, ctl.Min, ctl.Max
 			if hi <= lo {
 				hi = lo + 1
 			}
 			val := ctl.Value
+			unit := ctl.Unit
+			row := &ui.Container{}
+			card := ui.NewCard()
 			s := ui.NewSlider(func() float64 { return (val - lo) / (hi - lo) }, func(v float64) {
 				val = lo + v*(hi-lo)
 				_ = env.Plugins.Submit(p.name, id, val)
 			})
 			s.Label = ctl.Label
-			s.SetBounds(image.Rect(rr.Min.X, rr.Min.Y, rr.Max.X, rr.Min.Y+76))
-			c.Add(s)
-			h = 86
-			rr.Max.Y = rr.Min.Y + h
+			s.Text = func(v float64) string { return trimFloat(lo+v*(hi-lo)) + " " + unit }
+			row.Add(card, s)
+			rows = append(rows, &fitRow{Container: row, card: card, inner: s})
 		case "button":
 			id := ctl.ID
 			confirm := ctl.Confirm
@@ -155,19 +163,42 @@ func (p *pluginPage) Build(env *Env, r image.Rectangle) ui.View {
 					_ = env.Plugins.Submit(p.name, id, true)
 				}
 			})
-			b.SetBounds(rr)
-			c.Add(b)
-		case "value", "meter":
+			rows = append(rows, b)
+		default: // value, meter, choice, text: shown as a key/value row
 			text := ctl.Text
+			row := &ui.Container{}
+			card := ui.NewCard()
 			kv := ui.NewKeyValue(ctl.Label, func() string { return text })
-			kv.SetBounds(rr)
-			c.Add(kv)
-		default:
-			lbl := ui.NewLabel(ctl.Label, th.Fonts.Body, th.TextDim, font.Left)
-			lbl.SetBounds(rr)
-			c.Add(lbl)
+			row.Add(card, kv)
+			rows = append(rows, &fitRow{Container: row, card: card, inner: kv})
 		}
-		y += h + 8
 	}
+	list.SetRows(rows)
+	list.SetBounds(r)
+	c.Add(list)
 	return c
+}
+
+// fitRow is a list row holding a card and one control inset in it.
+type fitRow struct {
+	*ui.Container
+	card  ui.View
+	inner ui.View
+}
+
+func (f *fitRow) SetBounds(r image.Rectangle) {
+	f.Container.SetBounds(r)
+	f.card.SetBounds(r)
+	f.inner.SetBounds(ui.Inset(r, 14))
+}
+
+func trimFloat(v float64) string {
+	if v == float64(int64(v)) {
+		return intText(int64(v))
+	}
+	s := intText(int64(v * 10)) // one decimal
+	if len(s) < 2 {
+		s = "0" + s
+	}
+	return s[:len(s)-1] + "." + s[len(s)-1:]
 }

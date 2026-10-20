@@ -26,8 +26,8 @@ func TestTapCogOpensSettings(t *testing.T) {
 	if a.Depth() != 1 {
 		t.Fatalf("start depth %d, want 1", a.Depth())
 	}
-	// The cog is at the top-left of the status bar.
-	tap(a, 32, 29)
+	// The cog is at the right end of the status bar.
+	tap(a, 1244, 60)
 	a.RenderOnce()
 	if a.Depth() != 2 {
 		t.Fatalf("after tapping the cog, depth %d, want 2", a.Depth())
@@ -37,7 +37,7 @@ func TestTapCogOpensSettings(t *testing.T) {
 	}
 
 	// Tapping Home returns to the mixer.
-	tap(a, 1252, 29) // the home button on the header
+	tap(a, 1214, 58) // the home button on the header
 	a.RenderOnce()
 	if a.Depth() != 1 {
 		t.Fatalf("after Home, depth %d, want 1", a.Depth())

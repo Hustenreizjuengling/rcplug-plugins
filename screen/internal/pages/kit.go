@@ -27,19 +27,17 @@ type toggleRow struct {
 	desc   string
 }
 
-// newTogglesPage is a page of labelled switches.
+// newTogglesPage is a page of labelled switches, one card per row.
 func newTogglesPage(title string, rows []toggleRow) Page {
 	return &funcPage{title: title, build: func(env *Env, r image.Rectangle) ui.View {
 		c := &ui.Container{}
 		c.SetBounds(r)
 		th := env.Ctx.Theme
 		for i, row := range rows {
-			rr := image.Rect(r.Min.X, r.Min.Y+i*72, r.Max.X, r.Min.Y+i*72+64)
+			rr := image.Rect(r.Min.X, r.Min.Y+i*(th.Row+th.Gap), r.Max.X, r.Min.Y+i*(th.Row+th.Gap)+th.Row)
 			row := row
-			card := ui.NewPanelView(th.Panel)
+			card := ui.NewCard()
 			card.SetBounds(rr)
-			lbl := ui.NewLabel(env.T(row.key), th.Fonts.Body, th.Text, font.Left)
-			lbl.SetBounds(image.Rect(rr.Min.X+16, rr.Min.Y, rr.Max.X-90, rr.Max.Y))
 			tog := ui.NewToggle(func() bool {
 				v := env.Desk.Bool(row.node, row.idx, row.prop)
 				if row.invert {
@@ -52,100 +50,163 @@ func newTogglesPage(title string, rows []toggleRow) Page {
 				}
 				env.Desk.SetBool(row.node, row.idx, row.prop, on)
 			})
-			tog.SetBounds(image.Rect(rr.Max.X-84, rr.Min.Y+12, rr.Max.X-12, rr.Max.Y-12))
-			c.Add(card, lbl, tog)
+			tog.Label = env.T(row.key)
+			tog.SetBounds(image.Rect(rr.Min.X+28, rr.Min.Y+14, rr.Max.X-28, rr.Max.Y-14))
+			c.Add(card, tog)
 		}
 		return c
 	}}
 }
 
-// radioSpec is one option of a radio page and the value it writes.
+// radioSpec is one option of a choice page and the value it writes.
 type radioSpec struct {
 	title string
-	desc  string
+	desc  string // a RØDE key; de/en are the fallbacks when the device has no text for it
+	de    string
+	en    string
+	icon  string
 	value int64
 }
 
-// newRadioPage is a page that sets an integer property from a list of
-// choices.
-func newRadioPage(title, node string, idx int, prop string, specs []radioSpec) Page {
+// newRadioPage is a page of option cards bound to an integer property.
+func newRadioPage(title, node string, idx int, prop string, opts []radioSpec) Page {
+	return newChoicePage(title, 1, opts, func(env *Env) int64 { return env.Desk.Int(node, idx, prop) },
+		func(env *Env, v int64) { env.Desk.SetInt(node, idx, prop, v) })
+}
+
+// newChoicePage is a page of option cards over any getter/setter.
+func newChoicePage(title string, cols int, opts []radioSpec, get func(*Env) int64, set func(*Env, int64)) Page {
 	return &funcPage{title: title, build: func(env *Env, r image.Rectangle) ui.View {
 		c := &ui.Container{}
 		c.SetBounds(r)
-		opts := make([]ui.RadioOption, len(specs))
-		for i, s := range specs {
-			opts[i] = ui.RadioOption{Title: env.T(s.title), Desc: env.T(s.desc)}
+		choices := make([]ui.Choice, len(opts))
+		for i, o := range opts {
+			choices[i] = ui.Choice{Title: env.T(o.title), Icon: o.icon}
+			if o.desc != "" {
+				choices[i].Desc = env.TR(o.desc, o.de, o.en)
+			}
 		}
-		rl := ui.NewRadioList(opts, func() int {
-			cur := env.Desk.Int(node, idx, prop)
-			for i, s := range specs {
-				if s.value == cur {
+		cl := ui.NewChoiceList(choices, func() int {
+			cur := get(env)
+			for i, o := range opts {
+				if o.value == cur {
 					return i
 				}
 			}
 			return -1
-		}, func(i int) {
-			if i >= 0 && i < len(specs) {
-				env.Desk.SetInt(node, idx, prop, specs[i].value)
-			}
-		})
-		h := 84
-		if len(specs) > 0 && len(specs)*h < r.Dy() {
-			r.Max.Y = r.Min.Y + len(specs)*h
+		}, func(i int) { set(env, opts[i].value) })
+		cl.Columns = cols
+		if n := (len(opts) + cols - 1) / cols; n*130 < r.Dy() {
+			cl.RowH = max(130, min(330, (r.Dy()-(n-1)*16)/n))
 		}
-		rl.SetBounds(r)
-		c.Add(rl)
+		cl.SetBounds(r)
+		c.Add(cl)
 		return c
 	}}
 }
 
-// sliderSpec binds a slider to an integer property over a range.
+// sliderSpec is one slider of a sliders page.
 type sliderSpec struct {
 	key  string
 	node string
-	idx  int
 	prop string
-	min  int64
-	max  int64
+	min  float64
+	max  float64
+	text func(v float64) string
 }
 
-// newSlidersPage is a page of labelled sliders for integer properties.
+// newSlidersPage is a page of horizontal sliders over numeric properties.
 func newSlidersPage(title string, specs []sliderSpec) Page {
 	return &funcPage{title: title, build: func(env *Env, r image.Rectangle) ui.View {
 		c := &ui.Container{}
 		c.SetBounds(r)
+		th := env.Ctx.Theme
+		h := 124
 		for i, sp := range specs {
 			sp := sp
-			rr := image.Rect(r.Min.X, r.Min.Y+i*86, r.Max.X, r.Min.Y+i*86+76)
-			span := float64(sp.max - sp.min)
-			s := ui.NewSlider(func() float64 {
-				return (float64(env.Desk.Int(sp.node, sp.idx, sp.prop)) - float64(sp.min)) / span
-			}, func(v float64) {
-				env.Desk.SetInt(sp.node, sp.idx, sp.prop, sp.min+int64(v*span+0.5))
-			})
+			rr := image.Rect(r.Min.X, r.Min.Y+i*(h+th.Gap), r.Max.X, r.Min.Y+i*(h+th.Gap)+h)
+			card := ui.NewCard()
+			card.SetBounds(rr)
+			span := sp.max - sp.min
+			if span <= 0 {
+				span = 1
+			}
+			s := ui.NewSlider(func() float64 { return (env.Desk.Num(sp.node, sp.prop0(), sp.prop) - sp.min) / span },
+				func(v float64) { env.Desk.SetInt(sp.node, sp.prop0(), sp.prop, int64(sp.min+v*span+0.5)) })
 			s.Label = env.T(sp.key)
-			s.Text = func(v float64) string { return intText(sp.min + int64(v*span+0.5)) }
-			s.SetBounds(rr)
-			c.Add(s)
+			s.Text = func(v float64) string {
+				if sp.text != nil {
+					return sp.text(sp.min + v*span)
+				}
+				return intText(int64(sp.min + v*span + 0.5))
+			}
+			s.SetBounds(ui.Inset(rr, 16))
+			c.Add(card, s)
 		}
 		return c
 	}}
 }
 
-// infoPage is a page of read-only key/value rows.
-func infoPage(title string, kv func(env *Env) [][2]func() string) Page {
+func (s sliderSpec) prop0() int { return 0 }
+
+// infoPage is a page of key/value rows in a black card, as the device's
+// information page.
+func infoPage(title string, rows func(env *Env) [][2]func() string) Page {
 	return &funcPage{title: title, build: func(env *Env, r image.Rectangle) ui.View {
 		c := &ui.Container{}
 		c.SetBounds(r)
-		rows := kv(env)
-		for i, row := range rows {
-			rr := image.Rect(r.Min.X, r.Min.Y+i*70, r.Max.X, r.Min.Y+i*70+62)
-			kvv := ui.NewKeyValue(row[0](), row[1])
-			kvv.SetBounds(rr)
-			c.Add(kvv)
-		}
-		return c
+		return infoCard(env, c, r, rows(env))
 	}}
 }
 
-var _ = desk.SystemNode
+// infoCard adds a black card with key/value rows to c and returns c.
+func infoCard(env *Env, c *ui.Container, r image.Rectangle, rows [][2]func() string) ui.View {
+	th := env.Ctx.Theme
+	card := ui.NewPanelView(th.Black)
+	card.SetBounds(r)
+	c.Add(card)
+	y := r.Min.Y + 20
+	for _, row := range rows {
+		k := row[0]()
+		kv := ui.NewKeyValue(k+" :", row[1])
+		kv.Split = r.Dx() * 2 / 5
+		kv.SetBounds(image.Rect(r.Min.X, y, r.Max.X, y+60))
+		c.Add(kv)
+		y += 64
+	}
+	return c
+}
+
+// noteCard is a card with wrapped explanatory text.
+func noteCard(env *Env, r image.Rectangle, text string) []ui.View {
+	th := env.Ctx.Theme
+	card := ui.NewCard()
+	card.SetBounds(r)
+	para := ui.NewParagraph(text, th.Fonts.Body, th.TextDim)
+	para.SetBounds(ui.Inset(r, 24))
+	return []ui.View{card, para}
+}
+
+// rodeButton offers to hand the screen back to RØDE (where a denied setting
+// lives). The caller places it.
+func rodeButton(env *Env, r image.Rectangle) ui.View {
+	label := env.TR("", "Zurück zu RØDE", "Back to RØDE")
+	b := ui.NewButton(label, func() {
+		env.Nav.Confirm(label,
+			env.TR("", "Diese Einstellung wird auf RØDEs eigenem Bildschirm vorgenommen. Zurück zur RØDE-Oberfläche?",
+				"This setting is made on RØDE's own screen. Switch back to RØDE's interface?"),
+			env.T("OK"), false, func() { env.Nav.RodeScreen() })
+	})
+	b.Icon = "IconHome"
+	b.SetBounds(r)
+	return b
+}
+
+// bigCaption is a page's lead text (Title font, dim).
+func bigCaption(env *Env, text string, r image.Rectangle) ui.View {
+	l := ui.NewLabel(text, env.Ctx.Theme.Fonts.Body, env.Ctx.Theme.TextDim, font.Center)
+	l.SetBounds(r)
+	return l
+}
+
+var _ = desk.GUINode

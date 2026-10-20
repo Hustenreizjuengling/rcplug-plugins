@@ -9,7 +9,7 @@ import (
 
 // Dialog is a modal card over a dimming scrim: a title, a message and up to
 // two buttons. It takes every touch while it is up, so nothing behind it
-// moves. The app shows it as an overlay.
+// moves. The app shows it as an overlay; the encoder reaches its buttons.
 type Dialog struct {
 	Container
 	Title   string
@@ -24,68 +24,59 @@ type Dialog struct {
 // callbacks; an empty caption hides that button.
 func NewDialog(title, message, confirmLabel string, onConfirm func(), cancelLabel string, onCancel func()) *Dialog {
 	d := &Dialog{Title: title, Message: message}
-	if confirmLabel != "" {
-		d.confirm = NewButton(confirmLabel, onConfirm)
-	}
 	if cancelLabel != "" {
 		d.cancel = NewButton(cancelLabel, onCancel)
+	}
+	if confirmLabel != "" {
+		d.confirm = NewButton(confirmLabel, onConfirm)
+		d.confirm.Style = StyleLight
 	}
 	return d
 }
 
-func (d *Dialog) SetBounds(r image.Rectangle) {
-	d.Base.SetBounds(r)
-	// A centred card.
-	cw, ch := min(620, r.Dx()-80), 300
-	cx, cy := (r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2
-	card := image.Rect(cx-cw/2, cy-ch/2, cx+cw/2, cy+ch/2)
-	bw := (cw - 48) / 2
-	by := card.Max.Y - 24 - 56
-	d.Children = nil
-	if d.cancel != nil && d.confirm != nil {
-		d.cancel.SetBounds(image.Rect(card.Min.X+16, by, card.Min.X+16+bw, by+56))
-		d.confirm.SetBounds(image.Rect(card.Max.X-16-bw, by, card.Max.X-16, by+56))
-		d.Add(d.cancel, d.confirm)
-	} else if d.confirm != nil {
-		d.confirm.SetBounds(image.Rect(cx-bw/2, by, cx+bw/2, by+56))
-		d.Add(d.confirm)
-	}
-	d.MarkDirty()
-}
-
 func (d *Dialog) card() image.Rectangle {
-	cw, ch := min(620, d.bounds.Dx()-80), 300
+	cw, ch := min(800, d.bounds.Dx()-80), 380
 	cx, cy := (d.bounds.Min.X+d.bounds.Max.X)/2, (d.bounds.Min.Y+d.bounds.Max.Y)/2
 	return image.Rect(cx-cw/2, cy-ch/2, cx+cw/2, cy+ch/2)
 }
 
+func (d *Dialog) SetBounds(r image.Rectangle) {
+	d.Base.SetBounds(r)
+	card := d.card()
+	bh := 84
+	bw := (card.Dx() - 3*24) / 2
+	by := card.Max.Y - 24 - bh
+	d.Children = nil
+	if d.cancel != nil && d.confirm != nil {
+		d.cancel.SetBounds(image.Rect(card.Min.X+24, by, card.Min.X+24+bw, by+bh))
+		d.confirm.SetBounds(image.Rect(card.Max.X-24-bw, by, card.Max.X-24, by+bh))
+		d.Add(d.cancel, d.confirm)
+	} else if d.confirm != nil {
+		d.confirm.SetBounds(image.Rect(card.Min.X+(card.Dx()-bw)/2, by, card.Min.X+(card.Dx()-bw)/2+bw, by+bh))
+		d.Add(d.confirm)
+	} else if d.cancel != nil {
+		d.cancel.SetBounds(image.Rect(card.Min.X+(card.Dx()-bw)/2, by, card.Min.X+(card.Dx()-bw)/2+bw, by+bh))
+		d.Add(d.cancel)
+	}
+	if d.Danger && d.confirm != nil {
+		d.confirm.Style = StyleCard
+		d.confirm.Fill = gfx.Hex(0xb81e1e)
+	}
+	d.MarkDirty()
+}
+
 func (d *Dialog) Draw(dst *gfx.Image, c *Context, clip image.Rectangle) {
-	// Scrim.
-	Fill(dst, d.bounds, gfx.Hex(0x000000).WithAlpha(0.6), clip)
+	Fill(dst, d.bounds, gfx.Hex(0x000000).WithAlpha(0.65), clip)
 	t := c.Theme
 	card := d.card()
-	Panel(dst, card, 16, t.PanelHi, clip)
-	Text(dst, t.Fonts.Title, d.Title, image.Rect(card.Min.X+24, card.Min.Y+24, card.Max.X-24, card.Min.Y+70), font.Center, t.Text, clip)
-	// The message, wrapped.
-	msgR := image.Rect(card.Min.X+28, card.Min.Y+82, card.Max.X-28, card.Max.Y-96)
-	lines := t.Fonts.Body.Wrap(d.Message, float64(msgR.Dx()))
-	y := msgR.Min.Y
-	lh := int(t.Fonts.Body.Ascent() + t.Fonts.Body.Descent() + 6)
-	for _, line := range lines {
-		if y+lh > msgR.Max.Y {
-			break
-		}
-		Text(dst, t.Fonts.Body, line, image.Rect(msgR.Min.X, y, msgR.Max.X, y+lh), font.Center, t.TextDim, clip)
-		y += lh
-	}
-	if d.Danger && d.confirm != nil {
-		d.confirm.On = false
-	}
+	Gradient(dst, card, 20, gfx.Hex(0x3c3c3c), gfx.Hex(0x1e1e1e), clip)
+	Text(dst, t.Fonts.Title, d.Title, image.Rect(card.Min.X+32, card.Min.Y+24, card.Max.X-32, card.Min.Y+84), font.Center, t.Text, clip)
+	msgR := image.Rect(card.Min.X+40, card.Min.Y+100, card.Max.X-40, card.Max.Y-124)
+	// Centre the message block vertically in its area.
+	h := Lines(dst, t.Fonts.Body, d.Message, msgR, font.Center, t.TextDim, image.Rectangle{})
+	y := msgR.Min.Y + max(0, (msgR.Dy()-h)/2)
+	Lines(dst, t.Fonts.Body, d.Message, image.Rect(msgR.Min.X, y, msgR.Max.X, msgR.Max.Y), font.Center, t.TextDim, clip)
 	d.Container.Draw(dst, c, clip)
-	// Tint the confirm button red for a destructive action, drawn over it.
-	if d.Danger && d.confirm != nil {
-		PanelOutline(dst, d.confirm.Bounds(), t.Radius, 2, t.Record, clip)
-	}
 }
 
 // Touch takes everything (modal); only the buttons act.

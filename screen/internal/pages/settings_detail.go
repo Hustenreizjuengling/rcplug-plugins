@@ -2,9 +2,11 @@ package pages
 
 import (
 	"image"
+	"time"
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/desk"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/font"
+	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/gfx"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
 )
 
@@ -12,31 +14,40 @@ import (
 
 func newBrightnessPage() Page {
 	return newSlidersPage("BRIGHTNESS", []sliderSpec{
-		{key: "DISPLAY", node: desk.GUINode, prop: "screenBrightness", min: 0, max: 255},
-		{key: "BUTTONS", node: desk.GUINode, prop: "activeButtonsBrightness", min: 0, max: 255},
-		{key: "BUTTONS INACTIVE", node: desk.GUINode, prop: "inactiveButtonsBrightness", min: 0, max: 255},
+		{key: "DISPLAY", node: desk.GUINode, prop: "screenBrightness", min: 0, max: 255, text: pct255},
+		{key: "BUTTONS", node: desk.GUINode, prop: "activeButtonsBrightness", min: 0, max: 255, text: pct255},
+		{key: "BUTTONS INACTIVE", node: desk.GUINode, prop: "inactiveButtonsBrightness", min: 0, max: 255, text: pct255},
 	})
 }
 
+func pct255(v float64) string { return pct(v / 255) }
+
 func newMeteringPage() Page {
-	return newRadioPage("METERING", desk.GUINode, 0, "metering", []radioSpec{
-		{title: "DEFAULT", value: 0},
-		{title: "BROADCAST", value: 1},
-	})
+	return newChoicePage("METERING", 2, []radioSpec{
+		{title: "DEFAULT", icon: "MeteringDefault", value: 0,
+			desc: "LEVEL METERS WILL INCLUDE MARKERS AT REGULAR INTERVALS AND WILL INDICATE UNITY LEVEL.",
+			de:   "Die Pegelanzeigen zeigen Markierungen in regelmäßigen Abständen und den Einheitspegel.",
+			en:   "Level meters will include markers at regular intervals and will indicate unity level."},
+		{title: "BROADCAST", icon: "MeteringBroadcast", value: 1,
+			desc: "LEVEL METERS WILL INCLUDE DBFS MARKERS ON EACH CHANNEL. GAIN REDUCTION METER WILL BE VISIBLE FOR EACH CHANNEL.",
+			de:   "Die Pegelanzeigen zeigen dBFS-Marken an jedem Kanal. Die Pegelreduktion wird für jeden Kanal angezeigt.",
+			en:   "Level meters will include dBFS markers on each channel. Gain reduction will be visible for each channel."},
+	}, func(env *Env) int64 { return env.Desk.Int(desk.GUINode, 0, "metering") },
+		func(env *Env, v int64) { env.Desk.SetInt(desk.GUINode, 0, "metering", v) })
 }
 
 func newHapticsPage() Page {
 	return newRadioPage("HAPTICS", desk.SystemNode, 0, "systemHapticSetting", []radioSpec{
-		{title: "HAPTIC FEEDBACK ALWAYS ON", value: 0},
-		{title: "HAPTIC FEEDBACK ON HOLD", value: 1},
-		{title: "NO HAPTIC FEEDBACK", value: 2},
+		{title: "HAPTIC FEEDBACK ALWAYS ON", icon: "IconHapticsAlways", value: 0},
+		{title: "HAPTIC FEEDBACK ON HOLD", icon: "IconHapticsHold", value: 1},
+		{title: "NO HAPTIC FEEDBACK", icon: "IconHapticsOff", value: 2},
 	})
 }
 
 func newRecButtonPage() Page {
 	return newRadioPage("REC BUTTON", desk.SystemNode, 0, "systemRecButtonSetting", []radioSpec{
-		{title: "PRESS TO PAUSE RECORDING", value: 0},
-		{title: "PRESS TO STOP RECORDING", value: 1},
+		{title: "PRESS TO PAUSE RECORDING", desc: "HOLD REC TO STOP RECORDING", icon: "IconRecPause", value: 0},
+		{title: "PRESS TO STOP RECORDING", desc: "", icon: "IconRecStop", value: 1},
 	})
 }
 
@@ -47,14 +58,26 @@ func newMonitorPage() Page {
 		{key: "AUTO-MUTE MONITOR OUTPUT", node: desk.OutputNode, prop: "outputMonAutoMute"},
 		{key: "AUTO-MUTE BLUETOOTH OUTPUT", node: desk.OutputNode, prop: "outputBTAutoMute"},
 		{key: "FIXED OUTPUT LEVEL", node: desk.OutputNode, prop: "outputMonFixed"},
+		{key: "DISABLE HEADPHONE OUTPUTS", node: desk.SystemNode, prop: "disableAllHeadphoneOutputs"},
 	})
 }
 
 func newListenPage() Page {
-	return newRadioPage("LISTEN", desk.OutputNode, 0, "outputPrefader", []radioSpec{
-		{title: "AFTER-FADER LISTEN", value: 0},
-		{title: "PRE-FADER LISTEN", value: 1},
-	})
+	return newChoicePage("LISTEN", 1, []radioSpec{
+		{title: "AFTER-FADER LISTEN", icon: "IconListenAfterFader", value: 0,
+			desc: "WHEN SOLO IS ENGAGED, THE HOST WILL HEAR THE CHANNEL AT THE FADER LEVEL.",
+			de:   "Bei aktivem Solo hört der Moderator den Kanal mit dem Faderpegel.",
+			en:   "When solo is engaged, the host will hear the channel at the fader level."},
+		{title: "PRE-FADER LISTEN", icon: "IconListenPreFader", value: 1,
+			desc: "WHEN SOLO IS ENGAGED, THE HOST WILL HEAR THE CHANNEL AT UNITY REGARDLESS OF THE FADER LEVEL.",
+			de:   "Bei aktivem Solo hört der Moderator den Kanal unabhängig vom Faderpegel mit Einheitspegel.",
+			en:   "When solo is engaged, the host will hear the channel at unity regardless of the fader level."},
+	}, func(env *Env) int64 {
+		if env.Desk.Bool(desk.OutputNode, 0, "outputPrefader") {
+			return 1
+		}
+		return 0
+	}, func(env *Env, v int64) { env.Desk.SetBool(desk.OutputNode, 0, "outputPrefader", v == 1) })
 }
 
 func newMultitrackPage() Page {
@@ -62,70 +85,27 @@ func newMultitrackPage() Page {
 		c := &ui.Container{}
 		c.SetBounds(r)
 		th := env.Ctx.Theme
-		lbl := ui.NewLabel(env.T("RECORDING"), th.Fonts.Label, th.TextDim, font.Left)
-		lbl.SetBounds(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+28))
-		c.Add(lbl)
-		rl := ui.NewRadioList([]ui.RadioOption{
-			{Title: env.T("OFF")}, {Title: env.T("PRE-FADER")}, {Title: env.T("POST-FADER")},
+		cl := ui.NewChoiceList([]ui.Choice{
+			{Title: env.T("OFF")}, {Title: env.T("PRE-FADER"), Icon: "IconListenPreFader"}, {Title: env.T("POST-FADER"), Icon: "IconListenAfterFader"},
 		}, func() int { return int(env.Desk.Int(desk.OutputNode, 0, "recordingMultitrackMode")) },
 			func(i int) { env.Desk.SetInt(desk.OutputNode, 0, "recordingMultitrackMode", int64(i)) })
-		rl.SetBounds(image.Rect(r.Min.X, r.Min.Y+32, r.Max.X, r.Min.Y+32+3*76))
-		c.Add(rl)
-		// Bypass processing toggle.
-		br := image.Rect(r.Min.X, r.Min.Y+32+3*76+12, r.Max.X, r.Min.Y+32+3*76+12+64)
-		card := ui.NewPanelView(th.Panel)
-		card.SetBounds(br)
-		t := ui.NewLabel(env.T("BYPASS PROCESSING"), th.Fonts.Body, th.Text, font.Left)
-		t.SetBounds(image.Rect(br.Min.X+16, br.Min.Y, br.Max.X-90, br.Max.Y))
+		cl.Columns = 3
+		cl.RowH = 200
+		cl.SetBounds(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+200))
+		c.Add(cl)
+		rr := image.Rect(r.Min.X, r.Min.Y+230, r.Max.X, r.Min.Y+230+th.Row)
+		card := ui.NewCard()
+		card.SetBounds(rr)
 		tog := ui.NewToggle(func() bool { return env.Desk.Bool(desk.OutputNode, 0, "recordingProcessingBypass") },
 			func(v bool) { env.Desk.SetBool(desk.OutputNode, 0, "recordingProcessingBypass", v) })
-		tog.SetBounds(image.Rect(br.Max.X-84, br.Min.Y+12, br.Max.X-12, br.Max.Y-12))
-		c.Add(card, t, tog)
+		tog.Label = env.T("BYPASS PROCESSING")
+		tog.SetBounds(ui.Inset(rr, 14))
+		c.Add(card, tog)
 		return c
 	}}
 }
 
-func newMasterProcPage() Page {
-	return &funcPage{title: "PROCESSING", build: func(env *Env, r image.Rectangle) ui.View {
-		c := &ui.Container{}
-		c.SetBounds(r)
-		th := env.Ctx.Theme
-		head := image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+56)
-		card := ui.NewPanelView(th.Panel)
-		card.SetBounds(head)
-		name := ui.NewLabel(env.T("MASTER COMPELLOR"), th.Fonts.Title, th.Text, font.Left)
-		name.SetBounds(image.Rect(head.Min.X+16, head.Min.Y, head.Max.X-100, head.Max.Y))
-		tog := ui.NewToggle(func() bool { return env.Desk.Bool(desk.MasterNode, 0, "masterCompellorOn") },
-			func(v bool) { env.Desk.SetBool(desk.MasterNode, 0, "masterCompellorOn", v) })
-		tog.SetBounds(image.Rect(head.Max.X-88, head.Min.Y+10, head.Max.X-12, head.Max.Y-10))
-		c.Add(card, name, tog)
-		knobs := []struct{ key, prop string }{
-			{"THRESHOLD", "masterCompellorThreshold"}, {"ATTACK", "masterCompellorAttack"},
-			{"RELEASE", "masterCompellorRelease"}, {"GAIN", "masterCompellorGain"},
-		}
-		cells := grid(image.Rect(r.Min.X, head.Max.Y+12, r.Max.X, head.Max.Y+12+150), 4, 1, 10)
-		for i, k := range knobs {
-			prop := k.prop
-			kb := ui.NewKnob(func() float64 { return env.Desk.Num(desk.MasterNode, 0, prop) },
-				func(v float64) { env.Desk.SetFloat(desk.MasterNode, 0, prop, v) })
-			kb.Label = env.T(k.key)
-			kb.Text = pctFmt
-			kb.SetBounds(cells[i])
-			c.Add(kb)
-		}
-		// Output delay.
-		dr := image.Rect(r.Min.X, head.Max.Y+12+160, r.Max.X, head.Max.Y+12+160+64)
-		dcard := ui.NewPanelView(th.Panel)
-		dcard.SetBounds(dr)
-		dl := ui.NewLabel(env.T("OUTPUT DELAY"), th.Fonts.Body, th.Text, font.Left)
-		dl.SetBounds(image.Rect(dr.Min.X+16, dr.Min.Y, dr.Max.X-90, dr.Max.Y))
-		dtog := ui.NewToggle(func() bool { return env.Desk.Bool(desk.MasterNode, 0, "masterDelayOn") },
-			func(v bool) { env.Desk.SetBool(desk.MasterNode, 0, "masterDelayOn", v) })
-		dtog.SetBounds(image.Rect(dr.Max.X-84, dr.Min.Y+12, dr.Max.X-12, dr.Max.Y-12))
-		c.Add(dcard, dl, dtog)
-		return c
-	}}
-}
+// --- Faders: a tile per strip, physical and virtual apart ---
 
 func newFadersPage() Page {
 	return &funcPage{title: "FADERS", build: func(env *Env, r image.Rectangle) ui.View {
@@ -133,63 +113,181 @@ func newFadersPage() Page {
 		c.SetBounds(r)
 		th := env.Ctx.Theme
 		n := env.Desk.StripCount()
+		physical := env.Desk.PhysicalFaders()
 		if n == 0 {
 			return c
 		}
-		cells := grid(r, 3, (n+2)/3, 10)
-		for i := 0; i < n; i++ {
-			if i >= len(cells) {
-				break
+		tileW, tileH, gap := 140, 210, 16
+		place := func(strips []int, y int, caption string) {
+			lbl := ui.NewLabel(caption, th.Fonts.Body, th.TextDim, font.Center)
+			lbl.SetBounds(image.Rect(r.Min.X, y-44, r.Min.X+120, y-4))
+			c.Add(lbl)
+			total := len(strips)*tileW + (len(strips)-1)*gap
+			x := r.Min.X + 140 + max(0, (r.Dx()-140-total)/2)
+			for _, s := range strips {
+				t := &faderTile{env: env, strip: s}
+				t.SetBounds(image.Rect(x, y, x+tileW, y+tileH))
+				c.Add(t)
+				x += tileW + gap
 			}
-			strip := i
-			s := env.Desk.Strip(i)
-			src := env.Desk.SourceName(env.Desk.SourceOf(i))
-			label := s.Label
-			if src.Label != "" {
-				label = src.Label
-			}
-			b := ui.NewButton(label, func() { env.Nav.Push(NewChannel(strip)) })
-			b.TileLayout = true
-			b.Icon = sourceIcon(src.ID)
-			b.SetBounds(cells[i])
-			c.Add(b)
 		}
-		_ = th
+		var phys, virt []int
+		for i := 0; i < n; i++ {
+			if i < physical {
+				phys = append(phys, i)
+			} else {
+				virt = append(virt, i)
+			}
+		}
+		if len(virt) == 0 {
+			place(phys, r.Min.Y+(r.Dy()-tileH)/2, env.TR("PHYSICAL", "Physisch", "Physical"))
+			return c
+		}
+		place(phys, r.Min.Y+50, env.TR("PHYSICAL", "Physisch", "Physical"))
+		place(virt, r.Min.Y+50+tileH+56, env.TR("VIRTUAL", "Virtuell", "Virtual"))
 		return c
 	}}
 }
 
+// faderTile is a strip on the faders page: its icon on a card with the
+// source colour along the bottom; a tap opens the channel page.
+type faderTile struct {
+	ui.Base
+	env     *Env
+	strip   int
+	pressed bool
+	last    string
+}
+
+func (t *faderTile) CanFocus() bool { return true }
+func (t *faderTile) Activate() bool {
+	t.env.Nav.Push(NewChannel(t.strip))
+	return false
+}
+
+func (t *faderTile) Touch(phase ui.TouchPhase, p image.Point) bool {
+	switch phase {
+	case ui.Down:
+		t.pressed = true
+		t.MarkDirty()
+	case ui.Up:
+		if t.pressed {
+			t.Activate()
+		}
+		t.pressed = false
+	}
+	return true
+}
+
+func (t *faderTile) Dirty() []image.Rectangle {
+	if s := intText(t.env.Desk.SourceOf(t.strip)) + t.env.Desk.InputColour(t.strip); s != t.last {
+		t.last = s
+		t.MarkDirty()
+	}
+	return t.Base.Dirty()
+}
+
+func (t *faderTile) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
+	th := c.Theme
+	b := t.Bounds()
+	if t.pressed {
+		ui.Panel(dst, b, th.Radius, th.PanelHi, clip)
+	} else {
+		ui.Card(dst, b, th, clip)
+	}
+	src := t.env.Desk.SourceOf(t.strip)
+	name := t.env.Desk.SourceName(src)
+	icon := sourceIconBig(name.ID)
+	fg := th.Text
+	if src < 0 || icon == "" {
+		icon, fg = "IconNotAssigned", th.TextMuted
+	}
+	c.Icon(dst, icon, centred(image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Max.Y-24), 100, 100), fg)
+	colour := th.Text
+	if col := t.env.Desk.InputColour(t.strip); col != "" && src >= 0 {
+		colour = parseColour(col, th.Text)
+	} else if src < 0 {
+		colour = th.Line
+	}
+	ui.Panel(dst, image.Rect(b.Min.X, b.Max.Y-18, b.Max.X, b.Max.Y), 6, colour, clip)
+	ui.Fill(dst, image.Rect(b.Min.X, b.Max.Y-18, b.Max.X, b.Max.Y-10), colour, clip)
+	if t.Focused() {
+		ui.Focus(dst, b, th.Radius, false, th, clip)
+	}
+}
+
 // --- System ---
 
+var languages = []struct{ code, label string }{
+	{"en", "English"}, {"es", "Español"}, {"fr", "Français"}, {"it", "Italiano"},
+	{"pt", "Português"}, {"de", "Deutsch"}, {"ru", "Русский"}, {"ko", "Korean"}, {"ja", "Japanese"}, {"zh", "Chinese"},
+}
+
 func newLanguagePage() Page {
-	langs := []struct{ code, label string }{
-		{"en", "English"}, {"de", "Deutsch"}, {"es", "Español"}, {"fr", "Français"},
-		{"it", "Italiano"}, {"pt", "Português"}, {"ru", "Русский"}, {"ja", "日本語"}, {"zh", "中文"},
+	opts := make([]radioSpec, len(languages))
+	for i, l := range languages {
+		opts[i] = radioSpec{title: l.label, value: int64(i)}
 	}
-	return &funcPage{title: "LANGUAGE", build: func(env *Env, r image.Rectangle) ui.View {
-		c := &ui.Container{}
-		c.SetBounds(r)
-		opts := make([]ui.RadioOption, len(langs))
-		for i, l := range langs {
-			opts[i] = ui.RadioOption{Title: l.label}
-		}
-		rl := ui.NewRadioList(opts, func() int {
-			cur := env.Desk.Str(desk.GUINode, 0, "lang")
-			for i, l := range langs {
-				if l.code == cur {
-					return i
-				}
+	return newChoicePage("SELECT LANGUAGE", 2, opts, func(env *Env) int64 {
+		cur := env.Desk.Str(desk.GUINode, 0, "lang")
+		for i, l := range languages {
+			if l.code == cur {
+				return int64(i)
 			}
-			return -1
-		}, func(i int) { env.Desk.SetStr(desk.GUINode, 0, "lang", langs[i].code) })
-		rl.SetBounds(r)
-		c.Add(rl)
-		return c
-	}}
+		}
+		return -1
+	}, func(env *Env, v int64) {
+		env.Desk.SetStr(desk.GUINode, 0, "lang", languages[v].code)
+		env.Nav.Toast(env.TR("", "Die Sprache gilt nach einem Neustart der Oberfläche.", "The language applies after the interface restarts."))
+	})
 }
 
 func newMidiPage() Page {
 	return newTogglesPage("MIDI", []toggleRow{
 		{key: "MIDI CONTROL", node: desk.SystemNode, prop: "systemMidiControl"},
 	})
+}
+
+// newDateTimePage shows the clock settings as the device has them; the
+// clock itself is the device's and is set on RØDE's screen.
+func newDateTimePage() Page {
+	return &funcPage{title: "DATE & TIME", build: func(env *Env, r image.Rectangle) ui.View {
+		c := &ui.Container{}
+		c.SetBounds(r)
+		th := env.Ctx.Theme
+		now := time.Now()
+		fields := []struct{ key, val string }{
+			{"YEAR", now.Format("2006")}, {"MONTH", now.Format("01")}, {"DAY", now.Format("02")},
+			{"HOURS", now.Format("15")}, {"MINUTES", now.Format("04")}, {"SECONDS", now.Format("05")},
+		}
+		cells := columns(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+200), 6, 16)
+		for i, f := range fields {
+			cell := cells[i]
+			card := ui.NewPanelView(th.Black)
+			card.SetBounds(image.Rect(cell.Min.X, cell.Min.Y, cell.Max.X, cell.Min.Y+140))
+			v := ui.NewLabel(f.val, th.Fonts.Huge, th.Text, font.Center)
+			v.SetBounds(card.Bounds())
+			l := ui.NewLabel(env.T(f.key), th.Fonts.Label, th.Text, font.Center)
+			l.SetBounds(image.Rect(cell.Min.X, cell.Min.Y+146, cell.Max.X, cell.Max.Y))
+			c.Add(card, v, l)
+		}
+		rows := []toggleRow{
+			{key: "24H", node: desk.SystemNode, prop: "systemDateTime24h"},
+			{key: "SHOW DATE AND TIME ON HOME SCREEN", node: desk.SystemNode, prop: "systemDateTimeOnHome"},
+		}
+		for i, row := range rows {
+			row := row
+			rr := image.Rect(r.Min.X, r.Min.Y+230+i*(th.Row+th.Gap), r.Max.X, r.Min.Y+230+i*(th.Row+th.Gap)+th.Row)
+			card := ui.NewCard()
+			card.SetBounds(rr)
+			tog := ui.NewToggle(func() bool { return env.Desk.Bool(row.node, 0, row.prop) },
+				func(on bool) { env.Desk.SetBool(row.node, 0, row.prop, on) })
+			tog.Label = env.T(row.key)
+			tog.SetBounds(ui.Inset(rr, 14))
+			c.Add(card, tog)
+		}
+		c.Add(noteCard(env, image.Rect(r.Min.X, r.Max.Y-96, r.Max.X, r.Max.Y),
+			env.TR("", "Uhrzeit und Zeitzone werden auf RØDEs eigenem Bildschirm gestellt.", "The time and the time zone are set on RØDE's own screen."))...)
+		return c
+	}}
 }

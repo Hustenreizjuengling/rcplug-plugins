@@ -1,39 +1,40 @@
 package pages
 
 import (
-	"fmt"
 	"image"
+	"time"
 
-	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/desk"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/font"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/gfx"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
 )
 
-// recButton is the record control: it shows the state by colour and the
-// elapsed time, and starts or stops recording on a tap (via the recorder's
-// request property; the console applies the device's own rules).
+// recButton is the round REC control of the status bar: a ring whose colour
+// is the recorder's state (green ready, red recording, amber paused, blue
+// without storage). A tap starts, pauses or resumes; holding it stops, as
+// on the device.
 type recButton struct {
 	ui.Base
 	env     *Env
 	pressed bool
-	lastMs  int64
+	downAt  time.Time
 	lastSt  int64
+	held    bool
 }
 
 func newRecButton(env *Env) *recButton { return &recButton{env: env, lastSt: -1} }
 
-func (b *recButton) state() int64  { return b.env.Desk.Int(desk.RecorderNode, 0, "recordState") }
-func (b *recButton) timeMs() int64 { return b.env.Desk.Int(desk.RecorderNode, 0, "recordTimeMs") }
-
 func (b *recButton) Touch(phase ui.TouchPhase, p image.Point) bool {
 	switch phase {
 	case ui.Down:
-		b.pressed = true
+		b.pressed, b.held, b.downAt = true, false, time.Now()
 		b.MarkDirty()
+	case ui.Move:
+		b.hold()
 	case ui.Up:
-		if b.pressed {
-			b.toggle()
+		b.hold()
+		if b.pressed && !b.held {
+			b.tap()
 		}
 		b.pressed = false
 		b.MarkDirty()
@@ -41,22 +42,38 @@ func (b *recButton) Touch(phase ui.TouchPhase, p image.Point) bool {
 	return true
 }
 
-func (b *recButton) toggle() {
-	st := b.state()
-	if st == 2 || st == 1 { // recording or paused → stop
-		msg := b.env.TR("HOLD REC TO STOP RECORDING", "Aufnahme stoppen?", "Stop the recording?")
-		b.env.Nav.Confirm(b.env.T("REC"), msg, b.env.TR("STOP", "Stoppen", "Stop"), false, func() {
-			b.env.Desk.SetInt(desk.RecorderNode, 0, "requestRecordState", 0)
-		})
-		return
+// hold stops the recording once the finger has rested for 1.2 s.
+func (b *recButton) hold() {
+	if b.pressed && !b.held && time.Since(b.downAt) > 1200*time.Millisecond {
+		b.held = true
+		if st := b.env.Desk.RecordState(); st == 1 || st == 2 {
+			b.env.Desk.RequestRecord(0)
+		}
 	}
-	// ready → start
-	b.env.Desk.SetInt(desk.RecorderNode, 0, "requestRecordState", 2)
+}
+
+func (b *recButton) tap() {
+	switch b.env.Desk.RecordState() {
+	case 2:
+		b.env.Desk.RequestRecord(1)
+		b.env.Nav.Toast(b.env.T("HOLD REC TO STOP RECORDING"))
+	case 1:
+		b.env.Desk.RequestRecord(2)
+	case 3:
+		b.env.Nav.Toast(b.env.T("NO STORAGE AVAILABLE"))
+	default:
+		b.env.Desk.RequestRecord(2)
+	}
 }
 
 func (b *recButton) Dirty() []image.Rectangle {
-	if ms, st := b.timeMs(), b.state(); ms != b.lastMs || st != b.lastSt {
-		b.lastMs, b.lastSt = ms, st
+	if st := b.env.Desk.RecordState(); st != b.lastSt {
+		b.lastSt = st
+		b.MarkDirty()
+	}
+	// While held, redraw so the ring can show the hold.
+	if b.pressed && !b.held && time.Since(b.downAt) > 1200*time.Millisecond {
+		b.hold()
 		b.MarkDirty()
 	}
 	return b.Base.Dirty()
@@ -64,46 +81,23 @@ func (b *recButton) Dirty() []image.Rectangle {
 
 func (b *recButton) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
 	th := c.Theme
-	r := b.Bounds()
-	st := b.state()
-	fill := th.Panel
-	dot := th.TextMuted
-	switch st {
+	r := ui.Square(b.Bounds())
+	cx, cy := float64(r.Min.X+r.Max.X)/2, float64(r.Min.Y+r.Max.Y)/2
+	rad := float64(r.Dx()) / 2
+	ring := th.Accent
+	fill := gfx.Hex(0x101010)
+	switch b.env.Desk.RecordState() {
 	case 2:
-		fill, dot = th.Record, gfx.Hex(0xffffff)
+		ring, fill = th.Record, gfx.Hex(0x7a1010)
 	case 1:
-		fill, dot = th.Warn, gfx.Hex(0x101010)
+		ring, fill = th.Warn, gfx.Hex(0x6a4600)
 	case 3:
-		fill = th.Panel
+		ring = th.Blue
 	}
 	if b.pressed {
-		fill = th.PanelHi
+		fill = gfx.Mix(fill, th.Text, 0.15)
 	}
-	ui.Panel(dst, r, th.Radius, fill, clip)
-	// A record dot + the time.
-	cy := (r.Min.Y + r.Max.Y) / 2
-	circ := &gfx.Path{}
-	circ.Circle(float64(r.Min.X+22), float64(cy), 9)
-	dst.Fill(circ, gfx.Identity, gfx.NonZero, gfx.Solid(dot), clip)
-	label := recTime(b.timeMs())
-	if st == 0 {
-		label = "REC"
-	} else if st == 3 {
-		label = b.env.T("NO STORAGE AVAILABLE")
-	}
-	txtCol := th.Text
-	if st == 1 {
-		txtCol = gfx.Hex(0x101010)
-	}
-	ui.Text(dst, th.Fonts.Label, label, image.Rect(r.Min.X+38, r.Min.Y, r.Max.X-8, r.Max.Y), font.Left, txtCol, clip)
-}
-
-// recTime formats milliseconds as H:MM:SS or MM:SS.
-func recTime(ms int64) string {
-	s := ms / 1000
-	h, m, sec := s/3600, (s%3600)/60, s%60
-	if h > 0 {
-		return fmt.Sprintf("%d:%02d:%02d", h, m, sec)
-	}
-	return fmt.Sprintf("%02d:%02d", m, sec)
+	ui.Circle(dst, cx, cy, rad-2, fill, clip)
+	ui.Ring(dst, cx, cy, rad-6, 9, ring, clip)
+	ui.Text(dst, th.Fonts.Label, "REC", r, font.Center, th.Text, clip)
 }

@@ -2,7 +2,7 @@
 // the channel and processing pages, pads, the menus and settings, and the
 // rcplug and plugin pages. A page turns the desk model and the device's
 // icons and text into a tree of ui views; the app frames it with a header
-// and a status bar and drives navigation.
+// and drives navigation, touch and the main knob.
 package pages
 
 import (
@@ -29,7 +29,7 @@ func (e *Env) T(key string) string { return e.Text.T(key) }
 // translation when there is one, else the German or English fallback given
 // here, by the chosen language.
 func (e *Env) TR(key, de, en string) string {
-	if e.Text.Has(key) {
+	if key != "" && e.Text.Has(key) {
 		return e.Text.T(key)
 	}
 	if e.Text.German() {
@@ -48,6 +48,11 @@ type Nav interface {
 	Home()
 	// Open shows a page by its id (see the registry), e.g. "settings".
 	Open(id string)
+	// Replace swaps the current page for another (the next strip, say).
+	Replace(p Page)
+	// Refresh rebuilds the current page's views (after a state change the
+	// page keeps itself, such as a selection).
+	Refresh()
 	// Keyboard asks for text with the on-screen keyboard, then calls done.
 	Keyboard(prompt, initial string, done func(string))
 	// Confirm shows a modal dialog; onYes runs if confirmed.
@@ -59,7 +64,7 @@ type Nav interface {
 }
 
 // Page is one screen. Build lays its body into r and returns the view; Title
-// is the header caption ("" means a full-bleed page that draws its own top).
+// is the header caption.
 type Page interface {
 	Title() string
 	Build(env *Env, r image.Rectangle) ui.View
@@ -69,6 +74,20 @@ type Page interface {
 // no standard header (the mixer).
 type FullBleed interface {
 	FullBleed() bool
+}
+
+// HeaderPage is an optional interface: a page that puts its own controls in
+// the header bar (a strip switcher, the assign page's cross and tick). With
+// ownNav the app adds no back and home buttons.
+type HeaderPage interface {
+	Header(env *Env, bar image.Rectangle) (views []ui.View, ownNav bool)
+}
+
+// EncoderHandler is an optional interface: a page that drives the main knob
+// itself (the mixer: monitor level and the virtual faders). It returns false
+// to leave the event to the app's focus navigation.
+type EncoderHandler interface {
+	Encoder(env *Env, ev desk.EncoderEvent) bool
 }
 
 // PluginSource gives the rcplug and plugin pages their data (implemented by
@@ -115,11 +134,8 @@ type PluginControl struct {
 	Confirm string   `json:"confirm"` // the confirmation message
 }
 
-// fullBleed reports whether a page wants the whole screen.
-func fullBleed(p Page) bool {
+// FullBleedOf reports whether a page wants the whole screen.
+func FullBleedOf(p Page) bool {
 	fb, ok := p.(FullBleed)
 	return ok && fb.FullBleed()
 }
-
-// FullBleedOf is the exported form for the app.
-func FullBleedOf(p Page) bool { return fullBleed(p) }

@@ -21,6 +21,13 @@ this plugin's own code.
   `internal/desk`): it loads the state tree, follows the live stream of
   changes, and writes single properties back optimistically. It needs the
   `desk:write` permission, and the console must be running.
+- The main knob works as on RØDE's screen (package `internal/app`, the
+  focus): on the mixer it sets the monitor level, a press moves it on to the
+  virtual faders (and back), holding it mutes the focused one. On every other
+  page turning moves a green ring from control to control, a press taps the
+  control or starts adjusting a value (turn, then press again to let go), and
+  holding the knob goes back a page. The knob's turns and presses reach the
+  plugin through the desk's tree (`ENCODER.encoderSignal`, `encoderPressed`).
 - RØDE's screen comes back with the **Back to RØDE** button, when the plugin
   is stopped from the dashboard, or if it exits for any reason.
 
@@ -44,7 +51,12 @@ resources, passed with `--resources`:
     go run ./screen --serve 127.0.0.1:8099 --resources <folder> --lang de
 
 `--page` is one of: `settings`, `outputs`, `display`, `system`, `pads`,
-`routing`, `rcplug`, `channel` (or omitted for the mixer).
+`routing`, `mix`, `rcplug`, `info`, `channel`, `channel:<n>`, `assign`,
+`proc:<hpf|gate|comp|deesser|eq|aphex|pan>`, `master`, `metering`, `listen`,
+`faders`, `language`, `datetime`, `brightness`, `keyboard`, `dialog` (or
+omitted for the mixer). In the browser the main knob is the mouse wheel over
+the picture, the buttons under it, or the arrow keys (space = press,
+backspace = hold).
 
 ## Extending it
 

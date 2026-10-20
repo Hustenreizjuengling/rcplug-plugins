@@ -6,13 +6,16 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/app"
+	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/desk"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
 )
 
 // Server shows a running App in a web browser: it renders frames to PNG and
-// takes pointer events back, so the interface can be driven without a device.
+// takes pointer events and knob actions back, so the interface can be
+// driven without a device.
 type Server struct {
 	app *app.App
 	mu  sync.Mutex
@@ -30,6 +33,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/", s.page)
 	mux.HandleFunc("/frame.png", s.frame)
 	mux.HandleFunc("/touch", s.touch)
+	mux.HandleFunc("/knob", s.knob)
 	return mux
 }
 
@@ -60,6 +64,25 @@ func (s *Server) touch(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// knob takes a main-knob action: ?turn=±n, ?press=1 (a short press) or
+// ?hold=1 (a long press).
+func (s *Server) knob(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	var ev desk.EncoderEvent
+	switch {
+	case q.Get("turn") != "":
+		ev.Delta, _ = strconv.Atoi(q.Get("turn"))
+	case q.Get("hold") != "":
+		ev.Release, ev.Held = true, 2*time.Second
+	default:
+		ev.Release, ev.Held = true, 100*time.Millisecond
+	}
+	s.mu.Lock()
+	s.app.Encoder(ev)
+	s.mu.Unlock()
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(previewHTML))
@@ -76,10 +99,21 @@ const previewHTML = `<!doctype html>
  #frame{width:1280px;max-width:98vw;aspect-ratio:1280/720;touch-action:none;
    border:1px solid #333;border-radius:8px;box-shadow:0 8px 40px #000;user-select:none}
  .hint{font-size:12px;color:#666}
+ .knob{display:flex;gap:8px;align-items:center}
+ .knob button{background:#222;color:#ddd;border:1px solid #444;border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer}
+ .knob button:hover{background:#333}
 </style></head>
 <body><div class="wrap">
  <h1>RØDECaster Duo · alternative Oberfläche (Vorschau)</h1>
  <img id="frame" src="/frame.png" draggable="false">
+ <div class="knob">
+  <span class="hint">Hauptregler:</span>
+  <button data-k="turn=-1">⟲ links</button>
+  <button data-k="press=1">drücken</button>
+  <button data-k="hold=1">halten</button>
+  <button data-k="turn=1">rechts ⟳</button>
+  <span class="hint">(auch Mausrad über dem Bild, Leertaste = drücken)</span>
+ </div>
  <div class="hint">Klicken und ziehen wie am Touchscreen. Live-Vorschau ohne Gerät.</div>
 </div>
 <script>
@@ -92,7 +126,9 @@ function at(e){
   const y = Math.round((e.clientY - r.top)  / r.height * H);
   return {x: Math.max(0, Math.min(W-1, x)), y: Math.max(0, Math.min(H-1, y))};
 }
-async function send(phase, p){ await fetch('/touch?phase='+phase+'&x='+p.x+'&y='+p.y, {method:'POST', headers:{'X-Rcplug':'1'}}); refresh(); }
+const hdr = {method:'POST', headers:{'X-Rcplug':'1'}};
+async function send(phase, p){ await fetch('/touch?phase='+phase+'&x='+p.x+'&y='+p.y, hdr); refresh(); }
+async function knob(q){ await fetch('/knob?'+q, hdr); refresh(); }
 let busy = false, again = false;
 async function refresh(){
   if (busy){ again = true; return; }
@@ -104,6 +140,9 @@ async function refresh(){
 img.addEventListener('pointerdown', e=>{ down=true; img.setPointerCapture(e.pointerId); send('down', at(e)); e.preventDefault(); });
 img.addEventListener('pointermove', e=>{ if(down) send('move', at(e)); });
 img.addEventListener('pointerup',   e=>{ down=false; send('up', at(e)); });
+img.addEventListener('wheel', e=>{ e.preventDefault(); knob('turn=' + (e.deltaY > 0 ? 1 : -1)); }, {passive:false});
+document.querySelectorAll('.knob button').forEach(b => b.addEventListener('click', ()=>knob(b.dataset.k)));
+document.addEventListener('keydown', e=>{ if(e.code==='Space'){ e.preventDefault(); knob('press=1'); } if(e.key==='ArrowRight') knob('turn=1'); if(e.key==='ArrowLeft') knob('turn=-1'); if(e.key==='Backspace') knob('hold=1'); });
 setInterval(refresh, 250); // pick up live changes (meters, clock)
 </script>
 </body></html>`

@@ -23,6 +23,7 @@ import (
 	"image/png"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -137,7 +138,7 @@ func runDevice(ctx context.Context, card, touchDev, guiPath, langCode string, no
 		code = model.Str(desk.GUINode, 0, "lang")
 	}
 	code = resolveLang(langCode, code)
-	table, _ := res.Translations(code)
+	table, _ := res.Translations(rode.Language(code))
 	texts := lang.New(code, table)
 
 	ctxUI := ui.NewContext(ui.Dark(ui.Liberation()), rode.NewIcons(res))
@@ -182,12 +183,24 @@ func runPNG(out, resources, langCode, page string) error {
 	case page == "":
 	case page == "channel":
 		a.Push(pages.NewChannel(0))
+	case strings.HasPrefix(page, "channel:"):
+		n, _ := strconv.Atoi(strings.TrimPrefix(page, "channel:"))
+		a.Push(pages.NewChannel(n))
+	case page == "assign":
+		a.Push(pages.NewAssign(0))
 	case strings.HasPrefix(page, "proc:"):
 		a.Push(pages.Processor(0, strings.TrimPrefix(page, "proc:")))
+	case page == "master":
+		a.Push(pages.NewMasterRack())
 	case page == "keyboard":
 		a.Keyboard("Name", "Mic 1", nil)
 	case page == "dialog":
 		a.Confirm("CLEAR", "Are you sure you want to clear the pad?", "CLEAR", true, nil)
+	case page == "metering", page == "listen", page == "faders", page == "language", page == "datetime", page == "brightness", page == "haptics", page == "monitor", page == "multitrack":
+		a.Push(pages.Detail(page))
+	case page == "mix":
+		a.Open(pages.IDRouting)
+		a.Push(pages.RoutingMix(0))
 	default:
 		a.Open(page)
 	}

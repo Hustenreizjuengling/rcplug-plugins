@@ -43,6 +43,8 @@ type Model struct {
 
 	wmu     sync.Mutex
 	pending map[string]writeOp // coalesced writes, flushed by runWriter
+
+	enc *encoderState // the main knob's turns and presses
 }
 
 // Info is what the model knows about the device.
@@ -58,7 +60,7 @@ func New(hostURL string, logf func(string, ...interface{})) *Model {
 	if logf == nil {
 		logf = func(string, ...interface{}) {}
 	}
-	return &Model{conn: Dial(hostURL), logf: logf, control: "off", unity: 90, physical: 4, perBank: 6}
+	return &Model{conn: Dial(hostURL), logf: logf, control: "off", unity: 90, physical: 4, perBank: 6, enc: newEncoderState()}
 }
 
 // NewOffline makes a model with no console: it is filled with LoadRaw and
@@ -204,6 +206,9 @@ func (m *Model) applyChanges(data []byte) {
 		}
 		if n := m.root.At(path); n != nil {
 			n.Props[name] = val
+			if name == "encoderSignal" || name == "encoderPressed" {
+				m.onEncoderProp(name, val)
+			}
 		}
 	}
 	m.rev++

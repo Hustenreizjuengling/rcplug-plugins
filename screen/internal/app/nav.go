@@ -8,7 +8,7 @@ import (
 )
 
 // The navigation surface (pages.Nav). Each change marks the view tree for a
-// rebuild before the next frame.
+// rebuild before the next frame; a page change also drops the knob's focus.
 
 // Push shows a page on top of the current one.
 func (a *App) Push(p pages.Page) {
@@ -20,6 +20,7 @@ func (a *App) Push(p pages.Page) {
 	a.overlay = nil
 	a.dirty = true
 	a.mu.Unlock()
+	a.focus.reset()
 }
 
 // Pop goes back one page.
@@ -31,6 +32,7 @@ func (a *App) Pop() {
 	a.overlay = nil
 	a.dirty = true
 	a.mu.Unlock()
+	a.focus.reset()
 }
 
 // Home returns to the mixer.
@@ -40,6 +42,7 @@ func (a *App) Home() {
 	a.overlay = nil
 	a.dirty = true
 	a.mu.Unlock()
+	a.focus.reset()
 }
 
 // Open shows a top-level page by its id.
@@ -49,6 +52,27 @@ func (a *App) Open(id string) {
 	} else {
 		a.Toast("—")
 	}
+}
+
+// Replace swaps the current page for another (keeps the depth).
+func (a *App) Replace(p pages.Page) {
+	if p == nil {
+		return
+	}
+	a.mu.Lock()
+	a.stack[len(a.stack)-1] = p
+	a.overlay = nil
+	a.dirty = true
+	a.mu.Unlock()
+	a.focus.reset()
+}
+
+// Refresh rebuilds the current page's views; the knob's focus stays where
+// it was.
+func (a *App) Refresh() {
+	a.mu.Lock()
+	a.dirty = true
+	a.mu.Unlock()
 }
 
 // Keyboard asks for text with the on-screen keyboard.
@@ -98,6 +122,7 @@ func (a *App) setOverlay(v ui.View) {
 	a.overlay = v
 	a.dirty = true
 	a.mu.Unlock()
+	a.focus.reset()
 }
 
 func (a *App) clearOverlay() {
@@ -105,4 +130,5 @@ func (a *App) clearOverlay() {
 	a.overlay = nil
 	a.dirty = true
 	a.mu.Unlock()
+	a.focus.reset()
 }

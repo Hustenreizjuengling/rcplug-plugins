@@ -10,10 +10,10 @@ import (
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
 )
 
-// Run draws the interface and reads touches until ctx ends or the screen is
-// handed back to RØDE. out shows the page (landscape); touch carries finger
-// events in the panel's portrait coordinates; turn is how the page lies on
-// the panel (see the panel package).
+// Run draws the interface and reads touches and the main knob until ctx ends
+// or the screen is handed back to RØDE. out shows the page (landscape);
+// touch carries finger events in the panel's portrait coordinates; turn is
+// how the page lies on the panel (see the panel package).
 func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.TouchEvent, turn int) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -39,6 +39,7 @@ func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.Touc
 
 	wasDown := false
 	lastOnline, lastStrips := false, -1
+	knob := a.model.Encoder()
 
 	for {
 		select {
@@ -59,6 +60,8 @@ func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.Touc
 				a.root.Touch(ui.Up, p)
 			}
 			wasDown = ev.Down
+		case ev := <-knob:
+			a.handleEncoder(ev)
 		case <-tick.C:
 			// The device coming online (or its strip count changing) needs a
 			// fresh layout.
@@ -103,6 +106,7 @@ func (a *App) RenderOnce() []image.Rectangle {
 // Frame builds the view if it changed, renders, and returns the current
 // picture (for the browser preview).
 func (a *App) Frame() *gfx.Image {
+	a.expireToast()
 	a.mu.Lock()
 	rebuild := a.dirty
 	a.mu.Unlock()

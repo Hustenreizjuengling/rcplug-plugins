@@ -1,7 +1,7 @@
 // Package app ties the screen interface together: it owns the drawing root,
 // the desk model and the navigation stack, frames each page with a header
-// and handles the modal keyboard and dialogs, and runs the draw-and-touch
-// loop against an output and a touch source.
+// and handles the modal keyboard and dialogs, drives the main knob's focus,
+// and runs the draw-and-touch loop against an output and a touch source.
 package app
 
 import (
@@ -15,7 +15,14 @@ import (
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
 )
 
-const headerH = 56
+// The header bar of a menu page and the content area under it, as on the
+// device: square back and home buttons at the corners, the title between.
+const (
+	headerH    = 116
+	contentTop = 128
+	sidePad    = 30
+	bottomPad  = 20
+)
 
 // App is the running interface.
 type App struct {
@@ -33,6 +40,8 @@ type App struct {
 	toastUntil time.Time
 	dirty      bool // the view tree must be rebuilt
 	quit       func()
+
+	focus focus
 }
 
 // New makes an app for a w × h screen.
@@ -41,6 +50,7 @@ func New(w, h int, ctx *ui.Context, model *desk.Model, text *lang.Texts, plugins
 	a.root = ui.NewRoot(ctx, w, h)
 	a.stack = []pages.Page{pages.NewHome()}
 	a.dirty = true
+	a.focus.idx = -1
 	return a
 }
 
@@ -57,6 +67,13 @@ func (a *App) PageTitle() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.stack[len(a.stack)-1].Title()
+}
+
+// Page is the current page (for tests).
+func (a *App) Page() pages.Page {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.stack[len(a.stack)-1]
 }
 
 // Depth is how deep the navigation stack is (for tests).
@@ -85,67 +102,78 @@ func (a *App) build() {
 	a.mu.Unlock()
 
 	full := image.Rect(0, 0, a.w, a.h)
-	shell := &ui.Container{}
-	shell.SetBounds(full)
-
+	var shell *ui.Backdrop
 	if pages.FullBleedOf(page) {
-		body := page.Build(a.env(), full)
-		shell.Add(body)
+		shell = &ui.Backdrop{Plain: true}
+		shell.Fill = a.ctx.Theme.Bg
+		shell.SetBounds(full)
+		shell.Add(page.Build(a.env(), full))
 	} else {
-		shell.Add(a.header(page.Title(), depth > 1)...)
-		content := image.Rect(a.ctx.Theme.Pad, headerH+a.ctx.Theme.Pad, a.w-a.ctx.Theme.Pad, a.h-a.ctx.Theme.Pad)
-		body := page.Build(a.env(), content)
-		shell.Add(body)
+		shell = &ui.Backdrop{}
+		shell.SetBounds(full)
+		shell.Add(a.header(page, depth > 1)...)
+		content := image.Rect(sidePad, contentTop, a.w-sidePad, a.h-bottomPad)
+		shell.Add(page.Build(a.env(), content))
 	}
 	if toastOn && toast != "" {
 		shell.Add(a.toastView(toast))
 	}
 
 	var rootView ui.View = shell
+	var focusRoot ui.View = shell
 	if overlay != nil {
 		overlay.SetBounds(full)
 		top := &ui.Container{}
 		top.SetBounds(full)
 		top.Add(shell, overlay)
 		rootView = top
+		focusRoot = overlay
 	}
 	a.root.SetView(rootView)
+	a.focus.collect(focusRoot)
 }
 
-// header is the back button and the page title.
-func (a *App) header(title string, back bool) []ui.View {
+// header is the bar across the top: back and home, the title, or the page's
+// own header controls.
+func (a *App) header(page pages.Page, back bool) []ui.View {
 	th := a.ctx.Theme
 	bar := image.Rect(0, 0, a.w, headerH)
-	bg := ui.NewPanelView(th.Panel)
-	bg.Radius = 0
-	bg.SetBounds(bar)
-	out := []ui.View{bg}
-	x := 8
+	var out []ui.View
+	ownNav := false
+	if hp, ok := page.(pages.HeaderPage); ok {
+		var views []ui.View
+		views, ownNav = hp.Header(a.env(), bar)
+		out = append(out, views...)
+	} else if title := a.text.T(page.Title()); title != "" {
+		t := ui.NewLabel(title, th.Fonts.Title, th.Text, ui.AlignCenter)
+		t.SetBounds(image.Rect(sidePad+th.Button+20, 0, a.w-sidePad-th.Button-20, headerH))
+		out = append(out, t)
+	}
+	if ownNav {
+		return out
+	}
+	y := (headerH - th.Button) / 2
 	if back {
-		b := ui.NewButton("‹", func() { a.Pop() })
-		b.Fill = th.Panel
-		b.SetBounds(image.Rect(x, 6, x+56, headerH-6))
-		out = append(out, b)
-		x += 64
+		b := ui.NewButton("", func() { a.Pop() })
+		b.Icon = "IconBack"
+		b.SetBounds(image.Rect(sidePad, y, sidePad+th.Button, y+th.Button))
+		out = append([]ui.View{b}, out...)
 	}
 	home := ui.NewButton("", func() { a.Home() })
 	home.Icon = "IconHome"
-	home.Fill = th.Panel
-	home.SetBounds(image.Rect(a.w-58, 6, a.w-6, headerH-6))
-	t := ui.NewLabel(a.text.T(title), th.Fonts.Title, th.Text, ui.AlignLeft)
-	t.SetBounds(image.Rect(x+4, 0, a.w-70, headerH))
-	out = append(out, t, home)
-	return out
+	home.SetBounds(image.Rect(a.w-sidePad-th.Button, y, a.w-sidePad, y+th.Button))
+	return append(out, home)
 }
 
 // toastView is a brief message strip near the bottom.
 func (a *App) toastView(msg string) ui.View {
 	th := a.ctx.Theme
-	w := 600
-	r := image.Rect((a.w-w)/2, a.h-120, (a.w+w)/2, a.h-64)
+	w := min(900, 80+ui.TextWidth(th.Fonts.Body, msg))
+	r := image.Rect((a.w-w)/2, a.h-140, (a.w+w)/2, a.h-60)
 	c := &ui.Container{}
 	c.SetBounds(r)
 	card := ui.NewPanelView(th.PanelHi)
+	card.Radius = 16
 	card.SetBounds(r)
 	lbl := ui.NewLabel(msg, th.Fonts.Body, th.Text, ui.AlignCenter)
 	lbl.SetBounds(r)
