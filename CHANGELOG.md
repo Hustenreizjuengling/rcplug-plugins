@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.13 - Unreleased
+## 0.5.13 - 2026-10-20
 
 ### Added
 - **Screen 0.1.0** is an alternative interface on the device's own touchscreen: a
