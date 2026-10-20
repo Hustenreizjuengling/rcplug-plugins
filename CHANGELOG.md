@@ -4,7 +4,29 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.13 - Unreleased
+## 0.5.15 - Unreleased
+
+### Changed
+- **Screen 0.2.0** is rebuilt to the device's own layout and sizes after the first
+  test on a RØDECaster Duo: the mixer with dBFS scales, peak hold and the SMART pads
+  beside the strips, the channel page with gain, meter and target zone, the
+  processors as the rack with response curves, tiles and option cards on the menus.
+  The main knob works: it sets the monitor level, a press moves it on to the virtual
+  faders, and on the menus it steps through the controls, presses them and adjusts
+  values; holding it goes back. Channel assignment only changes with the green
+  tick (a tap on the list used to write at once). The device's translations load
+  (the first release ran in English), and the storage indicator, the recording
+  timer and the Broadcast gain-reduction meters are shown.
+
+## 0.5.14 - 2026-10-20
+
+### Fixed
+- **Screen 0.1.1** shows its title, description, icon and permissions in the
+  catalog again and installs from it: its manifest no longer translates the option
+  title, which the release tool could not read and so left out the plugin's whole
+  catalog card.
+
+## 0.5.13 - 2026-10-20
 
 ### Added
 - **Screen 0.1.0** is an alternative interface on the device's own touchscreen: a

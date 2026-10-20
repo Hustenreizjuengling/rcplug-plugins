@@ -33,10 +33,7 @@
   "translations": {
     "de": {
       "title": "Bildschirm",
-      "description": "Eine alternative Oberfläche auf dem Touchscreen des Geräts: Mischpult, Kanal- und Bearbeitungsseiten, SMART Pads, die Menüs und Einstellungen sowie Seiten für rcplug und andere Plugins – im Aussehen und in der Bedienung wie RØDEs eigener Bildschirm. Sie liest RØDEs Symbole und Texte zur Laufzeit vom Gerät (es werden keine RØDE-Dateien mitgeliefert). Der Hauptregler funktioniert wie auf RØDEs Bildschirm: Er stellt den Monitorpegel, ein Druck wechselt zu den virtuellen Fadern, und in den Menüs läuft er durch die Bedienelemente. RØDEs Bildschirm kommt mit der Schaltfläche „Zurück zu RØDE“ oder beim Stoppen des Plugins zurück. Startet vom Dashboard.",
-      "options": {
-        "language": {"title": "Sprache"}
-      }
+      "description": "Eine alternative Oberfläche auf dem Touchscreen des Geräts: Mischpult, Kanal- und Bearbeitungsseiten, SMART Pads, die Menüs und Einstellungen sowie Seiten für rcplug und andere Plugins – im Aussehen und in der Bedienung wie RØDEs eigener Bildschirm. Sie liest RØDEs Symbole und Texte zur Laufzeit vom Gerät (es werden keine RØDE-Dateien mitgeliefert). Der Hauptregler funktioniert wie auf RØDEs Bildschirm: Er stellt den Monitorpegel, ein Druck wechselt zu den virtuellen Fadern, und in den Menüs läuft er durch die Bedienelemente. RØDEs Bildschirm kommt mit der Schaltfläche „Zurück zu RØDE“ oder beim Stoppen des Plugins zurück. Startet vom Dashboard."
     }
   }
 }
