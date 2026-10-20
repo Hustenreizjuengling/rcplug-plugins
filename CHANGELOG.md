@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.20 - Unreleased
+## 0.5.20 - 2026-10-20
 
 ### Added
 - **Plugin pages on the device's screen.** Sonar 0.7.0 and Backup 0.3.0 describe a
