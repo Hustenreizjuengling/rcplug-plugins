@@ -4,6 +4,7 @@ import (
 	"image"
 	"time"
 
+	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/desk"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/font"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/gfx"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
@@ -42,12 +43,23 @@ func (b *recButton) Touch(phase ui.TouchPhase, p image.Point) bool {
 	return true
 }
 
-// hold stops the recording once the finger has rested for 1.2 s.
+// holdStops reports the device's REC button setting: 0 = a press pauses
+// and holding stops (the default), 1 = a press stops and holding pauses.
+func (b *recButton) holdStops() bool {
+	return b.env.Desk.Int(desk.SystemNode, 0, "systemRecButtonSetting") != 1
+}
+
+// hold acts once the finger has rested for 1.2 s: it stops the recording
+// (or pauses it, with the other setting).
 func (b *recButton) hold() {
 	if b.pressed && !b.held && time.Since(b.downAt) > 1200*time.Millisecond {
 		b.held = true
 		if st := b.env.Desk.RecordState(); st == 1 || st == 2 {
-			b.env.Desk.RequestRecord(0)
+			if b.holdStops() || st == 1 {
+				b.env.Desk.RequestRecord(0)
+			} else {
+				b.env.Desk.RequestRecord(1)
+			}
 		}
 	}
 }
@@ -55,8 +67,12 @@ func (b *recButton) hold() {
 func (b *recButton) tap() {
 	switch b.env.Desk.RecordState() {
 	case 2:
-		b.env.Desk.RequestRecord(1)
-		b.env.Nav.Toast(b.env.T("HOLD REC TO STOP RECORDING"))
+		if b.holdStops() {
+			b.env.Desk.RequestRecord(1)
+			b.env.Nav.Toast(b.env.T("HOLD REC TO STOP RECORDING"))
+		} else {
+			b.env.Desk.RequestRecord(0)
+		}
 	case 1:
 		b.env.Desk.RequestRecord(2)
 	case 3:

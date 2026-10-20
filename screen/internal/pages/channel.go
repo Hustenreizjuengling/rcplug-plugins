@@ -150,6 +150,22 @@ func (p *ChannelPage) inputCard(env *Env, strip int, area image.Rectangle) []ui.
 	return out
 }
 
+// outputOf is the output bus a source returns to (USB 1, chat, USB 2 and
+// Bluetooth share an id with theirs), or -1.
+func outputOf(env *Env, sourceID string) int {
+	switch sourceID {
+	case "usb1", "chat", "usb2", "bluetooth":
+	default:
+		return -1
+	}
+	for i, o := range env.Desk.Outputs() {
+		if o.ID == sourceID && i < env.Desk.Count(desk.MixMinusNode) {
+			return i
+		}
+	}
+	return -1
+}
+
 // onOffButton is RØDE's "OFF"/"ON" button bound to a boolean.
 func onOffButton(env *Env, get func() bool, set func(bool)) ui.View {
 	b := ui.NewButton("", func() { set(!get()) })
@@ -298,15 +314,43 @@ func (p *ChannelPage) processingCard(env *Env, strip int, area image.Rectangle) 
 	card.SetBounds(area)
 	out = append(out, card)
 
-	tabs := ui.NewSegmented([]string{env.T("PROCESSING"), env.T("EFFECTS")}, func() int { return 0 },
-		func(i int) {
-			if i == 1 {
-				env.Nav.Push(NewEffectsRack(strip, 0))
-			}
+	src := d.SourceOf(strip)
+	id := d.SourceName(src).ID
+	input := d.InputIndex(strip)
+	if id == "soundpad" {
+		// The pads' channel has no processing: the ducker instead.
+		title := ui.NewLabel(env.T("DUCKING"), th.Fonts.Label, th.Text, font.Center)
+		title.SetBounds(image.Rect(area.Min.X, area.Min.Y+20, area.Max.X, area.Min.Y+70))
+		desc := ui.NewParagraph(env.T("DUCKING WILL TEMPORARILY LOWER THE LEVEL OF OTHER CHANNELS WHILE SOUND IS PRESENT IN THE HOST'S MICROPHONE (MICROPHONE 1)."), th.Fonts.Small, th.TextDim)
+		desc.Align = font.Center
+		desc.SetBounds(image.Rect(area.Min.X+30, area.Min.Y+80, area.Max.X-30, area.Min.Y+200))
+		st := ui.NewStepper(func() float64 { return d.Num(desk.DuckerNode, 0, "duckerDepth") }, func(delta int) {
+			v := d.Num(desk.DuckerNode, 0, "duckerDepth") + float64(delta)
+			d.SetFloat(desk.DuckerNode, 0, "duckerDepth", max(-60, min(0, v)))
 		})
-	tabs.Bare = true
-	tabs.SetBounds(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+88))
-	out = append(out, tabs)
+		st.Label = env.T("DEPTH")
+		st.Text = func(v float64) string { return dbNum(v) }
+		st.Unit = "dB"
+		st.SetBounds(image.Rect(area.Min.X+80, area.Min.Y+230, area.Max.X-80, area.Min.Y+360))
+		return append(out, title, desc, st)
+	}
+	// Effects exist for the microphone inputs (a wired or wireless mic).
+	kind := d.Int(desk.InputNode, input, "inputType")
+	if kind == 0 || kind == 3 {
+		tabs := ui.NewSegmented([]string{env.T("PROCESSING"), env.T("EFFECTS")}, func() int { return 0 },
+			func(i int) {
+				if i == 1 {
+					env.Nav.Push(NewEffectsRack(strip, 0))
+				}
+			})
+		tabs.Bare = true
+		tabs.SetBounds(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+88))
+		out = append(out, tabs)
+	} else {
+		title := ui.NewLabel(env.T("PROCESSING"), th.Fonts.Label, th.Text, font.Center)
+		title.SetBounds(image.Rect(area.Min.X, area.Min.Y+20, area.Max.X, area.Min.Y+70))
+		out = append(out, title)
+	}
 
 	knobs := []struct{ key, prop, icon string }{
 		{"DEPTH", "channelDepth", "IconDepth"}, {"SPARKLE", "channelSparkle", "IconSparkle"}, {"PUNCH", "channelPunch", "IconPunch"},
@@ -331,6 +375,16 @@ func (p *ChannelPage) processingCard(env *Env, strip int, area image.Rectangle) 
 	adv := ui.NewButton(env.T("ADVANCED"), func() { env.Nav.Push(NewRack(strip, 0)) })
 	adv.Icon = "IconProcessingSettings"
 	adv.SetBounds(image.Rect(area.Min.X+16, area.Max.Y-96, area.Max.X-16, area.Max.Y-16))
+	// The digital sources have their own return: a way to that output's
+	// mix, beside the advanced button.
+	if o := outputOf(env, id); o >= 0 {
+		mid := (area.Min.X + area.Max.X) / 2
+		adv.SetBounds(image.Rect(area.Min.X+16, area.Max.Y-96, mid-8, area.Max.Y-16))
+		rt := ui.NewButton(env.T("ROUTING"), func() { env.Nav.Push(newRoutingMix(o)) })
+		rt.Icon = "IconRouting"
+		rt.SetBounds(image.Rect(mid+8, area.Max.Y-96, area.Max.X-16, area.Max.Y-16))
+		out = append(out, rt)
+	}
 	out = append(out, adv)
 	return out
 }

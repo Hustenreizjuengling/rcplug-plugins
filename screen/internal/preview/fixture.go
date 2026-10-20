@@ -136,7 +136,7 @@ func BuildTree() []byte {
 	kids = append(kids, leaf("SYSTEM", map[string]interface{}{
 		"systemFirmwareVersion": "1.7.6", "systemSerialNumber": "", "systemName": "RODECaster",
 		"systemHapticSetting": 1, "systemRecButtonSetting": 0, "systemMidiControl": false,
-		"systemDateTime24h": true, "systemDateTimeOnHome": true, "systemChannelSelected": -1, "assignableMeterSource": 0,
+		"systemDateTime24h": true, "systemDateTimeOnHome": true, "systemChannelSelected": -1, "systemDateTimeDaylightSavings": false, "systemDateTimezone": int64(49), "transferModeType": int64(0), "assignableMeterSource": 0,
 		"osUpdateAvailable": false, "appUpdateAvailable": false, "usb1Connected": true,
 		"disableAllHeadphoneOutputs": false,
 	}))
@@ -148,6 +148,11 @@ func BuildTree() []byte {
 		"masterCompellorRelease": 0.5, "masterCompellorGain": 0.3, "masterDelayOn": false, "masterDelaySeconds": 0.0,
 	}))
 	kids = append(kids, leaf("DUCKER", map[string]interface{}{"duckerDepth": -9.0}))
+	// The headphone knobs and the current show.
+	for _, lv := range []int64{46, 8} {
+		kids = append(kids, leaf("POT", map[string]interface{}{"potMin": int64(0), "potMax": int64(127), "potLevel": lv}))
+	}
+	kids = append(kids, leaf("CURRENTSHOW", map[string]interface{}{"currentShowName": "Meine Show", "currentShowIcon": int64(0), "currentShowUUID": ""}))
 	// The main knob (idle: int 0 + true) and the recording storage.
 	kids = append(kids, leaf("ENCODER", map[string]interface{}{"encoderSignal": "0105010000000001" + "0102", "encoderPressed": false, "encoderColour": 7}))
 	kids = append(kids, leaf("STORAGEVOLUME", map[string]interface{}{
@@ -273,7 +278,7 @@ func BuildTree() []byte {
 		"meta": map[string]interface{}{
 			"layout": map[string]interface{}{
 				"model": "duo", "modelName": "RØDECaster Duo", "firmware": "1.7.6",
-				"physicalFaders": 4, "padsPerBank": 6, "padBanks": 8, "mixPerSource": 13, "sourceCount": 19, "micInputs": 2,
+				"physicalFaders": 4, "padsPerBank": 6, "padBanks": 8, "mixPerSource": 13, "sourceCount": 19, "micInputs": 2, "headphones": 2,
 			},
 			"faders": fixtureFaders, "sources": fixtureSources, "outputs": fixtureOutputs, "unityFader": 90,
 		},

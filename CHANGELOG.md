@@ -6,6 +6,18 @@ may break compatibility).
 
 ## 0.5.19 - Unreleased
 
+### Added
+- **Screen 0.3.1**, more of RØDE's screen: turning a headphone knob shows the level
+  for a moment (and the popup's slider sets it); the channel page follows the source —
+  USB, chat, USB 2 and Bluetooth get a **Routing** button to their own output's mix,
+  the Effects tab appears for microphones only, and the SMART pads' channel shows the
+  ducking depth instead of processing; the equaliser's **Q** switch swaps the
+  frequency knobs for the bands' widths; Outputs gains a **Bluetooth** page (level,
+  mute, auto-mute); the Shows page names the current show; Date & Time gets the
+  daylight-saving switch and Brightness the Auto switch; the REC button follows the
+  device's REC button setting (press pauses / hold stops, or the other way round); while
+  the device is in transfer mode the screen says so instead of showing a silent mixer.
+
 ## 0.5.18 - 2026-10-20
 
 ### Added

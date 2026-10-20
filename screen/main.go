@@ -194,6 +194,12 @@ func runPNG(out, resources, langCode, page string) error {
 		a.Push(pages.NewMasterRack())
 	case page == "fx":
 		a.Push(pages.NewEffectsRack(0, 0))
+	case page == "headphones":
+		a.ShowHeadphone(0)
+	case page == "transfer":
+		a.Push(pages.NewTransfer())
+	case page == "bluetooth-out":
+		a.Push(pages.Detail("bluetooth"))
 	case page == "keyboard":
 		a.Keyboard("Name", "Mic 1", nil)
 	case page == "dialog":

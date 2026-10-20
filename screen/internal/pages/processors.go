@@ -32,7 +32,9 @@ type processor struct {
 	onProp string
 	params []procParam
 	graph  func(env *Env, strip int, node string) graphFunc
-	icon   string // shown in the graph box when there is no response to draw
+	icon   string      // shown in the graph box when there is no response to draw
+	alt    []procParam // a second set of knobs (the EQ's Q), behind altKey
+	altKey string
 }
 
 // graphFunc gives the response in dB at a frequency (Hz) or the output level
@@ -59,6 +61,7 @@ type RackPage struct {
 	node  string
 	pad   int // with isPad: the pad whose effects slot is edited
 	isPad bool
+	alt   bool // the processor's second set of knobs is shown
 }
 
 // NewEffectsRack makes the effects rack of a strip, opened at effect idx.
@@ -162,7 +165,7 @@ func (p *RackPage) Build(env *Env, r image.Rectangle) ui.View {
 		c.Add(pw)
 	}
 	// Band switches (the EQ's L/M/H) under the power switch.
-	y := r.Min.Y + 320
+	y := r.Min.Y + 296
 	for _, par := range pr.params {
 		if !par.toggle {
 			continue
@@ -172,7 +175,15 @@ func (p *RackPage) Build(env *Env, r image.Rectangle) ui.View {
 			func(v bool) { d.SetBool(node, strip, prop, v) })
 		t.SetBounds(image.Rect(r.Min.X+488, y, r.Min.X+578, y+64))
 		c.Add(t)
-		y += 80
+		y += 66
+	}
+	if len(pr.alt) > 0 {
+		t := ui.NewRingToggle(pr.altKey, func() bool { return p.alt }, func(v bool) {
+			p.alt = v
+			env.Nav.Refresh()
+		})
+		t.SetBounds(image.Rect(r.Min.X+488, y, r.Min.X+578, y+64))
+		c.Add(t)
 	}
 
 	// The selector bar and the knobs.
@@ -192,7 +203,11 @@ func (p *RackPage) Build(env *Env, r image.Rectangle) ui.View {
 		c.Add(prev, next)
 	}
 	var knobs []procParam
-	for _, par := range pr.params {
+	src := pr.params
+	if p.alt && len(pr.alt) > 0 {
+		src = pr.alt
+	}
+	for _, par := range src {
 		if !par.toggle {
 			knobs = append(knobs, par)
 		}
@@ -524,6 +539,9 @@ func pctFmt(v float64) string { return pct(v) }
 func linV(minV, maxV, v float64) float64 { return minV + v*(maxV-minV) }
 func logV(minV, maxV, v float64) float64 { return minV * math.Pow(maxV/minV, v) }
 
+// qText shows a band's width as a Q value (0.1 … 10 over the knob).
+func qText(v float64) string { return "Q " + strconv.FormatFloat(0.1+v*9.9, 'f', 1, 64) }
+
 // --- the processors (CHANNEL[strip]) ---
 
 var channelProcessors = []processor{
@@ -608,6 +626,13 @@ var channelProcessors = []processor{
 		{key: "MID BELL", prop: "eqMidBell", fmt: hz(200, 2000)},
 		{key: "MID GAIN", prop: "eqMidGain", fmt: bipolar(12)},
 		{key: "LOW BELL", prop: "eqLowShelf", fmt: hz(20, 200)},
+		{key: "LOW GAIN", prop: "eqLowGain", fmt: bipolar(12)},
+	}, altKey: "Q", alt: []procParam{
+		{key: "HIGH Q", prop: "eqHighQ", fmt: qText},
+		{key: "HIGH GAIN", prop: "eqHighGain", fmt: bipolar(12)},
+		{key: "MID Q", prop: "eqMidQ", fmt: qText},
+		{key: "MID GAIN", prop: "eqMidGain", fmt: bipolar(12)},
+		{key: "LOW Q", prop: "eqLowQ", fmt: qText},
 		{key: "LOW GAIN", prop: "eqLowGain", fmt: bipolar(12)},
 	}, graph: func(env *Env, s int, node string) graphFunc {
 		d := env.Desk

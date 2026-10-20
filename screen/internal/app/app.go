@@ -38,7 +38,10 @@ type App struct {
 	overlay    ui.View
 	toast      string
 	toastUntil time.Time
-	dirty      bool // the view tree must be rebuilt
+	popup      ui.View // a passing view over the page (the headphone level)
+	popupUntil time.Time
+	hpLast     []float64 // the headphone levels as last seen
+	dirty      bool      // the view tree must be rebuilt
 	quit       func()
 
 	focus focus
@@ -57,6 +60,11 @@ func New(w, h int, ctx *ui.Context, model *desk.Model, text *lang.Texts, plugins
 // env builds the page environment with this app as the navigator.
 func (a *App) env() *pages.Env {
 	return &pages.Env{Ctx: a.ctx, Desk: a.model, Text: a.text, Nav: a, Plugins: a.plugins}
+}
+
+// ShowHeadphone shows the headphone popup (for the preview).
+func (a *App) ShowHeadphone(i int) {
+	a.Popup(pages.HeadphonePopup(a.env(), i, a.w, a.h), pages.PopupFor)
 }
 
 // Root is the drawing root (for tests and the preview).
@@ -98,8 +106,15 @@ func (a *App) build() {
 	overlay := a.overlay
 	toast := a.toast
 	toastOn := time.Now().Before(a.toastUntil)
+	popup := a.popup
+	if !time.Now().Before(a.popupUntil) {
+		popup = nil
+	}
 	a.dirty = false
 	a.mu.Unlock()
+	if a.model.TransferMode() {
+		page, depth = pages.NewTransfer(), 1
+	}
 
 	full := image.Rect(0, 0, a.w, a.h)
 	var shell *ui.Backdrop
@@ -114,6 +129,9 @@ func (a *App) build() {
 		shell.Add(a.header(page, depth > 1)...)
 		content := image.Rect(sidePad, contentTop, a.w-sidePad, a.h-bottomPad)
 		shell.Add(page.Build(a.env(), content))
+	}
+	if popup != nil {
+		shell.Add(popup)
 	}
 	if toastOn && toast != "" {
 		shell.Add(a.toastView(toast))

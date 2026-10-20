@@ -125,6 +125,7 @@ type meta struct {
 		PadBanks       int    `json:"padBanks"`
 		MixPerSource   int    `json:"mixPerSource"`
 		MicInputs      int    `json:"micInputs"`
+		Headphones     int    `json:"headphones"`
 	} `json:"layout"`
 	Faders     []Name `json:"faders"`
 	Sources    []Name `json:"sources"`

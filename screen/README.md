@@ -60,6 +60,7 @@ resources, passed with `--resources`:
 `--page` is one of: `settings`, `outputs`, `display`, `system`, `pads`,
 `pad:<n>` (a pad's editor), `pad:<n>:options|new|colour`, `routing`, `mix`,
 `mix:<output>`, `rcplug`, `info`, `channel`, `channel:<n>`, `assign`, `fx`,
+`headphones` (the headphone popup), `transfer`, `bluetooth-out`,
 `proc:<hpf|gate|comp|deesser|eq|aphex|pan>`, `master`, `metering`, `listen`,
 `faders`, `language`, `datetime`, `brightness`, `keyboard`, `dialog` (or
 omitted for the mixer). In the browser the main knob is the mouse wheel over

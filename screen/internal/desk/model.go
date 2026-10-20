@@ -21,28 +21,30 @@ type Model struct {
 	conn *Conn
 	logf func(string, ...interface{})
 
-	mu        sync.RWMutex
-	root      *Node
-	runs      *runs
-	epoch     uint64
-	seq       uint64
-	online    bool
-	stale     bool
-	control   string // off | basic | expert
-	conState  string // the console's link to the desk
-	info      Info
-	faders    []Name
-	sources   []Name
-	outputs   []Name
-	unity     int64
-	physical  int
-	perBank   int
-	perSource int    // outputs per source in the send matrix
-	mics      int    // microphone inputs
-	banks     int    // pad banks
-	offline   bool   // no console: writes stay local (the preview)
-	reloading bool   // a resync reload is in flight (single-flight)
-	rev       uint64 // bumps on every change, so the UI can tell something moved
+	mu            sync.RWMutex
+	root          *Node
+	runs          *runs
+	epoch         uint64
+	seq           uint64
+	online        bool
+	stale         bool
+	control       string // off | basic | expert
+	conState      string // the console's link to the desk
+	info          Info
+	faders        []Name
+	sources       []Name
+	outputs       []Name
+	unity         int64
+	physical      int
+	perBank       int
+	perSource     int // outputs per source in the send matrix
+	mics          int // microphone inputs
+	headphones    int // headphone outputs
+	presetsLogged bool
+	banks         int    // pad banks
+	offline       bool   // no console: writes stay local (the preview)
+	reloading     bool   // a resync reload is in flight (single-flight)
+	rev           uint64 // bumps on every change, so the UI can tell something moved
 
 	wmu     sync.Mutex
 	pending map[string]writeOp // coalesced writes, flushed by runWriter
@@ -159,12 +161,16 @@ func (m *Model) adopt(raw []byte) error {
 	if td.Meta.Layout.MicInputs > 0 {
 		m.mics = td.Meta.Layout.MicInputs
 	}
+	if td.Meta.Layout.Headphones > 0 {
+		m.headphones = td.Meta.Layout.Headphones
+	}
 	if td.Meta.Layout.PadBanks > 0 {
 		m.banks = td.Meta.Layout.PadBanks
 	}
 	m.rev++
 	m.mu.Unlock()
 	m.logf("screen: desk loaded (%s %s, %d strips, seq %d)", m.info.ModelName, m.info.Firmware, len(m.faders), td.Seq)
+	m.logPresetsOnce()
 	return nil
 }
 
@@ -332,4 +338,25 @@ func min2(a, b time.Duration) time.Duration {
 		return a
 	}
 	return b
+}
+
+// logPresetsOnce writes the first processing preset's contents to the log
+// once (shortened): the format is not documented, and a device's
+// diagnostics are how it gets known.
+func (m *Model) logPresetsOnce() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.presetsLogged || m.runs == nil {
+		return
+	}
+	ps := m.runs.byType["FXPRESET"]
+	if len(ps) == 0 {
+		return
+	}
+	m.presetsLogged = true
+	s := ps[0].Str("fxPresetContents")
+	if len(s) > 200 {
+		s = s[:200] + "…"
+	}
+	m.logf("screen: %d processing presets; the first reads: %s", len(ps), s)
 }

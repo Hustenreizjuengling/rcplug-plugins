@@ -13,11 +13,29 @@ import (
 // --- Display ---
 
 func newBrightnessPage() Page {
-	return newSlidersPage("BRIGHTNESS", []sliderSpec{
+	sliders := newSlidersPage("BRIGHTNESS", []sliderSpec{
 		{key: "DISPLAY", node: desk.GUINode, prop: "screenBrightness", min: 0, max: 255, text: pct255},
 		{key: "BUTTONS", node: desk.GUINode, prop: "activeButtonsBrightness", min: 0, max: 255, text: pct255},
-		{key: "BUTTONS INACTIVE", node: desk.GUINode, prop: "inactiveButtonsBrightness", min: 0, max: 255, text: pct255},
+		{key: "BUTTONS INACTIVE", de: "Tasten inaktiv", en: "Buttons inactive", node: desk.GUINode, prop: "inactiveButtonsBrightness", min: 0, max: 255, text: pct255},
 	})
+	return &funcPage{title: "BRIGHTNESS", build: func(env *Env, r image.Rectangle) ui.View {
+		c := &ui.Container{}
+		c.SetBounds(r)
+		th := env.Ctx.Theme
+		c.Add(sliders.Build(env, image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+3*(124+th.Gap))))
+		// Auto brightness, as the device's switch (a bool since 1.7.6).
+		if env.Desk.Has(desk.GUINode, 0, "autoBrightness") {
+			rr := image.Rect(r.Min.X, r.Min.Y+3*(124+th.Gap), r.Max.X, r.Min.Y+3*(124+th.Gap)+th.Row)
+			card := ui.NewCard()
+			card.SetBounds(rr)
+			tog := ui.NewToggle(func() bool { return env.Desk.Bool(desk.GUINode, 0, "autoBrightness") },
+				func(on bool) { env.Desk.SetBool(desk.GUINode, 0, "autoBrightness", on) })
+			tog.Label = env.T("AUTO")
+			tog.SetBounds(ui.Inset(rr, 14))
+			c.Add(card, tog)
+		}
+		return c
+	}}
 }
 
 func pct255(v float64) string { return pct(v / 255) }
@@ -260,34 +278,37 @@ func newDateTimePage() Page {
 			{"YEAR", now.Format("2006")}, {"MONTH", now.Format("01")}, {"DAY", now.Format("02")},
 			{"HOURS", now.Format("15")}, {"MINUTES", now.Format("04")}, {"SECONDS", now.Format("05")},
 		}
-		cells := columns(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+200), 6, 16)
+		cells := columns(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+160), 6, 16)
 		for i, f := range fields {
 			cell := cells[i]
 			card := ui.NewPanelView(th.Black)
-			card.SetBounds(image.Rect(cell.Min.X, cell.Min.Y, cell.Max.X, cell.Min.Y+140))
-			v := ui.NewLabel(f.val, th.Fonts.Huge, th.Text, font.Center)
+			card.SetBounds(image.Rect(cell.Min.X, cell.Min.Y, cell.Max.X, cell.Min.Y+110))
+			v := ui.NewLabel(f.val, th.Fonts.Big, th.Text, font.Center)
 			v.SetBounds(card.Bounds())
 			l := ui.NewLabel(env.T(f.key), th.Fonts.Label, th.Text, font.Center)
-			l.SetBounds(image.Rect(cell.Min.X, cell.Min.Y+146, cell.Max.X, cell.Max.Y))
+			l.SetBounds(image.Rect(cell.Min.X, cell.Min.Y+114, cell.Max.X, cell.Max.Y))
 			c.Add(card, v, l)
 		}
 		rows := []toggleRow{
 			{key: "24H", node: desk.SystemNode, prop: "systemDateTime24h"},
 			{key: "SHOW DATE AND TIME ON HOME SCREEN", node: desk.SystemNode, prop: "systemDateTimeOnHome"},
+			{key: "DAYLIGHT SAVINGS", node: desk.SystemNode, prop: "systemDateTimeDaylightSavings"},
 		}
 		for i, row := range rows {
 			row := row
-			rr := image.Rect(r.Min.X, r.Min.Y+230+i*(th.Row+th.Gap), r.Max.X, r.Min.Y+230+i*(th.Row+th.Gap)+th.Row)
+			rr := image.Rect(r.Min.X, r.Min.Y+176+i*(th.Row+th.Gap), r.Max.X, r.Min.Y+176+i*(th.Row+th.Gap)+th.Row)
 			card := ui.NewCard()
 			card.SetBounds(rr)
 			tog := ui.NewToggle(func() bool { return env.Desk.Bool(row.node, 0, row.prop) },
 				func(on bool) { env.Desk.SetBool(row.node, 0, row.prop, on) })
-			tog.Label = env.T(row.key)
+			tog.Label = env.TR(row.key, "Sommerzeit", "Daylight saving time")
 			tog.SetBounds(ui.Inset(rr, 14))
 			c.Add(card, tog)
 		}
-		c.Add(noteCard(env, image.Rect(r.Min.X, r.Max.Y-96, r.Max.X, r.Max.Y),
-			env.TR("", "Uhrzeit und Zeitzone werden auf RØDEs eigenem Bildschirm gestellt.", "The time and the time zone are set on RØDE's own screen."))...)
+		hint := ui.NewLabel(env.TR("", "Uhrzeit und Zeitzone werden auf RØDEs eigenem Bildschirm gestellt.", "The time and the time zone are set on RØDE's own screen."),
+			th.Fonts.Small, th.TextDim, font.Center)
+		hint.SetBounds(image.Rect(r.Min.X, r.Max.Y-44, r.Max.X, r.Max.Y))
+		c.Add(hint)
 		return c
 	}}
 }

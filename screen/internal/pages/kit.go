@@ -108,6 +108,8 @@ func newChoicePage(title string, cols int, opts []radioSpec, get func(*Env) int6
 // sliderSpec is one slider of a sliders page.
 type sliderSpec struct {
 	key  string
+	de   string // fallbacks when the device has no text for key
+	en   string
 	node string
 	prop string
 	min  float64
@@ -134,6 +136,9 @@ func newSlidersPage(title string, specs []sliderSpec) Page {
 			s := ui.NewSlider(func() float64 { return (env.Desk.Num(sp.node, sp.prop0(), sp.prop) - sp.min) / span },
 				func(v float64) { env.Desk.SetInt(sp.node, sp.prop0(), sp.prop, int64(sp.min+v*span+0.5)) })
 			s.Label = env.T(sp.key)
+			if sp.de != "" {
+				s.Label = env.TR(sp.key, sp.de, sp.en)
+			}
 			s.Text = func(v float64) string {
 				if sp.text != nil {
 					return sp.text(sp.min + v*span)

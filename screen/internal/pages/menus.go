@@ -87,6 +87,7 @@ func init() {
 			{key: "LISTEN", icon: "IconListen", push: func() Page { return newListenPage() }},
 			{key: "MULTITRACK", icon: "IconMultitrack", push: func() Page { return newMultitrackPage() }},
 			{key: "PROCESSING", icon: "procCompressor", push: func() Page { return NewMasterRack() }},
+			{key: "BLUETOOTH", icon: "bluetooth", push: func() Page { return newBluetoothOutputPage() }},
 		}}
 	})
 	register(IDDisplay, func() Page {
@@ -107,11 +108,6 @@ func init() {
 			{key: "MIDI", icon: "smart_pads_trigger", push: func() Page { return newMidiPage() }},
 			{key: "CallMe", icon: "CallMe", open: IDCallMe},
 			{key: "FIRMWARE", de: "Firmware", en: "Firmware", icon: "FirmwareUpdate", open: IDFirmware},
-		}}
-	})
-	register(IDShows, func() Page {
-		return &menuPage{title: "SHOWS", cols: 3, tiles: []tile{
-			{key: "RECORDINGS", icon: "IconRecordings", open: IDRecordings},
 		}}
 	})
 }

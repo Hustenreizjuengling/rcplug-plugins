@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/gfx"
+	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/pages"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/panel"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
 )
@@ -89,13 +90,46 @@ func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.Touc
 	}
 }
 
-// expireToast clears a toast that has timed out.
+// expireToast clears a toast or popup that has timed out, and watches the
+// headphone knobs: a turn shows the level for a moment.
 func (a *App) expireToast() {
 	a.mu.Lock()
 	if a.toast != "" && time.Now().After(a.toastUntil) {
 		a.toast = ""
 		a.dirty = true
 	}
+	if a.popup != nil && time.Now().After(a.popupUntil) {
+		a.popup = nil
+		a.dirty = true
+	}
+	a.mu.Unlock()
+	a.watchHeadphones()
+}
+
+// watchHeadphones shows the headphone popup when a knob's level changes
+// (not on the first reading, nor while the device is offline).
+func (a *App) watchHeadphones() {
+	n := a.model.Headphones()
+	first := a.hpLast == nil
+	if first {
+		a.hpLast = make([]float64, n)
+	}
+	for i := 0; i < n && i < len(a.hpLast); i++ {
+		v := a.model.HeadphoneFrac(i)
+		if v != a.hpLast[i] && !first && a.model.Online() {
+			a.Popup(pages.HeadphonePopup(a.env(), i, a.w, a.h), pages.PopupFor)
+		}
+		a.hpLast[i] = v
+	}
+}
+
+// Popup lays a passing view over the page for a while (the headphone level);
+// a new one replaces the old.
+func (a *App) Popup(v ui.View, keep time.Duration) {
+	a.mu.Lock()
+	a.popup = v
+	a.popupUntil = time.Now().Add(keep)
+	a.dirty = true
 	a.mu.Unlock()
 }
 

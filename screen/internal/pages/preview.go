@@ -20,6 +20,8 @@ func Detail(name string) Page {
 		return newMonitorPage()
 	case "multitrack":
 		return newMultitrackPage()
+	case "bluetooth":
+		return newBluetoothOutputPage()
 	}
 	return newMeteringPage()
 }
