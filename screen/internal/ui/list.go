@@ -101,7 +101,9 @@ func (l *ScrollList) Touch(phase TouchPhase, p image.Point) bool {
 		}
 		return true
 	case Up:
-		if !l.scrolling && l.grab != nil {
+		// Fire the row only when the finger lifts on it (not after dragging
+		// away) and the list did not scroll.
+		if !l.scrolling && l.grab != nil && p.In(l.grab.Bounds()) {
 			l.grab.Touch(Down, l.downAt)
 			l.grab.Touch(Up, p)
 		}

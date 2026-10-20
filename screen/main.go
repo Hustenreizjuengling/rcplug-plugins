@@ -184,6 +184,10 @@ func runPNG(out, resources, langCode, page string) error {
 		a.Push(pages.NewChannel(0))
 	case strings.HasPrefix(page, "proc:"):
 		a.Push(pages.Processor(0, strings.TrimPrefix(page, "proc:")))
+	case page == "keyboard":
+		a.Keyboard("Name", "Mic 1", nil)
+	case page == "dialog":
+		a.Confirm("CLEAR", "Are you sure you want to clear the pad?", "CLEAR", true, nil)
 	default:
 		a.Open(page)
 	}

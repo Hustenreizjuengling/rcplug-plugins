@@ -50,6 +50,9 @@ type Pad struct {
 func (m *Model) PadAt(bank, slot int) Pad {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if m.runs == nil {
+		return Pad{}
+	}
 	per := m.perBank
 	if per <= 0 {
 		per = 6

@@ -21,24 +21,25 @@ type Model struct {
 	conn *Conn
 	logf func(string, ...interface{})
 
-	mu       sync.RWMutex
-	root     *Node
-	runs     *runs
-	epoch    uint64
-	seq      uint64
-	online   bool
-	stale    bool
-	control  string // off | basic | expert
-	conState string // the console's link to the desk
-	info     Info
-	faders   []Name
-	sources  []Name
-	outputs  []Name
-	unity    int64
-	physical int
-	perBank  int
-	offline  bool   // no console: writes stay local (the preview)
-	rev      uint64 // bumps on every change, so the UI can tell something moved
+	mu        sync.RWMutex
+	root      *Node
+	runs      *runs
+	epoch     uint64
+	seq       uint64
+	online    bool
+	stale     bool
+	control   string // off | basic | expert
+	conState  string // the console's link to the desk
+	info      Info
+	faders    []Name
+	sources   []Name
+	outputs   []Name
+	unity     int64
+	physical  int
+	perBank   int
+	offline   bool   // no console: writes stay local (the preview)
+	reloading bool   // a resync reload is in flight (single-flight)
+	rev       uint64 // bumps on every change, so the UI can tell something moved
 
 	wmu     sync.Mutex
 	pending map[string]writeOp // coalesced writes, flushed by runWriter
@@ -276,8 +277,21 @@ func (m *Model) applyStatus(data []byte) {
 	}
 }
 
-// reloadSoon reloads the tree once, out of band (after a resync).
+// reloadSoon reloads the tree once, out of band (after a resync). Only one
+// reload runs at a time, so a flapping console does not pile up fetches.
 func (m *Model) reloadSoon() {
+	m.mu.Lock()
+	if m.reloading {
+		m.mu.Unlock()
+		return
+	}
+	m.reloading = true
+	m.mu.Unlock()
+	defer func() {
+		m.mu.Lock()
+		m.reloading = false
+		m.mu.Unlock()
+	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := m.load(ctx); err != nil {

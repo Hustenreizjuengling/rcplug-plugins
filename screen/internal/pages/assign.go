@@ -38,12 +38,14 @@ func (p *AssignPage) Build(env *Env, r image.Rectangle) ui.View {
 // sourceRow is one selectable source in the assign list.
 type sourceRow struct {
 	ui.Base
-	env     *Env
-	strip   int
-	src     int64
-	label   string
-	id      string
-	pressed bool
+	env      *Env
+	strip    int
+	src      int64
+	label    string
+	id       string
+	pressed  bool
+	wasSel   bool
+	selKnown bool
 }
 
 func newSourceRow(env *Env, strip int, src int64, label, id string) *sourceRow {
@@ -67,7 +69,11 @@ func (s *sourceRow) Touch(phase ui.TouchPhase, p image.Point) bool {
 }
 
 func (s *sourceRow) Dirty() []image.Rectangle {
-	s.MarkDirty()
+	sel := s.env.Desk.SourceOf(s.strip) == s.src
+	if !s.selKnown || sel != s.wasSel {
+		s.wasSel, s.selKnown = sel, true
+		s.MarkDirty()
+	}
 	return s.Base.Dirty()
 }
 

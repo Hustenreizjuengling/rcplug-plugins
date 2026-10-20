@@ -87,24 +87,19 @@ func (k *Keyboard) build() {
 		}
 		add(rc, s, s, "")
 	}
-	add(image.Rect(r.Max.X-8-wide+gap/2, y+gap/2, r.Max.X-8-gap/2, y+rowH-gap/2), "⌫", "", "back")
+	add(image.Rect(r.Max.X-8-wide+gap/2, y+gap/2, r.Max.X-8-gap/2, y+rowH-gap/2), "Del", "", "back")
 	// Row 4: symbols, space, cancel, done.
 	y = top + 4*rowH
 	symW := kw * 3 / 2
 	add(image.Rect(r.Min.X+8+gap/2, y+gap/2, r.Min.X+8+symW-gap/2, y+rowH-gap/2), symLabel(k), "", "sym")
 	spaceR := image.Rect(r.Min.X+8+symW+gap/2, y+gap/2, r.Max.X-8-2*symW-gap/2, y+rowH-gap/2)
 	add(spaceR, "", " ", "space")
-	add(image.Rect(r.Max.X-8-2*symW+gap/2, y+gap/2, r.Max.X-8-symW-gap/2, y+rowH-gap/2), "✕", "", "cancel")
-	add(image.Rect(r.Max.X-8-symW+gap/2, y+gap/2, r.Max.X-8-gap/2, y+rowH-gap/2), "✓", "", "done")
+	add(image.Rect(r.Max.X-8-2*symW+gap/2, y+gap/2, r.Max.X-8-symW-gap/2, y+rowH-gap/2), "X", "", "cancel")
+	add(image.Rect(r.Max.X-8-symW+gap/2, y+gap/2, r.Max.X-8-gap/2, y+rowH-gap/2), "OK", "", "done")
 	k.MarkDirty()
 }
 
-func shiftLabel(k *Keyboard) string {
-	if k.shift {
-		return "⇧•"
-	}
-	return "⇧"
-}
+func shiftLabel(k *Keyboard) string { return "Aa" }
 func symLabel(k *Keyboard) string {
 	if k.symbols {
 		return "ABC"

@@ -118,6 +118,25 @@ func TestOptimisticWrite(t *testing.T) {
 	}
 }
 
+func TestUnloadedModelIsSafe(t *testing.T) {
+	// Before the first tree load (runs == nil), reads must not panic.
+	m := New("http://127.0.0.1:0", nil)
+	if m.Online() {
+		t.Error("a fresh model should be offline")
+	}
+	if got := m.PadAt(0, 0); got.Exists {
+		t.Error("PadAt on an unloaded model should be empty")
+	}
+	if m.StripCount() != 0 || m.Count(tChannel) != 0 {
+		t.Error("counts on an unloaded model should be 0")
+	}
+	_ = m.Muted(0)
+	_ = m.FaderFrac(0)
+	_ = m.MeterL(0)
+	_ = m.SourceOf(0)
+	m.SetMute(0, true) // must be a no-op, not a panic
+}
+
 func TestApplyChanges(t *testing.T) {
 	m := newTestModel(t)
 	before := m.Rev()
