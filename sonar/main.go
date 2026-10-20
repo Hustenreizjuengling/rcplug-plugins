@@ -87,6 +87,8 @@ func main() {
 	mux.HandleFunc("GET /api/diagnostics", h.handleDiagnostics)
 	mux.HandleFunc("GET /api/config", h.handleConfig)
 	mux.HandleFunc("POST /api/config", h.handleConfig)
+	mux.HandleFunc("GET /screen", h.handleScreen) // the page on the device's screen
+	mux.HandleFunc("POST /screen", h.handleScreen)
 
 	log.Printf("sonar %s (rcplug-plugins %s) on %s, source=%s rate=%d", version, release, *addr, h.srcSpec, *rate)
 	if err := sdk.Serve(ctx, *addr, mux); err != nil {
@@ -401,6 +403,82 @@ func validChannel(s string) bool { return channelID.MatchString(s) }
 
 var channelID = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
 
+// apply carries out a configuration change (from the browser page or the
+// screen's page) and saves the state.
+func (h *hub) apply(p configPatch) error {
+	if p.Source != nil {
+		spec, err := validateSource(*p.Source, sdk.DataDir())
+		if err != nil {
+			return sdk.NewError(http.StatusBadRequest, "invalid_source", err.Error())
+		}
+		p.Source = &spec
+	}
+	var assignSpec string
+	if p.Assign != nil {
+		if !validChannel(p.Assign.Channel) {
+			return sdk.NewError(http.StatusBadRequest, "invalid_channel", "unknown channel")
+		}
+		if p.Assign.Source != "" {
+			spec, err := validateSource(p.Assign.Source, sdk.DataDir())
+			if err != nil {
+				return sdk.NewError(http.StatusBadRequest, "invalid_source", err.Error())
+			}
+			assignSpec = spec
+		}
+	}
+	if p.Channel != nil && *p.Channel != "" && !validChannel(*p.Channel) {
+		return sdk.NewError(http.StatusBadRequest, "invalid_channel", "unknown channel")
+	}
+	h.mu.Lock()
+	if p.Calibrate != nil {
+		if err := h.calibrate(*p.Calibrate); err != nil {
+			h.mu.Unlock()
+			return err
+		}
+	}
+	if p.Assign != nil {
+		if assignSpec == "" {
+			delete(h.channels, p.Assign.Channel)
+		} else {
+			h.channels[p.Assign.Channel] = assignSpec
+		}
+	}
+	if p.Channel != nil {
+		h.channel = *p.Channel
+	}
+	// The chosen channel's audio source wins unless a source was given
+	// explicitly in the same request.
+	if p.Source == nil && (p.Channel != nil || p.Assign != nil) {
+		if spec, ok := h.channels[h.channel]; ok && h.channel != "" {
+			p.Source = &spec
+		}
+	}
+	if p.Smoothing != nil {
+		h.cfg.Smoothing = clamp(*p.Smoothing, 0, 0.99)
+	}
+	if p.Flip != nil {
+		h.cfg.FlipSign = *p.Flip
+	}
+	if p.NoiseFloor != nil && *p.NoiseFloor < 0 && *p.NoiseFloor >= -120 {
+		h.cfg.NoiseFloor = *p.NoiseFloor
+	}
+	changed := p.Source != nil && *p.Source != h.srcSpec
+	if changed {
+		h.srcSpec = *p.Source
+	} else if h.proc != nil {
+		h.proc.SetConfig(h.cfg) // tuning applies live, no capture restart
+	}
+	h.mu.Unlock()
+	if changed {
+		select {
+		case h.restart <- struct{}{}:
+		default:
+		}
+	}
+	h.saveState()
+	return nil
+}
+
 func (h *hub) handleConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		var p configPatch
@@ -408,81 +486,10 @@ func (h *hub) handleConfig(w http.ResponseWriter, r *http.Request) {
 			sdk.WriteError(w, sdk.NewError(http.StatusBadRequest, "bad_request", err.Error()))
 			return
 		}
-		if p.Source != nil {
-			spec, err := validateSource(*p.Source, sdk.DataDir())
-			if err != nil {
-				sdk.WriteError(w, sdk.NewError(http.StatusBadRequest, "invalid_source", err.Error()))
-				return
-			}
-			p.Source = &spec
-		}
-		var assignSpec string
-		if p.Assign != nil {
-			if !validChannel(p.Assign.Channel) {
-				sdk.WriteError(w, sdk.NewError(http.StatusBadRequest, "invalid_channel", "unknown channel"))
-				return
-			}
-			if p.Assign.Source != "" {
-				spec, err := validateSource(p.Assign.Source, sdk.DataDir())
-				if err != nil {
-					sdk.WriteError(w, sdk.NewError(http.StatusBadRequest, "invalid_source", err.Error()))
-					return
-				}
-				assignSpec = spec
-			}
-		}
-		if p.Channel != nil && *p.Channel != "" && !validChannel(*p.Channel) {
-			sdk.WriteError(w, sdk.NewError(http.StatusBadRequest, "invalid_channel", "unknown channel"))
+		if err := h.apply(p); err != nil {
+			sdk.WriteError(w, err)
 			return
 		}
-		h.mu.Lock()
-		if p.Calibrate != nil {
-			if err := h.calibrate(*p.Calibrate); err != nil {
-				h.mu.Unlock()
-				sdk.WriteError(w, err)
-				return
-			}
-		}
-		if p.Assign != nil {
-			if assignSpec == "" {
-				delete(h.channels, p.Assign.Channel)
-			} else {
-				h.channels[p.Assign.Channel] = assignSpec
-			}
-		}
-		if p.Channel != nil {
-			h.channel = *p.Channel
-		}
-		// The chosen channel's audio source wins unless a source was given
-		// explicitly in the same request.
-		if p.Source == nil && (p.Channel != nil || p.Assign != nil) {
-			if spec, ok := h.channels[h.channel]; ok && h.channel != "" {
-				p.Source = &spec
-			}
-		}
-		if p.Smoothing != nil {
-			h.cfg.Smoothing = clamp(*p.Smoothing, 0, 0.99)
-		}
-		if p.Flip != nil {
-			h.cfg.FlipSign = *p.Flip
-		}
-		if p.NoiseFloor != nil && *p.NoiseFloor < 0 && *p.NoiseFloor >= -120 {
-			h.cfg.NoiseFloor = *p.NoiseFloor
-		}
-		changed := p.Source != nil && *p.Source != h.srcSpec
-		if changed {
-			h.srcSpec = *p.Source
-		} else if h.proc != nil {
-			h.proc.SetConfig(h.cfg) // tuning applies live, no capture restart
-		}
-		h.mu.Unlock()
-		if changed {
-			select {
-			case h.restart <- struct{}{}:
-			default:
-			}
-		}
-		h.saveState()
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()

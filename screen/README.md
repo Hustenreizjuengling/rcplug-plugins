@@ -70,10 +70,31 @@ backspace = hold).
 ## Extending it
 
 Other plugins can add a page without drawing anything themselves: they serve a
-small JSON description of their controls at `/plugins/<name>/screen` and accept
-changes there. The interface renders those controls in the RØDE style, so a
-plugin can never break the screen. The controls are: `toggle`, `slider`,
-`choice`, `button` (with an optional confirmation), `value` and `meter`.
+small JSON description of their controls at `/screen` (the host proxies it as
+`/plugins/<name>/screen`) and accept changes there. The interface renders those
+controls in the RØDE style, so a plugin can never break the screen; it lists the
+page under rcplug → Plugins while the plugin runs. Sonar and Backup have one.
+
+`GET /screen?lang=<de|en>` answers with the page in that language:
+
+```json
+{"title": "Sonar", "controls": [
+  {"id": "source",    "type": "value",  "label": "Listening to", "text": "Mic 1 + Mic 2"},
+  {"id": "level",     "type": "meter",  "label": "Level", "value": 0.6, "min": 0, "max": 1},
+  {"id": "listen",    "type": "choice", "label": "Listen to", "options": ["Mic 1 + Mic 2", "USB 1"], "value": 0},
+  {"id": "smoothing", "type": "slider", "label": "Smoothing", "value": 0.8, "min": 0, "max": 0.99, "unit": ""},
+  {"id": "flip",      "type": "toggle", "label": "Swap left and right", "on": false},
+  {"id": "reset",     "type": "button", "label": "Reset", "danger": true, "confirm": "Forget the calibration?"}
+]}
+```
+
+`value` and `meter` show a text or a level and follow the plugin (the page is
+fetched again about twice a second while it is shown). A `choice` lists its
+options and names the chosen one by index in `value`. A change is a
+`POST /screen` with `{"control": "<id>", "value": …}`: `true`/`false` for a
+toggle, the number for a slider, the option's index for a choice, `true` for a
+button (after the confirmation, if one is declared). The plugin answers 200
+and reflects the change in its next description.
 
 ## Packages
 

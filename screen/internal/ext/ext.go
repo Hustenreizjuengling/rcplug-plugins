@@ -29,6 +29,9 @@ type Registry struct {
 	mu      sync.RWMutex
 	plugins []pages.PluginInfo
 	cache   map[string]*pages.PluginPage
+	lang    string
+	polled  map[string]time.Time // when a page was last fetched on request
+	polling map[string]bool
 }
 
 // New makes a registry for the host (hostURL "" uses the plugin's host). self
@@ -41,12 +44,60 @@ func New(hostURL, self string, logf func(string, ...interface{})) *Registry {
 		logf = func(string, ...interface{}) {}
 	}
 	return &Registry{
-		host:  strings.TrimRight(hostURL, "/"),
-		self:  self,
-		http:  &http.Client{Timeout: 4 * time.Second},
-		logf:  logf,
-		cache: map[string]*pages.PluginPage{},
+		host:   strings.TrimRight(hostURL, "/"),
+		self:   self,
+		http:   &http.Client{Timeout: 4 * time.Second},
+		logf:   logf,
+		cache:  map[string]*pages.PluginPage{},
+		polled: map[string]time.Time{}, polling: map[string]bool{},
 	}
+}
+
+// SetLang tells plugins which language the screen shows (?lang=).
+func (r *Registry) SetLang(code string) {
+	r.mu.Lock()
+	r.lang = code
+	r.mu.Unlock()
+}
+
+// pageURL is a plugin's screen page, with the language.
+func (r *Registry) pageURL(name string) string {
+	r.mu.RLock()
+	lang := r.lang
+	r.mu.RUnlock()
+	u := r.host + "/plugins/" + name + "/screen"
+	if lang != "" {
+		u += "?lang=" + lang
+	}
+	return u
+}
+
+// pollEvery is how often a shown page is fetched at most.
+const pollEvery = 600 * time.Millisecond
+
+// Poll fetches a plugin's page again, in the background, at most every
+// pollEvery (the page's rows call it every frame).
+func (r *Registry) Poll(name string) {
+	r.mu.Lock()
+	if r.polling[name] || time.Since(r.polled[name]) < pollEvery {
+		r.mu.Unlock()
+		return
+	}
+	r.polling[name] = true
+	r.mu.Unlock()
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		var pg pages.PluginPage
+		err := r.get(ctx, r.pageURL(name), &pg)
+		r.mu.Lock()
+		if err == nil && len(pg.Controls) > 0 {
+			r.cache[name] = &pg
+		}
+		r.polled[name] = time.Now()
+		r.polling[name] = false
+		r.mu.Unlock()
+	}()
 }
 
 // Run refreshes the registry until ctx ends.
@@ -90,7 +141,7 @@ func (r *Registry) refresh(ctx context.Context) {
 		list = append(list, pages.PluginInfo{Name: p.Name, Title: p.Title, Running: p.Running, Icon: p.Icon})
 		if p.Running && p.HasUI {
 			var pg pages.PluginPage
-			if err := r.get(cctx, r.host+"/plugins/"+p.Name+"/screen", &pg); err == nil && len(pg.Controls) > 0 {
+			if err := r.get(cctx, r.pageURL(p.Name), &pg); err == nil && len(pg.Controls) > 0 {
 				pagesByName[p.Name] = &pg
 			}
 		}

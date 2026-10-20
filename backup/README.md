@@ -30,6 +30,13 @@ until **Restore now**. Then plugins are switched off first, then the options are
 (a running plugin restarts with them), then plugins are switched on. Plugins in the backup that the device does not have are listed with a
 button to install them from the catalog; their settings follow on the next restore.
 
+## On the device's screen
+
+With the `screen` plugin running, Backup has a page under rcplug → Plugins: how
+many backups there are, when the last one was made, and a button that backs up
+rcplug's settings now. Restoring stays in the dashboard, where the changes are
+shown before they are made.
+
 ## Files
 
 A backup is one JSON document:

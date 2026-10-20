@@ -286,6 +286,8 @@ func (s *store) routes(mux *http.ServeMux) {
 		sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
 	})
 	// For rcplugd's diagnostics bundle: what is kept, never the contents.
+	mux.HandleFunc("GET /screen", s.handleScreen) // the page on the device's screen
+	mux.HandleFunc("POST /screen", s.handleScreen)
 	mux.HandleFunc("GET /api/diagnostics", func(w http.ResponseWriter, r *http.Request) {
 		list, err := s.list()
 		doc := map[string]interface{}{"version": version, "release": release, "backups": list}

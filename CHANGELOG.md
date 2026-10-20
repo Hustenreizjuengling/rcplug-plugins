@@ -6,6 +6,16 @@ may break compatibility).
 
 ## 0.5.20 - Unreleased
 
+### Added
+- **Plugin pages on the device's screen.** Sonar 0.7.0 and Backup 0.3.0 describe a
+  page for the `screen` plugin (`GET /screen?lang=`, changes by `POST /screen`): Sonar
+  shows what it listens to, the direction, level and distance, lets the source,
+  smoothing and left/right swap be set and the distance calibrated; Backup shows how
+  many backups there are and when the last one was made, and backs up rcplug's
+  settings on a tap. **Screen 0.3.2** draws such pages with live values (the page is
+  fetched about twice a second while shown), choices as option rows, meters as bars,
+  asks the plugin in the screen's language, and documents the format in its README.
+
 ## 0.5.19 - 2026-10-20
 
 ### Added

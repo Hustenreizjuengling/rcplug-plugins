@@ -143,6 +143,7 @@ func runDevice(ctx context.Context, card, touchDev, guiPath, langCode string, no
 
 	ctxUI := ui.NewContext(ui.Dark(ui.Liberation()), rode.NewIcons(res))
 	reg := ext.New("", sdk.Name(), log.Printf)
+	reg.SetLang(code)
 	go reg.Run(ctx)
 
 	defer panel.Light(log.Printf)()
@@ -194,6 +195,11 @@ func runPNG(out, resources, langCode, page string) error {
 		a.Push(pages.NewMasterRack())
 	case page == "fx":
 		a.Push(pages.NewEffectsRack(0, 0))
+	case strings.HasPrefix(page, "plugin:"):
+		a.Open(pages.IDRcplug)
+		a.Open(pages.IDPlugins)
+		n := strings.TrimPrefix(page, "plugin:")
+		a.Push(pages.PluginPageFor(n, strings.ToUpper(n[:1])+n[1:]))
 	case page == "headphones":
 		a.ShowHeadphone(0)
 	case page == "transfer":
@@ -255,7 +261,7 @@ func offlineApp(resources, langCode string) (*app.App, *desk.Model, error) {
 	if err := model.LoadRaw(preview.BuildTree()); err != nil {
 		return nil, nil, err
 	}
-	a := app.New(1280, 720, ctxUI, model, texts, nil)
+	a := app.New(1280, 720, ctxUI, model, texts, preview.NewPlugins())
 	return a, model, nil
 }
 

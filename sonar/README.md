@@ -151,6 +151,13 @@ flags); changing the source restarts the capture. A failing source is retried wi
 growing pause (1 to 10 s) and the error is shown on the page, for ALSA and JACK with
 `arecord`'s own message.
 
+## On the device's screen
+
+With the `screen` plugin running, Sonar has a page under rcplug → Plugins: what
+it listens to, the direction, level and distance, the source to listen to, the
+smoothing and the left/right swap, and the calibration buttons. The plugin
+serves it at `/screen` (see the screen plugin's README for the format).
+
 ## API
 
 | Request | Content |

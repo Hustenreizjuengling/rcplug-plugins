@@ -99,6 +99,9 @@ type PluginSource interface {
 	Page(name string) (*PluginPage, bool)
 	// Submit sends a control's new value back to a plugin.
 	Submit(name, control string, value interface{}) error
+	// Poll asks for a fresh page from a plugin soon (while its page is
+	// shown); the source limits how often it really asks.
+	Poll(name string)
 	// DashboardURL is the host's dashboard address (for a QR code).
 	DashboardURL() string
 }
