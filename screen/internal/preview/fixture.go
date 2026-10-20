@@ -135,7 +135,7 @@ func BuildTree() []byte {
 	kids = append(kids, leaf("SYSTEM", map[string]interface{}{
 		"systemFirmwareVersion": "1.7.6", "systemSerialNumber": "", "systemName": "RODECaster",
 		"systemHapticSetting": 1, "systemRecButtonSetting": 0, "systemMidiControl": false,
-		"systemDateTime24h": true, "systemDateTimeOnHome": true, "assignableMeterSource": 0,
+		"systemDateTime24h": true, "systemDateTimeOnHome": true, "systemChannelSelected": -1, "assignableMeterSource": 0,
 		"osUpdateAvailable": false, "appUpdateAvailable": false, "usb1Connected": true,
 		"disableAllHeadphoneOutputs": false,
 	}))

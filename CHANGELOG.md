@@ -6,6 +6,12 @@ may break compatibility).
 
 ## 0.5.17 - Unreleased
 
+### Fixed
+- **Screen 0.2.2:** the button above each physical fader opens that strip's channel
+  page, as on RØDE's screen (pressed again there, it returns to the mixer; another
+  strip's button switches the page). The third test on a Duo confirmed the touch range
+  and the knob's detents of 0.2.1.
+
 ## 0.5.16 - 2026-10-20
 
 ### Fixed

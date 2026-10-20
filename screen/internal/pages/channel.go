@@ -22,6 +22,9 @@ func NewChannel(strip int) Page { return &ChannelPage{strip: strip} }
 
 func (p *ChannelPage) Title() string { return "" }
 
+// Strip is the strip the page shows.
+func (p *ChannelPage) Strip() int { return p.strip }
+
 // Header: the channel cog, previous / icon / next with the strip dots.
 func (p *ChannelPage) Header(env *Env, bar image.Rectangle) ([]ui.View, bool) {
 	return stripHeader(env, bar, p.strip, true, func(s int) Page { return NewChannel(s) }), false

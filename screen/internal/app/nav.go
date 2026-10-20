@@ -132,3 +132,28 @@ func (a *App) clearOverlay() {
 	a.mu.Unlock()
 	a.focus.reset()
 }
+
+// channelButton answers the button above a physical fader as RØDE's screen
+// does: it opens the strip's channel page; pressed again on that page, it
+// returns to the mixer.
+func (a *App) channelButton(strip int) {
+	if strip < 0 || strip >= a.model.StripCount() {
+		return
+	}
+	a.mu.Lock()
+	top := a.stack[len(a.stack)-1]
+	overlay := a.overlay
+	a.mu.Unlock()
+	if overlay != nil {
+		return
+	}
+	if ch, ok := top.(*pages.ChannelPage); ok && ch.Strip() == strip {
+		a.Home()
+		return
+	}
+	a.Home()
+	a.Push(pages.NewChannel(strip))
+}
+
+// ChannelButton feeds a channel-button press (for tests and the preview).
+func (a *App) ChannelButton(strip int) { a.channelButton(strip) }

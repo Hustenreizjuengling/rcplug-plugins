@@ -35,10 +35,12 @@ type encoderState struct {
 	logged    int
 	lastInt   int64
 	lastKnown bool
+	buttons   chan int // channel-button presses (see buttons.go)
+	channel   int      // systemChannelSelected as last seen
 }
 
 func newEncoderState() *encoderState {
-	return &encoderState{ch: make(chan EncoderEvent, 64)}
+	return &encoderState{ch: make(chan EncoderEvent, 64), buttons: make(chan int, 8), channel: -1}
 }
 
 // Encoder is the stream of knob events (turns, presses, releases).

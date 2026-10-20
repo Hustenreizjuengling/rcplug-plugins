@@ -84,3 +84,25 @@ func itoa(n int) string {
 	}
 	return itoa(n/10) + string(rune('0'+n%10))
 }
+
+// TestChannelButton: the strip's number is sent once when the button goes
+// down (systemChannelSelected leaves -1), never when it comes up.
+func TestChannelButton(t *testing.T) {
+	m := New("http://127.0.0.1:0", nil)
+	for _, v := range []int64{0, -1, 2, -1, -1} {
+		m.onChannelSelected(Int64(v))
+	}
+	var got []int
+	for {
+		select {
+		case n := <-m.ChannelButton():
+			got = append(got, n)
+			continue
+		default:
+		}
+		break
+	}
+	if len(got) != 2 || got[0] != 0 || got[1] != 2 {
+		t.Fatalf("button presses %v, want [0 2]", got)
+	}
+}

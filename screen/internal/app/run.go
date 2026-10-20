@@ -40,6 +40,7 @@ func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.Touc
 	wasDown := false
 	lastOnline, lastStrips := false, -1
 	knob := a.model.Encoder()
+	button := a.model.ChannelButton()
 
 	for {
 		select {
@@ -62,6 +63,8 @@ func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.Touc
 			wasDown = ev.Down
 		case ev := <-knob:
 			a.handleEncoder(ev)
+		case n := <-button:
+			a.channelButton(n)
 		case <-tick.C:
 			// The device coming online (or its strip count changing) needs a
 			// fresh layout.

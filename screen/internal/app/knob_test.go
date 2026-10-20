@@ -96,3 +96,25 @@ func TestKnobOnMixer(t *testing.T) {
 		t.Fatal("the mixer's knob must not navigate")
 	}
 }
+
+// TestChannelButton: the button above a fader opens that strip's channel
+// page, a second press on the same page returns to the mixer, and another
+// strip's button switches the page.
+func TestChannelButton(t *testing.T) {
+	a, _ := newTestApp(t)
+	a.ChannelButton(1)
+	if a.Depth() != 2 {
+		t.Fatalf("depth after the button: %d, want 2", a.Depth())
+	}
+	if ch, ok := a.Page().(*pages.ChannelPage); !ok || ch.Strip() != 1 {
+		t.Fatalf("top page after the button: %T", a.Page())
+	}
+	a.ChannelButton(2)
+	if ch, ok := a.Page().(*pages.ChannelPage); !ok || ch.Strip() != 2 || a.Depth() != 2 {
+		t.Fatalf("another strip's button should switch the page: %T depth %d", a.Page(), a.Depth())
+	}
+	a.ChannelButton(2)
+	if a.Depth() != 1 {
+		t.Fatalf("the same button again should return to the mixer, depth %d", a.Depth())
+	}
+}
