@@ -22,6 +22,8 @@ type procParam struct {
 	prop   string
 	toggle bool // a band on/off rather than a knob
 	fmt    func(float64) string
+	lo     float64 // with span: the property's own range (not 0…1)
+	span   float64
 }
 
 type processor struct {
@@ -46,12 +48,39 @@ const (
 	graphTransfer           // x = input dBFS −60 … 0, y = output dBFS −60 … 0
 )
 
-// RackPage shows a strip's processors (node CHANNEL) or the master
-// compellor (node MASTERCHANNEL).
+// RackPage shows a strip's processors (node CHANNEL), its effects (node
+// EFFECTS_PARAMETERS, one per source) or the master compellor (node
+// MASTERCHANNEL).
 type RackPage struct {
 	strip int
 	idx   int
 	node  string
+}
+
+// NewEffectsRack makes the effects rack of a strip, opened at effect idx.
+func NewEffectsRack(strip, idx int) Page {
+	return &RackPage{strip: strip, idx: idx, node: desk.EffectsNode}
+}
+
+// effectsIndex finds the EFFECTS_PARAMETERS node of a strip's source (−1 if
+// there is none): the node carries the source it belongs to.
+func effectsIndex(env *Env, strip int) int {
+	src := env.Desk.SourceOf(strip)
+	if src < 0 {
+		return -1
+	}
+	n := env.Desk.Count(desk.EffectsNode)
+	for i := 0; i < n; i++ {
+		if env.Desk.Int(desk.EffectsNode, i, "channelInputSource") == src {
+			return i
+		}
+	}
+	for i := 0; i < n; i++ {
+		if env.Desk.Int(desk.EffectsNode, i, "effectsIdx") == src {
+			return i
+		}
+	}
+	return -1
 }
 
 // NewRack makes the rack page for a strip, opened at processor idx.
@@ -68,8 +97,11 @@ func (p *RackPage) Title() string {
 }
 
 func (p *RackPage) procs() []processor {
-	if p.node == desk.MasterNode {
+	switch p.node {
+	case desk.MasterNode:
 		return masterProcessors
+	case desk.EffectsNode:
+		return effectsProcessors
 	}
 	return channelProcessors
 }
@@ -78,8 +110,13 @@ func (p *RackPage) Header(env *Env, bar image.Rectangle) ([]ui.View, bool) {
 	if p.node == desk.MasterNode {
 		return nil, false
 	}
-	idx := p.idx
-	return stripHeader(env, bar, p.strip, false, func(s int) Page { return NewRack(s, idx) }), false
+	idx, node := p.idx, p.node
+	return stripHeader(env, bar, p.strip, false, func(s int) Page {
+		if node == desk.EffectsNode {
+			return NewEffectsRack(s, idx)
+		}
+		return NewRack(s, idx)
+	}), false
 }
 
 func (p *RackPage) Build(env *Env, r image.Rectangle) ui.View {
@@ -93,6 +130,16 @@ func (p *RackPage) Build(env *Env, r image.Rectangle) ui.View {
 	}
 	pr := procs[p.idx]
 	node, strip := p.node, p.strip
+	if node == desk.EffectsNode {
+		// The effects node is the one of the strip's source.
+		strip = effectsIndex(env, p.strip)
+		if strip < 0 {
+			lbl := ui.NewLabel(env.T("NOT ASSIGNED"), th.Fonts.Title, th.TextDim, font.Center)
+			lbl.SetBounds(r)
+			c.Add(lbl)
+			return c
+		}
+	}
 
 	rack := &rackPanel{}
 	rack.SetBounds(r)
@@ -153,12 +200,35 @@ func (p *RackPage) Build(env *Env, r image.Rectangle) ui.View {
 		prop, f := par.prop, par.fmt
 		kx := right.Min.X + (i%cols)*(cellW+20)
 		ky := right.Min.Y + 100 + (i/cols)*(cellH+12)
-		k := ui.NewKnob(func() float64 { return d.Num(node, strip, prop) },
-			func(v float64) { d.SetFloat(node, strip, prop, v) })
+		var k *ui.Knob
+		if par.span != 0 {
+			// A property in its own unit (semitones): mapped onto the knob's 0…1.
+			lo, span := par.lo, par.span
+			k = ui.NewKnob(func() float64 { return (d.Num(node, strip, prop) - lo) / span },
+				func(v float64) { d.SetFloat(node, strip, prop, math.Round(lo+v*span)) })
+			k.Step = 1 / span
+		} else {
+			k = ui.NewKnob(func() float64 { return d.Num(node, strip, prop) },
+				func(v float64) { d.SetFloat(node, strip, prop, v) })
+		}
 		k.Style = ui.KnobRack
 		k.OnLight = true
 		k.Label = env.T(par.key)
 		k.Text = f
+		switch prop {
+		case "reverbModel":
+			k.Text = reverbName(env)
+			k.Step = 0.2
+		case "robotMix":
+			k.Text = robotName(env)
+			k.Step = 1.0 / 3
+		}
+		if par.key == "SIZE" {
+			k.Label = env.TR("", "Größe", "Size")
+		}
+		if par.key == "TYPE" {
+			k.Label = env.TR("", "Typ", "Type")
+		}
 		k.SetBounds(image.Rect(kx, ky, kx+cellW, ky+cellH))
 		c.Add(k)
 	}
@@ -582,6 +652,63 @@ var channelProcessors = []processor{
 	}},
 	{key: "PANNING", onProp: "channelPanOn", params: []procParam{
 		{key: "PAN", prop: "channelPan", fmt: panText},
+	}},
+}
+
+// reverbName is the room of a reverb size (five steps over 0…1).
+func reverbName(env *Env) func(float64) string {
+	names := []string{"SMALL ROOM", "MEDIUM ROOM", "LARGE ROOM", "SMALL HALL", "LARGE HALL"}
+	return func(v float64) string {
+		i := int(v * 5)
+		if i >= len(names) {
+			i = len(names) - 1
+		}
+		return env.T(names[i])
+	}
+}
+
+// robotName is the robot of a robot "mix" (three kinds).
+func robotName(env *Env) func(float64) string {
+	return func(v float64) string {
+		switch {
+		case v < 0.25:
+			return env.TR("", "Klein", "Small")
+		case v < 0.5:
+			return env.TR("", "Mittel", "Medium")
+		}
+		return env.TR("", "Groß", "Large")
+	}
+}
+
+func tenths(v float64) string { return strconv.FormatFloat(v*10, 'f', 1, 64) }
+
+// effectsProcessors are the voice effects of a source, as the device's
+// effects page lists them.
+var effectsProcessors = []processor{
+	{key: "REVERB", onProp: "reverbOn", params: []procParam{
+		{key: "LEVEL", prop: "reverbMix", fmt: tenths},
+		{key: "LOW CUT", prop: "reverbLowCut", fmt: hz(20, 500)},
+		{key: "HIGH CUT", prop: "reverbHighCut", fmt: hz(1000, 20000)},
+		{key: "SIZE", prop: "reverbModel"},
+	}},
+	{key: "ECHO", onProp: "echoOn", params: []procParam{
+		{key: "LEVEL", prop: "echoMix", fmt: tenths},
+		{key: "DELAY", prop: "echoDelay", fmt: func(v float64) string { return strconv.Itoa(int(v*1000+0.5)) + " ms" }},
+		{key: "DECAY", prop: "echoDecay", fmt: tenths},
+		{key: "LOW CUT", prop: "echoLowCut", fmt: hz(20, 500)},
+		{key: "HIGH CUT", prop: "echoHighCut", fmt: hz(1000, 20000)},
+	}},
+	{key: "MEGAPHONE", onProp: "distortionOn", params: []procParam{
+		{key: "INTENSITY", prop: "distortionIntensity", fmt: tenths},
+	}},
+	{key: "ROBOT", onProp: "robotOn", params: []procParam{
+		{key: "LEVEL", prop: "robotLevel", fmt: tenths},
+		{key: "TYPE", prop: "robotMix"},
+	}},
+	{key: "VOICE DISGUISE", onProp: "voiceDisguiseOn"},
+	{key: "PITCH SHIFT", onProp: "pitchShiftOn", params: []procParam{
+		{key: "SEMITONES", prop: "pitchShiftSemitones", lo: -12, span: 24,
+			fmt: func(v float64) string { return strconv.Itoa(int(math.Round(v*24 - 12))) }},
 	}},
 }
 

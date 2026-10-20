@@ -41,7 +41,12 @@ func ReadTouch(ctx context.Context, pw, ph int, out chan<- TouchEvent, logf func
 		if dev == "" {
 			dev = "/dev/input/event0"
 		}
-		err := readOne(ctx, dev, pw, ph, out)
+		err := readOne(ctx, dev, pw, ph, out, func(ts *touchscreen) {
+			if msg := "panel: touchscreen " + dev + ": " + ts.String(); msg != said {
+				logf("%s", msg)
+				said = msg
+			}
+		})
 		if ctx.Err() != nil {
 			return
 		}
@@ -56,11 +61,12 @@ func ReadTouch(ctx context.Context, pw, ph int, out chan<- TouchEvent, logf func
 	}
 }
 
-func readOne(ctx context.Context, dev string, pw, ph int, out chan<- TouchEvent) error {
+func readOne(ctx context.Context, dev string, pw, ph int, out chan<- TouchEvent, opened func(*touchscreen)) error {
 	ts, err := openTouch(dev)
 	if err != nil {
 		return err
 	}
+	opened(ts)
 	stop := context.AfterFunc(ctx, ts.Close)
 	defer stop()
 	defer ts.Close()

@@ -12,12 +12,12 @@ func TestDecodeEncoderSignal(t *testing.T) {
 		ival  int64
 		bval  bool
 	}{
-		{"01050100000000010102", 1, 0, true},   // idle sync: int 0 + true → one step right
-		{"01050100000000010103", -1, 0, false}, // int 0 + false → one step left
-		{"010501ffffffff010102", -1, -1, true}, // int −1
-		{"01050103000000010103", 3, 3, false},  // int 3 wins over the bool
-		{"0105017f000000010102", 8, 127, true}, // capped
-		{"010501", 0, 0, false},                // cut short: nothing
+		{"01050100000000010102", 0, 0, true},    // idle sync: int 0 → no step
+		{"01050101000000010103", 1, 1, false},   // one detent right (the bool is a flip)
+		{"010501ffffffff010102", -1, -1, true},  // one detent left
+		{"010501fdffffff010103", -3, -3, false}, // three detents left (a quick turn)
+		{"0105017f000000010102", 32, 127, true}, // capped
+		{"010501", 0, 0, false},                 // cut short: nothing
 	}
 	for _, c := range cases {
 		raw := mustHex(t, c.hex)

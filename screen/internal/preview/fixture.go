@@ -176,6 +176,16 @@ func BuildTree() []byte {
 		}
 		kids = append(kids, leaf("INPUTSOURCE", p))
 	}
+	// 18 effects slots, one per source.
+	for i := 0; i < 18; i++ {
+		kids = append(kids, leaf("EFFECTS_PARAMETERS", map[string]interface{}{
+			"channelInputSource": int64(i), "effectsIdx": int64(i), "channelOutputMute": false,
+			"reverbOn": i == 0, "reverbMix": 0.5, "reverbLowCut": 0.6661, "reverbHighCut": 0.3333, "reverbModel": 0.6,
+			"echoOn": false, "echoMix": 0.5, "echoDelay": 0.165, "echoDecay": 0.5, "echoLowCut": 0.5, "echoHighCut": 0.5,
+			"distortionOn": false, "distortionIntensity": 0.7, "robotOn": false, "robotLevel": 0.0, "robotMix": 0.0,
+			"voiceDisguiseOn": false, "pitchShiftOn": false, "pitchShiftSemitones": 0.0,
+		}))
+	}
 	// 13 mix-minus modes (one per output).
 	for i := 0; i < 13; i++ {
 		kids = append(kids, leaf("MIXMINUSES", map[string]interface{}{"outputMixMinus": 0}))

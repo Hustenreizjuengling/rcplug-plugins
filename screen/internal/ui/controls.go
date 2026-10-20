@@ -302,16 +302,30 @@ type Meter struct {
 	lastPeak  float64
 	holdPeak  float64
 	holdAt    time.Time
+	shown     float64
+	shownAt   time.Time
 }
+
+// MeterFall is how fast a drawn level falls after the reading dropped
+// (scale fractions per second), so 20 Hz readings look smooth.
+const MeterFall = 1.0 / 3
 
 // NewMeter makes a level meter.
 func NewMeter(level func() float64) *Meter { return &Meter{Level: level, Vertical: true, last: -1} }
 
 func (m *Meter) lvl() float64 {
+	target := 0.0
 	if m.Level != nil {
-		return clamp01(m.Level())
+		target = clamp01(m.Level())
 	}
-	return 0
+	now := time.Now()
+	dt := now.Sub(m.shownAt).Seconds()
+	if dt > 0.5 {
+		dt = 0.5
+	}
+	m.shownAt = now
+	m.shown = math.Max(target, m.shown-MeterFall*dt)
+	return m.shown
 }
 
 // peak is the peak-hold fraction: the caller's, or a 1.5 s hold of the
@@ -333,7 +347,9 @@ func (m *Meter) peak(v float64) float64 {
 func (m *Meter) Dirty() []image.Rectangle {
 	v := m.lvl()
 	p := m.peak(v)
-	if v != m.last || p != m.lastPeak {
+	// Redraw when the bar moved by a pixel.
+	px := float64(max(m.bounds.Dx(), m.bounds.Dy()))
+	if math.Abs(v-m.last)*px >= 1 || math.Abs(p-m.lastPeak)*px >= 1 {
 		m.last, m.lastPeak = v, p
 		m.MarkDirty()
 	}

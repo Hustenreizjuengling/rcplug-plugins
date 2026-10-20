@@ -291,12 +291,15 @@ func (p *ChannelPage) processingCard(env *Env, strip int, area image.Rectangle) 
 	card.SetBounds(area)
 	out = append(out, card)
 
-	head := ui.NewPanelView(gfx.Hex(0x1e1e1e))
-	head.Radius = 16
-	head.SetBounds(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+80))
-	title := ui.NewLabel(env.T("PROCESSING"), th.Fonts.Body, th.Text, font.Center)
-	title.SetBounds(head.Bounds())
-	out = append(out, head, title)
+	tabs := ui.NewSegmented([]string{env.T("PROCESSING"), env.T("EFFECTS")}, func() int { return 0 },
+		func(i int) {
+			if i == 1 {
+				env.Nav.Push(NewEffectsRack(strip, 0))
+			}
+		})
+	tabs.Bare = true
+	tabs.SetBounds(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+88))
+	out = append(out, tabs)
 
 	knobs := []struct{ key, prop, icon string }{
 		{"DEPTH", "channelDepth", "IconDepth"}, {"SPARKLE", "channelSparkle", "IconSparkle"}, {"PUNCH", "channelPunch", "IconPunch"},

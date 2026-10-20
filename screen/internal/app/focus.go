@@ -106,7 +106,11 @@ func (a *App) handleEncoder(ev desk.EncoderEvent) {
 			cur.Adjust(ev.Delta)
 			return
 		}
-		a.focus.move(ev.Delta)
+		if ev.Delta > 0 {
+			a.focus.move(1)
+		} else {
+			a.focus.move(-1)
+		}
 	case ev.Release && ev.Held >= holdFor:
 		if a.focus.isAdjusting() {
 			a.focus.setAdjusting(false)

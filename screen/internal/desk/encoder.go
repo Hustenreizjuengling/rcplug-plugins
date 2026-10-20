@@ -12,10 +12,10 @@ import (
 // holding a juce int and a bool) and ENCODER.encoderPressed (a bool). The
 // model turns those changes into events the UI reads from Encoder().
 //
-// How the turn is coded in encoderSignal is not documented; the decoder
-// takes the int as the step (its sign as the direction) and, when the int is
-// zero, the bool as the direction. The first signals are logged in full so a
-// device's diagnostics show the real coding.
+// Seen on a Duo (1.7.6): the int is the signed number of detents since the
+// last signal (1 at a slow turn, up to 4 when spun), the bool merely flips
+// with every signal so the property always changes. The first signals are
+// logged so a device's diagnostics show the coding.
 
 // EncoderEvent is one knob action.
 type EncoderEvent struct {
@@ -104,20 +104,13 @@ func decodeEncoderSignal(raw []byte) (delta int, ival int64, bval, hasBool bool)
 			bval, hasBool = false, true
 		}
 	}
-	switch {
-	case hasInt && ival != 0:
+	if hasInt {
 		delta = int(ival)
-		if delta > 8 {
-			delta = 8
+		if delta > 32 {
+			delta = 32
 		}
-		if delta < -8 {
-			delta = -8
-		}
-	case hasBool:
-		if bval {
-			delta = 1
-		} else {
-			delta = -1
+		if delta < -32 {
+			delta = -32
 		}
 	}
 	return

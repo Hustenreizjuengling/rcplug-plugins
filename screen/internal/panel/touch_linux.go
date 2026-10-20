@@ -11,9 +11,11 @@ import (
 )
 
 // The touchscreen through evdev, as RØDE's screen program reads it. The Duo
-// has a Goodix GT911 (/dev/input/event0); it reports the panel's portrait
-// coordinates on its own scale (its device tree says 800 × 1280), so points
-// are scaled by the ranges the driver gives.
+// has a Goodix GT911 (/dev/input/event0). The driver announces the ranges
+// its device tree names (800 × 1280) but the chip reports the panel's own
+// pixels (720 × 1280): scaling by the announced range squeezed every touch
+// towards one edge (a tenth of the screen at the top), so a range that is
+// at least the panel's size is taken as pixels; a smaller one is scaled.
 const (
 	evSyn = 0x00
 	evKey = 0x01
@@ -104,10 +106,7 @@ func (t *touchscreen) Run(w, h int, out chan<- TouchEvent) {
 	var x, y int32
 	down, was, slot := false, false, int32(0)
 	moved := false
-	scale := func(v int32, a axis, n int) int {
-		p := int(int64(v-a.min) * int64(n) / int64(a.max-a.min+1))
-		return max(0, min(n-1, p))
-	}
+	scale := func(v int32, a axis, n int) int { return mapAxis(v, a, n) }
 	for {
 		n, err := t.f.Read(buf)
 		if err != nil {
@@ -142,3 +141,16 @@ func (t *touchscreen) Run(w, h int, out chan<- TouchEvent) {
 }
 
 func (t *touchscreen) Close() { _ = t.f.Close() }
+
+// mapAxis maps a reported coordinate onto n pixels: as is when the device's
+// range covers the panel (its values are pixels), scaled when it is smaller.
+func mapAxis(v int32, a axis, n int) int {
+	span := int64(a.max-a.min) + 1
+	var p int
+	if span >= int64(n) {
+		p = int(v - a.min)
+	} else {
+		p = int(int64(v-a.min) * int64(n) / span)
+	}
+	return max(0, min(n-1, p))
+}

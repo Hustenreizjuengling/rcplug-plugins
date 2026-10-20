@@ -6,6 +6,15 @@ may break compatibility).
 
 ## 0.5.16 - Unreleased
 
+### Fixed
+- **Screen 0.2.1**, after the second test on a Duo: the main knob counts detents as the
+  device sends them (one to four a signal; the monitor moves in finer steps and a turn
+  moves the focus by one control), the touchscreen's own pixel range is used (taps on
+  the header buttons landed too low), and the strip meters fall smoothly between the
+  console's readings instead of jumping. The channel page gains the **Effects** rack:
+  reverb (level, low and high cut, room size), echo, megaphone, robot, voice disguise
+  and pitch shift, on the source's own effects slot.
+
 ## 0.5.15 - 2026-10-20
 
 ### Changed

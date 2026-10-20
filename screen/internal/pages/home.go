@@ -398,10 +398,30 @@ type stripView struct {
 	down    image.Point
 	dragged bool
 	dragY   int
-	meter   *ui.Meter // the louder side's hold, drawn by hand
-	peakL   float64
-	peakR   float64
-	peakAt  time.Time
+	shown   [2]float64 // the levels as drawn: they fall smoothly between readings
+	shownAt time.Time
+}
+
+// meterFall is how fast a drawn level falls after the reading dropped, in
+// scale fractions per second (the 60 dB scale: 20 dB/s), so the 20 Hz
+// readings from the console look like the device's own meters.
+const meterFall = 1.0 / 3
+
+// levels returns the levels to draw: the readings when they rose, a smooth
+// fall when they dropped.
+func (s *stripView) levels() (l, r float64) {
+	lv, rv := s.env.Desk.MeterLR(s.strip)
+	tl, tr := desk.DbFrac(lv), desk.DbFrac(rv)
+	now := time.Now()
+	dt := now.Sub(s.shownAt).Seconds()
+	if dt > 0.5 {
+		dt = 0.5
+	}
+	s.shownAt = now
+	fall := meterFall * dt
+	s.shown[0] = math.Max(tl, s.shown[0]-fall)
+	s.shown[1] = math.Max(tr, s.shown[1]-fall)
+	return s.shown[0], s.shown[1]
 }
 
 func (s *stripView) icons() image.Rectangle {
@@ -426,13 +446,16 @@ func (s *stripView) bars() (l, r image.Rectangle, stereo bool) {
 
 func (s *stripView) state() string {
 	d := s.env.Desk
-	l, r := d.MeterLR(s.strip)
+	l, r := s.levels()
 	pl, pr := d.MeterPeakLR(s.strip)
 	focus := s.page.knobOn && s.virtual && s.page.knob == s.strip-d.PhysicalFaders()+1
 	return intText(d.SourceOf(s.strip)) + "|" + d.InputColour(s.strip) + "|" + intText(d.FaderLevel(s.strip)) +
-		"|" + pct(l) + pct(r) + pct(pl) + pct(pr) + "|" + boolText(d.Muted(s.strip)) + boolText(d.Cue(s.strip)) +
+		"|" + fine(l) + fine(r) + pct(pl) + pct(pr) + "|" + boolText(d.Muted(s.strip)) + boolText(d.Cue(s.strip)) +
 		boolText(focus) + boolText(d.BroadcastMeters()) + pct(d.GainReductionDb(s.strip)/24)
 }
+
+// fine is a level rounded to the meter's pixel (for change detection).
+func fine(v float64) string { return intText(int64(v*float64(meterBase-meterTop))) + "," }
 
 func boolText(b bool) string {
 	if b {
@@ -497,11 +520,11 @@ func (s *stripView) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
 	// The dBFS scale: labels left of the bars, every 15 dB; dots every 3.
 	ui.MeterScale(dst, l, l.Min.X-6, c, clip)
 	// Meter columns with level and peak.
-	lv, rv := d.MeterLR(s.strip)
+	lv, rv := s.shown[0], s.shown[1]
 	pl, pr := d.MeterPeakLR(s.strip)
-	s.column(dst, l, desk.DbFrac(lv), desk.DbFrac(pl), c, clip)
+	s.column(dst, l, lv, desk.DbFrac(pl), c, clip)
 	if stereo {
-		s.column(dst, r, desk.DbFrac(rv), desk.DbFrac(pr), c, clip)
+		s.column(dst, r, rv, desk.DbFrac(pr), c, clip)
 	}
 	// Gain reduction in Broadcast metering: a thin amber bar right of the strip.
 	if d.BroadcastMeters() {
@@ -656,7 +679,7 @@ func (p *HomePage) Encoder(env *Env, ev desk.EncoderEvent) bool {
 	switch {
 	case ev.Delta != 0:
 		if p.knob == 0 {
-			d.SetMonitorLevel(d.MonitorLevel() + float64(ev.Delta)*0.02)
+			d.SetMonitorLevel(d.MonitorLevel() + float64(ev.Delta)*0.01)
 			return true
 		}
 		strip := physical + p.knob - 1

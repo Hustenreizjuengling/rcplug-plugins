@@ -192,6 +192,8 @@ func runPNG(out, resources, langCode, page string) error {
 		a.Push(pages.Processor(0, strings.TrimPrefix(page, "proc:")))
 	case page == "master":
 		a.Push(pages.NewMasterRack())
+	case page == "fx":
+		a.Push(pages.NewEffectsRack(0, 0))
 	case page == "keyboard":
 		a.Keyboard("Name", "Mic 1", nil)
 	case page == "dialog":
