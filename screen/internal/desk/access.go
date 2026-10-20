@@ -262,16 +262,11 @@ func (m *Model) Press(typ string, i int, name string, ms int) {
 	}()
 }
 
-// send tells the console about a single-property write, in the background.
+// send records a single-property write; runWriter flushes it (coalescing
+// rapid changes such as a fader drag). Offline, writes stay local.
 func (m *Model) send(path []int, name string, value interface{}, epoch uint64) {
 	if m.offline {
 		return
 	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := m.conn.Set(ctx, epoch, path, name, value); err != nil {
-			m.logf("screen: write %v.%s=%v: %v", path, name, value, err)
-		}
-	}()
+	m.enqueue(writeOp{path: path, name: name, value: value, epoch: epoch})
 }

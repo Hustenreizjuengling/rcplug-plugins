@@ -39,6 +39,9 @@ type Model struct {
 	perBank  int
 	offline  bool   // no console: writes stay local (the preview)
 	rev      uint64 // bumps on every change, so the UI can tell something moved
+
+	wmu     sync.Mutex
+	pending map[string]writeOp // coalesced writes, flushed by runWriter
 }
 
 // Info is what the model knows about the device.
@@ -72,6 +75,7 @@ func (m *Model) Conn() *Conn { return m.conn }
 // Run keeps the model current until ctx ends: it loads the tree, follows the
 // change stream, and reloads when the stream says the state jumped or breaks.
 func (m *Model) Run(ctx context.Context) {
+	go m.runWriter(ctx)
 	backoff := time.Second
 	for ctx.Err() == nil {
 		if err := m.load(ctx); err != nil {
