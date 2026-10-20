@@ -1,5 +1,10 @@
 package desk
 
+import "math"
+
+// log10 is math.Log10 (kept local so the file reads plainly).
+func log10(x float64) float64 { return math.Log10(x) }
+
 // Higher-level helpers over the tree for the mixer screens: strips, their
 // source, fader, mute, listen and meters, and the common single nodes. They
 // are thin wrappers so the pages read like the device's own screens.
@@ -118,6 +123,19 @@ func (m *Model) UnityFrac() float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return clamp01(float64(m.unity) / 127)
+}
+
+// FaderDbFrac is the approximate dB of a fader fraction (0..1), relative to
+// the unity detent. Display aid only; the desk publishes no taper.
+func (m *Model) FaderDbFrac(frac float64) float64 {
+	m.mu.RLock()
+	unity := m.unity
+	m.mu.RUnlock()
+	pos := clamp01(frac) * 127
+	if pos <= 0 || unity <= 0 {
+		return -144
+	}
+	return 20 * log10(pos/float64(unity))
 }
 
 // MeterL and MeterR are strip i's meter levels (0..1).

@@ -220,6 +220,9 @@ func (m *Model) SetStr(typ string, i int, name string, v string) {
 
 // Trigger fires a binary trigger property of the i-th node of a type.
 func (m *Model) Trigger(typ string, i int, name string) {
+	if m.offline {
+		return
+	}
 	m.mu.RLock()
 	n := m.nth(typ, i)
 	epoch := m.epoch
@@ -239,6 +242,9 @@ func (m *Model) Trigger(typ string, i int, name string) {
 
 // Press performs a momentary press of a boolean button (ms long).
 func (m *Model) Press(typ string, i int, name string, ms int) {
+	if m.offline {
+		return
+	}
 	m.mu.RLock()
 	n := m.nth(typ, i)
 	epoch := m.epoch
@@ -258,6 +264,9 @@ func (m *Model) Press(typ string, i int, name string, ms int) {
 
 // send tells the console about a single-property write, in the background.
 func (m *Model) send(path []int, name string, value interface{}, epoch uint64) {
+	if m.offline {
+		return
+	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()

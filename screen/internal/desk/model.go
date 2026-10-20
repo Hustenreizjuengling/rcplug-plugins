@@ -36,6 +36,8 @@ type Model struct {
 	outputs  []Name
 	unity    int64
 	physical int
+	perBank  int
+	offline  bool   // no console: writes stay local (the preview)
 	rev      uint64 // bumps on every change, so the UI can tell something moved
 }
 
@@ -52,7 +54,16 @@ func New(hostURL string, logf func(string, ...interface{})) *Model {
 	if logf == nil {
 		logf = func(string, ...interface{}) {}
 	}
-	return &Model{conn: Dial(hostURL), logf: logf, control: "off", unity: 90, physical: 4}
+	return &Model{conn: Dial(hostURL), logf: logf, control: "off", unity: 90, physical: 4, perBank: 6}
+}
+
+// NewOffline makes a model with no console: it is filled with LoadRaw and
+// its writes only change the local copy (for the browser preview and tests).
+func NewOffline(logf func(string, ...interface{})) *Model {
+	m := New("", logf)
+	m.offline = true
+	m.control = "expert"
+	return m
 }
 
 // Conn is the underlying console connection (for triggers and presses).
@@ -95,6 +106,15 @@ func (m *Model) load(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	return m.adopt(raw)
+}
+
+// LoadRaw adopts a tree document directly (for the offline preview and
+// tests), without a console.
+func (m *Model) LoadRaw(raw []byte) error { return m.adopt(raw) }
+
+// adopt parses a tree document and replaces the model with it.
+func (m *Model) adopt(raw []byte) error {
 	root, td, err := parseTree(raw)
 	if err != nil {
 		return err
@@ -119,6 +139,9 @@ func (m *Model) load(ctx context.Context) error {
 	}
 	if td.Meta.Layout.PhysicalFaders > 0 {
 		m.physical = td.Meta.Layout.PhysicalFaders
+	}
+	if td.Meta.Layout.PadsPerBank > 0 {
+		m.perBank = td.Meta.Layout.PadsPerBank
 	}
 	m.rev++
 	m.mu.Unlock()
