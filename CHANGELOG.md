@@ -6,6 +6,17 @@ may break compatibility).
 
 ## 0.5.13 - Unreleased
 
+### Added
+- **Screen 0.1.0** is an alternative interface on the device's own touchscreen: a
+  mixer with channel, processing and assignment pages, SMART pads, the menus and
+  settings, output routing, and pages for rcplug and other plugins — drawn to look and
+  work like RØDE's own screen. It reads RØDE's icons and text from the device at run
+  time (no RØDE files are shipped) and controls the desk through the console with
+  optimistic, coalesced writes. RØDE's screen returns with the “Back to RØDE” button
+  or whenever the plugin stops, so the desk is never left without a screen. It starts
+  from the dashboard (no autostart yet) and needs rcplug 0.8.11 or later for the
+  screen handover.
+
 ## 0.5.12 - 2026-10-19
 
 ### Added
