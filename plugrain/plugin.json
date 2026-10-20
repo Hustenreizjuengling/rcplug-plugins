@@ -1,0 +1,51 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Hustenreizjuengling/rcplug/main/plugin.schema.json",
+  "name": "plugrain",
+  "title": "PlugRain",
+  "description": "Experimental screen demo: takes over the device's screen for a few minutes with green rain, falling as smoothly as the display can show it, and the proof that it runs as root on the device. RØDE's screen (or the screen plugin it was started from) comes back with the button, a long press, after the set time or when stopped. Started from the dashboard or from the screen plugin's rcplug page.",
+  "version": "0.3.0",
+  "exec": [
+    "./plugrain"
+  ],
+  "autostart": false,
+  "order": 90,
+  "icon": "▣",
+  "permissions": [
+    "screen"
+  ],
+  "update": {
+    "github": "Hustenreizjuengling/rcplug-plugins"
+  },
+  "options": [
+    {
+      "id": "minutes",
+      "type": "number",
+      "title": "Back to RØDE after (minutes)",
+      "min": 1,
+      "max": 30,
+      "default": 5,
+      "arg": "--minutes={value}"
+    },
+    {
+      "id": "language",
+      "type": "choice",
+      "title": "Language on the screen",
+      "default": "en",
+      "choices": [
+        {"value": "en", "title": "English"},
+        {"value": "de", "title": "Deutsch"}
+      ],
+      "arg": "--lang={value}"
+    }
+  ],
+  "translations": {
+    "de": {
+      "title": "PlugRain",
+      "description": "Experimentelle Bildschirm-Demo: übernimmt für ein paar Minuten den Bildschirm des Geräts mit grünem Regen, so flüssig, wie das Display ihn zeigen kann, und dem Beweis, dass sie als root auf dem Gerät läuft. RØDEs Bildschirm (oder die Screen-Oberfläche, aus der es gestartet wurde) kommt mit dem Knopf, langem Drücken, nach der eingestellten Zeit oder beim Stoppen zurück. Start im Dashboard oder von der rcplug-Seite des Screen-Plugins.",
+      "options": {
+        "minutes": {"title": "Zurück zu RØDE nach (Minuten)"},
+        "language": {"title": "Sprache auf dem Bildschirm"}
+      }
+    }
+  }
+}

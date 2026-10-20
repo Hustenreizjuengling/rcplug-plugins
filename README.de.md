@@ -8,6 +8,8 @@ rcplug startet es auf dem Gerät und zeigt seine Webseite im Dashboard.
 |---|---|
 | [Sicherung](backup/README.md) | Sichert die Einstellungen von rcplug, zeigt, was eine Wiederherstellung ändern würde, und spielt Sicherungen zurück; Sicherungen lassen sich als Datei herunter- und hochladen. |
 | [Sonar](sonar/README.md) | Zeigt als Live-Radar, aus welcher Richtung ein Geräusch auf einem Stereokanal kommt. Entstanden als Spielerei für Versteckspiele unter Freunden. |
+| [Screen](screen/README.md) | Eine alternative Oberfläche auf dem Touchscreen des Geräts, gebaut wie RØDEs eigene: Mischpult, Kanäle, Verarbeitung, SMART Pads, Einstellungen, eigene Mischungen und Seiten für rcplug und andere Plugins. |
+| [PlugRain](plugrain/README.md) | Experimentelle Bildschirm-Demo: übernimmt für ein paar Minuten den Bildschirm des Geräts mit grünem Regen und einem root-Beweis und gibt ihn dann an RØDE zurück. Zeigt, dass Plugins auf den Bildschirm zeichnen können. |
 
 English: [README.md](README.md)
 

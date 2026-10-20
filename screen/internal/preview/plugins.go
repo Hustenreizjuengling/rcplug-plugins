@@ -49,7 +49,16 @@ func (p *Plugins) Plugins() []pages.PluginInfo {
 		{Name: "sonar", Title: "Sonar", Running: true, Icon: "◉"},
 		{Name: "backup", Title: "Backup", Running: true},
 		{Name: "console", Title: "Console", Running: true},
+		{Name: "plugrain", Title: "PlugRain", Screen: true},
 	}
+}
+
+// Handover records the request (the real host would stop this interface).
+func (p *Plugins) Handover(name string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Submitted = append(p.Submitted, Submission{name, "handover", true})
+	return nil
 }
 
 func (p *Plugins) Page(name string) (*pages.PluginPage, bool) {

@@ -354,9 +354,10 @@ func (m *Model) logPresetsOnce() {
 		return
 	}
 	m.presetsLogged = true
-	s := ps[0].Str("fxPresetContents")
-	if len(s) > 200 {
-		s = s[:200] + "…"
+	for i, p := range ps {
+		if i >= 2 {
+			break
+		}
+		m.logf("screen: processing preset %d of %d: %s", i+1, len(ps), p.Str("fxPresetContents"))
 	}
-	m.logf("screen: %d processing presets; the first reads: %s", len(ps), s)
 }

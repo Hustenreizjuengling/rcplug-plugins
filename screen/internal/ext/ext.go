@@ -9,8 +9,10 @@ package ext
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -117,11 +119,12 @@ func (r *Registry) Run(ctx context.Context) {
 
 type statusDoc struct {
 	Plugins []struct {
-		Name    string `json:"name"`
-		Title   string `json:"title"`
-		Running bool   `json:"running"`
-		Icon    string `json:"icon"`
-		HasUI   bool   `json:"hasUI"`
+		Name    string   `json:"name"`
+		Title   string   `json:"title"`
+		Running bool     `json:"running"`
+		Icon    string   `json:"icon"`
+		HasUI   bool     `json:"hasUI"`
+		Perms   []string `json:"permissions"`
 	} `json:"plugins"`
 }
 
@@ -138,7 +141,13 @@ func (r *Registry) refresh(ctx context.Context) {
 		if p.Name == r.self {
 			continue
 		}
-		list = append(list, pages.PluginInfo{Name: p.Name, Title: p.Title, Running: p.Running, Icon: p.Icon})
+		info := pages.PluginInfo{Name: p.Name, Title: p.Title, Running: p.Running, Icon: p.Icon}
+		for _, perm := range p.Perms {
+			if perm == "screen" {
+				info.Screen = true
+			}
+		}
+		list = append(list, info)
 		if p.Running && p.HasUI {
 			var pg pages.PluginPage
 			if err := r.get(cctx, r.pageURL(p.Name), &pg); err == nil && len(pg.Controls) > 0 {
@@ -189,6 +198,39 @@ func (r *Registry) Submit(name, control string, value interface{}) error {
 		}
 		resp.Body.Close()
 	}()
+	return nil
+}
+
+// Handover asks the host to pass the screen to another plugin (the host
+// then stops this one, and starts it again when the other ends).
+func (r *Registry) Handover(name string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	body := `{"from":` + strconv.Quote(r.self) + `}`
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.host+"/api/plugins/"+name+"/handover", strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(sdk.APIHeader, "1")
+	if t := os.Getenv("RCPLUG_TOKEN"); t != "" {
+		req.Header.Set("X-Rcplug-Token", t)
+	}
+	resp, err := r.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		var e struct {
+			Error string `json:"error"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&e)
+		if e.Error != "" {
+			return errors.New(e.Error)
+		}
+		return &httpError{resp.StatusCode}
+	}
 	return nil
 }
 

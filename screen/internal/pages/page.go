@@ -102,6 +102,9 @@ type PluginSource interface {
 	// Poll asks for a fresh page from a plugin soon (while its page is
 	// shown); the source limits how often it really asks.
 	Poll(name string)
+	// Handover asks the host to pass the device's screen to another screen
+	// plugin (this interface ends; it comes back when that plugin ends).
+	Handover(name string) error
 	// DashboardURL is the host's dashboard address (for a QR code).
 	DashboardURL() string
 }
@@ -112,6 +115,7 @@ type PluginInfo struct {
 	Title   string
 	Running bool
 	Icon    string
+	Screen  bool // takes over the device's screen (permission screen)
 }
 
 // PluginPage is a plugin's declared screen (a list of controls the UI draws

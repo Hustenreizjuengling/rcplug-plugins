@@ -35,6 +35,38 @@ func (p *rcplugPage) Build(env *Env, r image.Rectangle) ui.View {
 	})
 	rode.SetBounds(cells[1])
 	c.Add(plugins, rode)
+	// A tile per plugin that takes the screen itself (PlugRain): a tap hands
+	// the screen over; this interface comes back when that plugin ends.
+	var demos []PluginInfo
+	if env.Plugins != nil {
+		for _, pi := range env.Plugins.Plugins() {
+			if pi.Screen {
+				demos = append(demos, pi)
+			}
+		}
+	}
+	if len(demos) > 0 {
+		dcells := tileGrid(image.Rect(r.Min.X, r.Min.Y+290, r.Max.X, r.Min.Y+290+140+48), len(demos), 4, 140, 30)
+		for i, pi := range demos {
+			pi := pi
+			title := pi.Title
+			if title == "" {
+				title = pi.Name
+			}
+			b := ui.NewTile(title, "IconPlay", func() {
+				env.Nav.Confirm(title,
+					env.TR("", title+" übernimmt den Bildschirm; diese Oberfläche kommt zurück, wenn es endet.",
+						title+" takes over the screen; this interface comes back when it ends."),
+					env.T("OK"), false, func() {
+						if err := env.Plugins.Handover(pi.Name); err != nil {
+							env.Nav.Toast(err.Error())
+						}
+					})
+			})
+			b.SetBounds(dcells[i])
+			c.Add(b)
+		}
+	}
 
 	// The dashboard address (open it on a phone to manage rcplug).
 	url := ""
@@ -44,7 +76,7 @@ func (p *rcplugPage) Build(env *Env, r image.Rectangle) ui.View {
 	if url == "" {
 		url = "—"
 	}
-	infoCard(env, c, image.Rect(r.Min.X+100, r.Min.Y+320, r.Max.X-100, r.Min.Y+420), [][2]func() string{
+	infoCard(env, c, image.Rect(r.Min.X+100, r.Max.Y-100, r.Max.X-100, r.Max.Y), [][2]func() string{
 		{func() string { return "Dashboard" }, func() string { return url }},
 	})
 	_ = th

@@ -71,6 +71,12 @@ omitted for the mixer). In the browser the main knob is the mouse wheel over
 the picture, the buttons under it, or the arrow keys (space = press,
 backspace = hold).
 
+## Demos with the screen of their own
+
+A plugin that takes over the screen itself (permission `screen`, like PlugRain) gets
+a tile on the rcplug page: a tap hands the display over to it without RØDE's screen in
+between, and when that plugin ends this interface comes back (rcplug 0.8.18).
+
 ## Extending it
 
 Other plugins can add a page without drawing anything themselves: they serve a

@@ -6,6 +6,15 @@ may break compatibility).
 
 ## 0.5.23 - Unreleased
 
+### Added
+- **PlugRain 0.3.0** joins the catalog as the demo of a plugin with the device's screen:
+  green rain and the proof of root for a few minutes, then the screen goes back. It has
+  a tile on the **Screen** plugin's rcplug page: a tap hands the display over to it
+  without RØDE's screen in between, and when PlugRain ends the Screen interface comes
+  back (rcplug 0.8.18). The tile appears for every plugin with the `screen` permission.
+- **Screen 0.3.5** logs the device's processing presets whole (their format is still
+  being learned) and documents the demo tiles.
+
 ## 0.5.22 - 2026-10-20
 
 ### Changed

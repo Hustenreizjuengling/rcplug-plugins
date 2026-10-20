@@ -16,3 +16,4 @@ starts
 # Command binaries accidentally built into the repository root
 /sonar/sonar
 /backup/backup
+/plugrain/plugrain
