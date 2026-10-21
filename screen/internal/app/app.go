@@ -39,6 +39,7 @@ type App struct {
 	toast      string
 	toastUntil time.Time
 	popup      ui.View // a passing view over the page (the headphone level)
+	popupKey   string  // what the popup shows, so a repeat only keeps it longer
 	popupUntil time.Time
 	diskAsked  int       // the volume the unrecognised-disk question was asked for (+1), 0 for none
 	hpLast     []float64 // the headphone levels as last seen

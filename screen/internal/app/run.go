@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"image"
+	"strconv"
 	"time"
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/gfx"
@@ -162,7 +163,8 @@ func (a *App) watchHeadphones() {
 	for i := 0; i < n && i < len(a.hpLast); i++ {
 		v := a.model.HeadphoneFrac(i)
 		if v != a.hpLast[i] && !first && a.model.Online() {
-			a.Popup(pages.HeadphonePopup(a.env(), i, a.w, a.h), pages.PopupFor)
+			i := i
+			a.popupFor("headphone:"+strconv.Itoa(i), func() ui.View { return pages.HeadphonePopup(a.env(), i, a.w, a.h) }, pages.PopupFor)
 		}
 		a.hpLast[i] = v
 	}
@@ -172,10 +174,26 @@ func (a *App) watchHeadphones() {
 // a new one replaces the old.
 func (a *App) Popup(v ui.View, keep time.Duration) {
 	a.mu.Lock()
-	a.popup = v
+	a.popup, a.popupKey = v, ""
 	a.popupUntil = time.Now().Add(keep)
 	a.dirty = true
 	a.mu.Unlock()
+}
+
+// popupFor shows the popup for key, or, while that one is already up, only
+// keeps it longer: its views follow the value themselves, and rebuilding
+// the whole tree for every reading of a turning knob would queue the turns
+// behind the drawing.
+func (a *App) popupFor(key string, make func() ui.View, keep time.Duration) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.popup != nil && a.popupKey == key && time.Now().Before(a.popupUntil) {
+		a.popupUntil = time.Now().Add(keep)
+		return
+	}
+	a.popup, a.popupKey = make(), key
+	a.popupUntil = time.Now().Add(keep)
+	a.dirty = true
 }
 
 // RenderOnce builds and renders a single frame (for the PNG preview and

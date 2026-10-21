@@ -6,6 +6,12 @@ may break compatibility).
 
 ## 0.5.36 - Unreleased
 
+### Fixed
+- **Screen 0.4.5: the headphone knobs no longer lag either.** Every reading of a
+  turning headphone knob put up the level popup anew and rebuilt the whole page for it;
+  the popup now stays up and its slider follows the level itself, as the mixer's ring
+  does since 0.4.4.
+
 ## 0.5.35 - 2026-10-21
 
 ### Fixed
