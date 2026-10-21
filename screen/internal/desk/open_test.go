@@ -10,7 +10,7 @@ func openTestModel(t *testing.T) *Model {
 	m.offline = true
 	sys := &Node{Type: SystemNode, Path: []int{700}, Props: map[string]Value{
 		"systemMixSelected": Int64(MixSelectedNone), "assignableMeterSource": Int64(0),
-		"systemMainMode": Int64(0), "rcSyncModeRequest": Bool(false),
+		"systemMainMode": Int64(0), "rcSyncModeRequest": Bool(false), "usbHostOnUsb2": Int64(0),
 	}}
 	rec := &Node{Type: RecordingNode, Path: []int{701, 0}, Props: map[string]Value{
 		"recordingUID":     Int64(5),
@@ -56,6 +56,30 @@ func TestMeterSourceAndMainMode(t *testing.T) {
 	m.RequestSyncModeChange()
 	if !m.Bool(SystemNode, 0, "rcSyncModeRequest") {
 		t.Fatal("the sync-mode request was not pulsed")
+	}
+}
+
+// TestUSBDeviceByPID looks a hosted device up by either of its product ids
+// and knows nothing for 0 or a foreign id.
+func TestUSBDeviceByPID(t *testing.T) {
+	if d, ok := USBDeviceByPID(0x4a); !ok || d.Name != "PodMic USB" || d.Kind != USBKindMicrophone {
+		t.Fatalf("0x4a: %+v %v", d, ok)
+	}
+	if d, ok := USBDeviceByPID(0x4b); !ok || d.Name != "PodMic USB" {
+		t.Fatalf("the second id 0x4b: %+v %v", d, ok)
+	}
+	if d, ok := USBDeviceByPID(0x1e); !ok || d.Name != "Wireless GO II" || d.Kind != USBKindReceiver {
+		t.Fatalf("0x1e: %+v %v", d, ok)
+	}
+	for _, pid := range []int64{0, -1, 0x4c, 0x7777} {
+		if _, ok := USBDeviceByPID(pid); ok {
+			t.Fatalf("%#x should be unknown", pid)
+		}
+	}
+	m := openTestModel(t)
+	m.SetInt(SystemNode, 0, "usbHostOnUsb2", 0x35)
+	if d, ok := m.USBHostDevice(); !ok || d.Name != "NT-USB+" {
+		t.Fatalf("hosted device: %+v %v", d, ok)
 	}
 }
 

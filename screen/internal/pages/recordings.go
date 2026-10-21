@@ -135,6 +135,7 @@ type playerPage struct {
 	loaded  bool
 	saved   [4]float64
 	lastRec string
+	markers cueMarkers // the file's cue points, read when the page opens
 }
 
 func newPlayerPage(uid int64) Page { return &playerPage{uid: uid} }
@@ -207,6 +208,7 @@ func (p *playerPage) Build(env *Env, r image.Rectangle) ui.View {
 		for i, prop := range desk.PlayerEnvProps {
 			d.PlayerSetEnv(prop, rec.Env[i])
 		}
+		p.markers = loadCueMarkers(rec.Path)
 	}
 	teal := gfx.Hex(0x3ec6f0)
 	// The time display.
@@ -245,14 +247,28 @@ func (p *playerPage) Build(env *Env, r image.Rectangle) ui.View {
 	cut := func(x0, x1 int) image.Rectangle {
 		return image.Rect(row.Min.X+x0*w/1000, row.Min.Y, row.Min.X+x1*w/1000, row.Max.Y)
 	}
+	// The file's own rate when its header could be read, else the desk's.
 	sampleRate := 48000.0
-	seek := func(dt time.Duration) {
-		pl := d.Player()
-		pos := pl.Position + dt
+	if p.markers.rate > 0 {
+		sampleRate = float64(p.markers.rate)
+	}
+	jumpTo := func(pos time.Duration) {
 		if pos < 0 {
 			pos = 0
 		}
 		d.PlayerJump(int64(pos.Seconds() * sampleRate))
+	}
+	seek := func(dt time.Duration) { jumpTo(d.Player().Position + dt) }
+	// The flag buttons walk the file's markers: back to the previous one
+	// (the start without one), forward to the next.
+	prevMarker := func() {
+		t, _ := p.markers.before(d.Player().Position)
+		jumpTo(t)
+	}
+	nextMarker := func() {
+		if t, ok := p.markers.after(d.Player().Position); ok {
+			jumpTo(t)
+		}
 	}
 	mk := func(icon string, rc image.Rectangle, tint gfx.Color, tap func()) *ui.Button {
 		b := ui.NewButton("", tap)
@@ -269,7 +285,7 @@ func (p *playerPage) Build(env *Env, r image.Rectangle) ui.View {
 	})
 	scissors.Enabled = !p.edit
 	marker := gfx.Hex(0xa08c48)
-	mk("IconArrowBackFlag", cut(105, 205), marker, func() { seek(-time.Hour) })
+	mk("IconArrowBackFlag", cut(105, 205), marker, prevMarker)
 	mk("IconArrowBack15", cut(210, 310), th.Text, func() { seek(-15 * time.Second) })
 	play := mk("IconPlay", cut(315, 680), th.Text, func() {
 		if d.Player().State == playerPlaying {
@@ -289,7 +305,7 @@ func (p *playerPage) Build(env *Env, r image.Rectangle) ui.View {
 		}
 	}})
 	mk("IconArrowFrwd30", cut(685, 785), th.Text, func() { seek(30 * time.Second) })
-	mk("IconArrowFrwdFlag", cut(790, 890), marker, func() { seek(time.Hour) })
+	mk("IconArrowFrwdFlag", cut(790, 890), marker, nextMarker)
 	bin := mk("Bin", cut(895, 1000), th.Record, func() {
 		env.Nav.Confirm(env.T("DELETE"), env.T("ARE YOU SURE YOU WANT TO DELETE ")+" \""+rec.Name+"\"?", env.T("DELETE"), true, func() {
 			d.DeleteRecording(rec.UID)
