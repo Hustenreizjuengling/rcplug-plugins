@@ -32,9 +32,9 @@ this plugin's own code.
   noise gate, EQ, high-pass filter). Saving and deleting presets stay on
   RØDE's screen: they change the tree's nodes, which the console does not
   pass on.
-- When it ends it leaves the display black (the buffers cleared and shown
-  once more), so nothing of its last page flickers through while the next
-  program takes the panel.
+- When it ends it leaves the display black (the buffers cleared and the
+  black held for two refreshes, until the panel has it whole), so nothing of
+  its last page flickers through while the next program takes the panel.
 - The main knob works as on RØDE's screen (package `internal/app`, the
   focus): on the mixer it sets the monitor level, a press moves it on to the
   virtual faders (and back), holding it mutes the focused one. On every other
@@ -42,6 +42,8 @@ this plugin's own code.
   control or starts adjusting a value (turn, then press again to let go), and
   holding the knob goes back a page. The knob's turns and presses reach the
   plugin through the desk's tree (`ENCODER.encoderSignal`, `encoderPressed`).
+  The channel buttons above the faders open the strip's channel page, and
+  return to the mixer when pressed again there (`SYSTEM.systemChannelSelected`).
 - RØDE's screen comes back with the **Back to RØDE** button, when the plugin
   is stopped from the dashboard, or if it exits for any reason.
 - It is started in the dashboard the first time. With rcplug 0.8.17 or later

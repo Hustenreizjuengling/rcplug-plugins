@@ -9,6 +9,23 @@ package desk
 // ChannelButton is the stream of channel-button presses (the strip's number).
 func (m *Model) ChannelButton() <-chan int { return m.enc.buttons }
 
+// syncChannelButton takes the button's state from a freshly loaded tree
+// (under the model lock): a button held while the tree loaded is not a new
+// press.
+func (m *Model) syncChannelButton() {
+	n := -1
+	if m.runs != nil {
+		if s := m.runs.byType[SystemNode]; len(s) > 0 {
+			if v, ok := s[0].Props["systemChannelSelected"]; ok {
+				n = int(v.Int())
+			}
+		}
+	}
+	m.enc.mu.Lock()
+	m.enc.channel = n
+	m.enc.mu.Unlock()
+}
+
 // onChannelSelected is called (under the model lock) when
 // systemChannelSelected changes.
 func (m *Model) onChannelSelected(v Value) {

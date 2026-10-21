@@ -135,6 +135,7 @@ func (m *Model) adopt(raw []byte) error {
 	m.mu.Lock()
 	m.root = root
 	m.runs = indexRuns(root)
+	m.syncChannelButton()
 	m.epoch, m.seq, m.stale = td.Epoch, td.Seq, td.Stale
 	m.online = true
 	m.info = Info{Model: td.Meta.Layout.Model, ModelName: td.Meta.Layout.ModelName, Firmware: td.Meta.Layout.Firmware}
@@ -225,8 +226,11 @@ func (m *Model) applyChanges(data []byte) {
 		}
 		if n := m.root.At(path); n != nil {
 			n.Props[name] = val
-			if name == "encoderSignal" || name == "encoderPressed" {
+			switch name {
+			case "encoderSignal", "encoderPressed":
 				m.onEncoderProp(name, val)
+			case "systemChannelSelected":
+				m.onChannelSelected(val)
 			}
 		}
 	}

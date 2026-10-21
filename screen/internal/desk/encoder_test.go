@@ -106,3 +106,28 @@ func TestChannelButton(t *testing.T) {
 		t.Fatalf("button presses %v, want [0 2]", got)
 	}
 }
+
+// TestChannelButtonFromChanges: a press arrives as a change of
+// SYSTEM.systemChannelSelected and reaches ChannelButton; a button held
+// while the tree loads is not a press.
+func TestChannelButtonFromChanges(t *testing.T) {
+	m := NewOffline(nil)
+	tree := `{"epoch":1,"seq":1,"root":{"t":"Rodecaster","p":{},"y":"","c":[{"t":"SYSTEM","p":{"systemChannelSelected":1},"y":"i","c":[]}]}}`
+	if err := m.LoadRaw([]byte(tree)); err != nil {
+		t.Fatal(err)
+	}
+	m.applyChanges([]byte(`{"epoch":1,"seq":2,"ch":[[[0],"systemChannelSelected",-1,"i"],[[0],"systemChannelSelected",0,"i"],[[0],"systemChannelSelected",-1,"i"]]}`))
+	var got []int
+	for {
+		select {
+		case n := <-m.ChannelButton():
+			got = append(got, n)
+			continue
+		default:
+		}
+		break
+	}
+	if len(got) != 1 || got[0] != 0 {
+		t.Fatalf("button presses %v, want [0]", got)
+	}
+}

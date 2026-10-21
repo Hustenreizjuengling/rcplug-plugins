@@ -6,6 +6,16 @@ may break compatibility).
 
 ## 0.5.25 - Unreleased
 
+### Fixed
+- **Screen 0.3.7: the channel buttons above the faders work.** The desk reports a press
+  (`systemChannelSelected`), and the model read it but never passed it on, so the button
+  did nothing. It opens the strip's channel page now, as on RØDE's screen, and returns to
+  the mixer when pressed again on that page.
+- **Screen 0.3.7 and PlugRain 0.3.2 hold the black for two refreshes before they give
+  the display up.** A page flip is done when its buffer starts to be scanned out, so the
+  black frame could be cut off before it reached the panel's last rows (the page's right
+  side), where the last page then flickered through at the next program's start.
+
 ### Changed
 - The font atlas tool (`tools/fontatlas`, not shipped with any plugin) uses
   `golang.org/x/image` 0.41, which closes two advisories in its TIFF decoder; the tool
