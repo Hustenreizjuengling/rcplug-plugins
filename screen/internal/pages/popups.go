@@ -50,15 +50,21 @@ func (p *transferPage) Build(env *Env, r image.Rectangle) ui.View {
 	th := env.Ctx.Theme
 	c := &ui.Container{}
 	c.SetBounds(r)
-	icon := ui.NewIcon("IconUsb1Main", th.TextDim)
-	icon.SetBounds(centred(image.Rect(r.Min.X, r.Min.Y+120, r.Max.X, r.Min.Y+320), 160, 160))
-	title := ui.NewLabel(env.T("IN TRANSFER MODE"), th.Fonts.Big, th.Text, font.Center)
-	title.SetBounds(image.Rect(r.Min.X, r.Min.Y+340, r.Max.X, r.Min.Y+420))
-	note := ui.NewParagraph(env.TR("", "Der Speicher des Geräts ist mit dem Computer verbunden; Audio und Pegel sind so lange angehalten. Der Übertragungsmodus wird auf RØDEs eigenem Bildschirm beendet.",
-		"The device's storage is connected to the computer; audio and the meters pause meanwhile. Transfer mode is ended on RØDE's own screen."), th.Fonts.Body, th.TextDim)
+	// RØDE's page: the device picture with the transfer bar, "Your device is
+	// in Transfer Mode", the hint about the PC app, and Exit Transfer Mode.
+	pic := "IconRCDUOTransferMode"
+	if !env.Desk.IsDuo() {
+		pic = "IconRCP2TransferMode"
+	}
+	icon := ui.NewIcon(pic, 0)
+	icon.SetBounds(centred(image.Rect(r.Min.X, r.Min.Y+60, r.Max.X, r.Min.Y+330), 420, 260))
+	title := ui.NewLabel(env.T("YOUR DEVICE IS IN TRANSFER MODE"), th.Fonts.Title, th.Text, font.Center)
+	title.SetBounds(image.Rect(r.Min.X, r.Min.Y+350, r.Max.X, r.Min.Y+420))
+	note := ui.NewParagraph(env.T("YOU CAN NOW TRANSFER CONTENT USING RØDECASTER APP ON YOUR PC/MAC"), th.Fonts.Body, th.TextDim)
 	note.Align = font.Center
-	note.SetBounds(image.Rect(r.Min.X+160, r.Min.Y+430, r.Max.X-160, r.Min.Y+540))
-	c.Add(icon, title, note, rodeButton(env, image.Rect(r.Min.X+r.Dx()/2-220, r.Max.Y-130, r.Min.X+r.Dx()/2+220, r.Max.Y-50)))
+	note.SetBounds(image.Rect(r.Min.X+160, r.Min.Y+430, r.Max.X-160, r.Min.Y+520))
+	c.Add(icon, title, note)
+	c.Add(transferExitButton(env, image.Rect(r.Min.X+r.Dx()/2-260, r.Max.Y-150, r.Min.X+r.Dx()/2+260, r.Max.Y-70))...)
 	return c
 }
 

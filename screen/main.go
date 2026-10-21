@@ -223,8 +223,10 @@ func runPNG(out, resources, langCode, page string) error {
 		a.Keyboard("Name", "Mic 1", nil)
 	case page == "dialog":
 		a.Confirm("CLEAR", "Are you sure you want to clear the pad?", "CLEAR", true, nil)
-	case page == "metering", page == "listen", page == "faders", page == "language", page == "datetime", page == "brightness", page == "haptics", page == "monitor", page == "multitrack":
-		a.Push(pages.Detail(page))
+	case page == "metering", page == "listen", page == "faders", page == "language", page == "datetime", page == "brightness", page == "haptics", page == "monitor", page == "multitrack",
+		page == "headphones-page", page == "recbutton", page == "compression", page == "midi", page == "info", page == "info-device", page == "regulatory",
+		page == "analytics", page == "firmware-page", page == "opmode", page == "storage", page == "timezone", page == "cloud", page == "numpad":
+		a.Push(pages.Detail(strings.TrimSuffix(page, "-page")))
 	case page == "mix":
 		a.Open(pages.IDRouting)
 		a.Push(pages.RoutingMix(0))

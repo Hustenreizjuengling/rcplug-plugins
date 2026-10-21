@@ -2,6 +2,7 @@ package pages
 
 import (
 	"image"
+	"strings"
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/desk"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/font"
@@ -173,7 +174,10 @@ func infoCard(env *Env, c *ui.Container, r image.Rectangle, rows [][2]func() str
 	y := r.Min.Y + 20
 	for _, row := range rows {
 		k := row[0]()
-		kv := ui.NewKeyValue(k+" :", row[1])
+		if !strings.HasSuffix(k, ":") {
+			k += " :"
+		}
+		kv := ui.NewKeyValue(k, row[1])
 		kv.Split = r.Dx() * 2 / 5
 		kv.SetBounds(image.Rect(r.Min.X, y, r.Max.X, y+60))
 		c.Add(kv)

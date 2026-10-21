@@ -90,10 +90,12 @@ func init() {
 			}
 			return ""
 		}, tiles: []tile{
-			{key: "FADERS", icon: "IconFaders", push: func() Page { return newFadersPage() }},
+			// RØDE's MenuConfigurationPage (1.7.6) in its order: Faders,
+			// Outputs, Operation Mode, Display, Shows, System; the rcplug
+			// tile is ours, at the end.
+			{key: "FADERS", icon: "IconInputs", push: func() Page { return newFadersPage() }},
 			{key: "OUTPUTS", icon: "IconOutputs", open: IDOutputs},
-			{key: "SMART PADS", icon: "smart_pads_sound", open: IDPads},
-			{key: "ROUTING", icon: "IconRouting", open: IDRouting},
+			{key: "OPERATION MODE", icon: "Oslash", push: func() Page { return newOperatingModePage() }},
 			{key: "DISPLAY", icon: "IconDisplay", open: IDDisplay},
 			{key: "SHOWS", icon: "IconShows", open: IDShows},
 			{key: "SYSTEM", icon: "IconSystem", open: IDSystem},
@@ -102,12 +104,12 @@ func init() {
 	})
 	register(IDOutputs, func() Page {
 		return &menuPage{title: "OUTPUTS", cols: 3, tiles: []tile{
+			{key: "HEADPHONES", icon: "IconHeadphones", push: func() Page { return newHeadphonesPage() }},
 			{key: "MONITOR", icon: "IconMonitor", push: func() Page { return newMonitorPage() }},
 			{key: "ROUTING", icon: "IconRouting", open: IDRouting},
 			{key: "LISTEN", icon: "IconListen", push: func() Page { return newListenPage() }},
 			{key: "MULTITRACK", icon: "IconMultitrack", push: func() Page { return newMultitrackPage() }},
-			{key: "PROCESSING", icon: "procCompressor", push: func() Page { return NewMasterRack() }},
-			{key: "BLUETOOTH", icon: "bluetooth", push: func() Page { return newBluetoothOutputPage() }},
+			{key: "PROCESSING", icon: "IconProcessingNavigation", push: func() Page { return NewMasterRack() }},
 		}}
 	})
 	register(IDDisplay, func() Page {
@@ -115,7 +117,7 @@ func init() {
 			{key: "BRIGHTNESS", icon: "IconBrightness", push: func() Page { return newBrightnessPage() }},
 			{key: "METERING", icon: "IconMetering", push: func() Page { return newMeteringPage() }},
 			{key: "HAPTICS", icon: "IconHaptics", push: func() Page { return newHapticsPage() }},
-			{key: "REC BUTTON", icon: "IconRec", push: func() Page { return newRecButtonPage() }},
+			{key: "REC BUTTON", icon: "IconRecordingSettings", push: func() Page { return newRecButtonPage() }},
 		}}
 	})
 	register(IDSystem, func() Page {
@@ -126,8 +128,8 @@ func init() {
 			{key: "BLUETOOTH", icon: "bluetooth", open: IDBluetooth},
 			{key: "INFORMATION", icon: "IconInformation", open: IDInfo},
 			{key: "MIDI", icon: "smart_pads_trigger", push: func() Page { return newMidiPage() }},
+			{key: "CLOUD CONNECTION", de: "Cloud-Verbindung", en: "Cloud Connection", icon: "cloud_outline", push: func() Page { return newCloudPage() }},
 			{key: "CallMe", icon: "CallMe", open: IDCallMe},
-			{key: "FIRMWARE", de: "Firmware", en: "Firmware", icon: "FirmwareUpdate", open: IDFirmware},
 		}}
 	})
 }

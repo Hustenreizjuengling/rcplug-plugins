@@ -22,6 +22,34 @@ func Detail(name string) Page {
 		return newMultitrackPage()
 	case "bluetooth":
 		return newBluetoothOutputPage()
+	case "headphones":
+		return newHeadphonesPage()
+	case "recbutton":
+		return newRecButtonPage()
+	case "compression":
+		return newCompressionPage()
+	case "midi":
+		return newMidiPage()
+	case "info":
+		return newInfoMainPage()
+	case "info-device":
+		return newInfoDevicePage()
+	case "regulatory":
+		return newRegulatoryPage()
+	case "analytics":
+		return newAnalyticsPage()
+	case "firmware":
+		return newFirmwareUpdatePage()
+	case "opmode":
+		return newOperatingModePage()
+	case "storage":
+		return newStoragePage()
+	case "timezone":
+		return newTimeZonePage(&dateTimePage{init: true, zone: 49})
+	case "cloud":
+		return newCloudPage()
+	case "numpad":
+		return NewNumPad("Port", 1080, 1, 65535, nil)
 	}
 	return newMeteringPage()
 }

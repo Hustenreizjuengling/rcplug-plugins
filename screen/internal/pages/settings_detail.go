@@ -2,7 +2,6 @@ package pages
 
 import (
 	"image"
-	"time"
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/desk"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/font"
@@ -11,63 +10,6 @@ import (
 )
 
 // --- Display ---
-
-func newBrightnessPage() Page {
-	sliders := newSlidersPage("BRIGHTNESS", []sliderSpec{
-		{key: "DISPLAY", node: desk.GUINode, prop: "screenBrightness", min: 0, max: 255, text: pct255},
-		{key: "BUTTONS", node: desk.GUINode, prop: "activeButtonsBrightness", min: 0, max: 255, text: pct255},
-		{key: "BUTTONS INACTIVE", de: "Tasten inaktiv", en: "Buttons inactive", node: desk.GUINode, prop: "inactiveButtonsBrightness", min: 0, max: 255, text: pct255},
-	})
-	return &funcPage{title: "BRIGHTNESS", build: func(env *Env, r image.Rectangle) ui.View {
-		c := &ui.Container{}
-		c.SetBounds(r)
-		th := env.Ctx.Theme
-		c.Add(sliders.Build(env, image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+3*(124+th.Gap))))
-		// Auto brightness, as the device's switch (a bool since 1.7.6).
-		if env.Desk.Has(desk.GUINode, 0, "autoBrightness") {
-			rr := image.Rect(r.Min.X, r.Min.Y+3*(124+th.Gap), r.Max.X, r.Min.Y+3*(124+th.Gap)+th.Row)
-			card := ui.NewCard()
-			card.SetBounds(rr)
-			tog := ui.NewToggle(func() bool { return env.Desk.Bool(desk.GUINode, 0, "autoBrightness") },
-				func(on bool) { env.Desk.SetBool(desk.GUINode, 0, "autoBrightness", on) })
-			tog.Label = env.T("AUTO")
-			tog.SetBounds(ui.Inset(rr, 14))
-			c.Add(card, tog)
-		}
-		return c
-	}}
-}
-
-func pct255(v float64) string { return pct(v / 255) }
-
-func newMeteringPage() Page {
-	return newChoicePage("METERING", 2, []radioSpec{
-		{title: "DEFAULT", icon: "MeteringDefault", value: 0,
-			desc: "LEVEL METERS WILL INCLUDE MARKERS AT REGULAR INTERVALS AND WILL INDICATE UNITY LEVEL.",
-			de:   "Die Pegelanzeigen zeigen Markierungen in regelmäßigen Abständen und den Einheitspegel.",
-			en:   "Level meters will include markers at regular intervals and will indicate unity level."},
-		{title: "BROADCAST", icon: "MeteringBroadcast", value: 1,
-			desc: "LEVEL METERS WILL INCLUDE DBFS MARKERS ON EACH CHANNEL. GAIN REDUCTION METER WILL BE VISIBLE FOR EACH CHANNEL.",
-			de:   "Die Pegelanzeigen zeigen dBFS-Marken an jedem Kanal. Die Pegelreduktion wird für jeden Kanal angezeigt.",
-			en:   "Level meters will include dBFS markers on each channel. Gain reduction will be visible for each channel."},
-	}, func(env *Env) int64 { return env.Desk.Int(desk.GUINode, 0, "metering") },
-		func(env *Env, v int64) { env.Desk.SetInt(desk.GUINode, 0, "metering", v) })
-}
-
-func newHapticsPage() Page {
-	return newRadioPage("HAPTICS", desk.SystemNode, 0, "systemHapticSetting", []radioSpec{
-		{title: "HAPTIC FEEDBACK ALWAYS ON", icon: "IconHapticsAlways", value: 0},
-		{title: "HAPTIC FEEDBACK ON HOLD", icon: "IconHapticsHold", value: 1},
-		{title: "NO HAPTIC FEEDBACK", icon: "IconHapticsOff", value: 2},
-	})
-}
-
-func newRecButtonPage() Page {
-	return newRadioPage("REC BUTTON", desk.SystemNode, 0, "systemRecButtonSetting", []radioSpec{
-		{title: "PRESS TO PAUSE RECORDING", desc: "HOLD REC TO STOP RECORDING", icon: "IconRecPause", value: 0},
-		{title: "PRESS TO STOP RECORDING", desc: "", icon: "IconRecStop", value: 1},
-	})
-}
 
 // --- Outputs ---
 
@@ -96,31 +38,6 @@ func newListenPage() Page {
 		}
 		return 0
 	}, func(env *Env, v int64) { env.Desk.SetBool(desk.OutputNode, 0, "outputPrefader", v == 1) })
-}
-
-func newMultitrackPage() Page {
-	return &funcPage{title: "MULTITRACK", build: func(env *Env, r image.Rectangle) ui.View {
-		c := &ui.Container{}
-		c.SetBounds(r)
-		th := env.Ctx.Theme
-		cl := ui.NewChoiceList([]ui.Choice{
-			{Title: env.T("OFF")}, {Title: env.T("PRE-FADER"), Icon: "IconListenPreFader"}, {Title: env.T("POST-FADER"), Icon: "IconListenAfterFader"},
-		}, func() int { return int(env.Desk.Int(desk.OutputNode, 0, "recordingMultitrackMode")) },
-			func(i int) { env.Desk.SetInt(desk.OutputNode, 0, "recordingMultitrackMode", int64(i)) })
-		cl.Columns = 3
-		cl.RowH = 200
-		cl.SetBounds(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+200))
-		c.Add(cl)
-		rr := image.Rect(r.Min.X, r.Min.Y+230, r.Max.X, r.Min.Y+230+th.Row)
-		card := ui.NewCard()
-		card.SetBounds(rr)
-		tog := ui.NewToggle(func() bool { return env.Desk.Bool(desk.OutputNode, 0, "recordingProcessingBypass") },
-			func(v bool) { env.Desk.SetBool(desk.OutputNode, 0, "recordingProcessingBypass", v) })
-		tog.Label = env.T("BYPASS PROCESSING")
-		tog.SetBounds(ui.Inset(rr, 14))
-		c.Add(card, tog)
-		return c
-	}}
 }
 
 // --- Faders: a tile per strip, physical and virtual apart ---
@@ -236,79 +153,5 @@ func (t *faderTile) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
 
 // --- System ---
 
-var languages = []struct{ code, label string }{
-	{"en", "English"}, {"es", "Español"}, {"fr", "Français"}, {"it", "Italiano"},
-	{"pt", "Português"}, {"de", "Deutsch"}, {"ru", "Русский"}, {"ko", "Korean"}, {"ja", "Japanese"}, {"zh", "Chinese"},
-}
-
-func newLanguagePage() Page {
-	opts := make([]radioSpec, len(languages))
-	for i, l := range languages {
-		opts[i] = radioSpec{title: l.label, value: int64(i)}
-	}
-	return newChoicePage("SELECT LANGUAGE", 2, opts, func(env *Env) int64 {
-		cur := env.Desk.Str(desk.GUINode, 0, "lang")
-		for i, l := range languages {
-			if l.code == cur {
-				return int64(i)
-			}
-		}
-		return -1
-	}, func(env *Env, v int64) {
-		env.Desk.SetStr(desk.GUINode, 0, "lang", languages[v].code)
-		env.Nav.Toast(env.TR("", "Die Sprache gilt nach einem Neustart der Oberfläche.", "The language applies after the interface restarts."))
-	})
-}
-
-func newMidiPage() Page {
-	return newTogglesPage("MIDI", []toggleRow{
-		{key: "MIDI CONTROL", node: desk.SystemNode, prop: "systemMidiControl"},
-	})
-}
-
-// newDateTimePage shows the clock settings as the device has them; the
-// clock itself is the device's and is set on RØDE's screen.
-func newDateTimePage() Page {
-	return &funcPage{title: "DATE & TIME", build: func(env *Env, r image.Rectangle) ui.View {
-		c := &ui.Container{}
-		c.SetBounds(r)
-		th := env.Ctx.Theme
-		now := time.Now()
-		fields := []struct{ key, val string }{
-			{"YEAR", now.Format("2006")}, {"MONTH", now.Format("01")}, {"DAY", now.Format("02")},
-			{"HOURS", now.Format("15")}, {"MINUTES", now.Format("04")}, {"SECONDS", now.Format("05")},
-		}
-		cells := columns(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+160), 6, 16)
-		for i, f := range fields {
-			cell := cells[i]
-			card := ui.NewPanelView(th.Black)
-			card.SetBounds(image.Rect(cell.Min.X, cell.Min.Y, cell.Max.X, cell.Min.Y+110))
-			v := ui.NewLabel(f.val, th.Fonts.Big, th.Text, font.Center)
-			v.SetBounds(card.Bounds())
-			l := ui.NewLabel(env.T(f.key), th.Fonts.Label, th.Text, font.Center)
-			l.SetBounds(image.Rect(cell.Min.X, cell.Min.Y+114, cell.Max.X, cell.Max.Y))
-			c.Add(card, v, l)
-		}
-		rows := []toggleRow{
-			{key: "24H", node: desk.SystemNode, prop: "systemDateTime24h"},
-			{key: "SHOW DATE AND TIME ON HOME SCREEN", node: desk.SystemNode, prop: "systemDateTimeOnHome"},
-			{key: "DAYLIGHT SAVINGS", node: desk.SystemNode, prop: "systemDateTimeDaylightSavings"},
-		}
-		for i, row := range rows {
-			row := row
-			rr := image.Rect(r.Min.X, r.Min.Y+176+i*(th.Row+th.Gap), r.Max.X, r.Min.Y+176+i*(th.Row+th.Gap)+th.Row)
-			card := ui.NewCard()
-			card.SetBounds(rr)
-			tog := ui.NewToggle(func() bool { return env.Desk.Bool(row.node, 0, row.prop) },
-				func(on bool) { env.Desk.SetBool(row.node, 0, row.prop, on) })
-			tog.Label = env.TR(row.key, "Sommerzeit", "Daylight saving time")
-			tog.SetBounds(ui.Inset(rr, 14))
-			c.Add(card, tog)
-		}
-		hint := ui.NewLabel(env.TR("", "Uhrzeit und Zeitzone werden auf RØDEs eigenem Bildschirm gestellt.", "The time and the time zone are set on RØDE's own screen."),
-			th.Fonts.Small, th.TextDim, font.Center)
-		hint.SetBounds(image.Rect(r.Min.X, r.Max.Y-44, r.Max.X, r.Max.Y))
-		c.Add(hint)
-		return c
-	}}
-}
+// The language, MIDI, date & time, storage and information pages are in
+// settings_system.go, settings_datetime.go and settings_info.go.

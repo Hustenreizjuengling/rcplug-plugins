@@ -139,6 +139,27 @@ func BuildTree() []byte {
 		"systemDateTime24h": true, "systemDateTimeOnHome": true, "systemChannelSelected": -1, "systemDateTimeDaylightSavings": false, "systemDateTimezone": int64(49), "transferModeType": int64(0), "assignableMeterSource": 0,
 		"osUpdateAvailable": false, "appUpdateAvailable": false, "usb1Connected": true,
 		"disableAllHeadphoneOutputs": false,
+		// Settings and requests of the system pages (values as on a real Duo).
+		"systemBetaMode": false, "shareAnom": true, "shareResource": true, "boardType": int64(1),
+		"updateCheckRequested": false, "updateChecking": false, "updateNoInternet": false, "updateVersion": "",
+		"downloadInitiateRequested": false, "downloadCancelRequested": false, "updateDownloadProgress": int64(0),
+		"updateDownloaded": false, "updateInitiateRequested": false, "updateInstalledProgress": int64(0), "updateComplete": false,
+		"updateRebootRequested": false, "updateResetDeviceRequested": false, "updateViaUSB": false, "powerOffRequest": false,
+		"rcSyncModeRequest": false, "rcSyncState": int64(0), "rcSyncDeviceModel": int64(-1), "rcSyncCaptureMode": false,
+		"systemMainMode": int64(0), "engineMode": int64(0), "systemMixSelected": int64(13),
+	}))
+	// Headphone outputs (four in the tree, two on a Duo): port 1 set to
+	// Low Sensitivity as on the reference device, the ring colours as hex.
+	for i, typ := range []int64{2, 0, 0, 0} {
+		kids = append(kids, leaf("HEADPHONE", map[string]interface{}{"headphoneType": typ, "headphoneColour": []string{"ff3bd33b", "ff1e62e6", "ffffffff", "ffffffff"}[i]}))
+	}
+	kids = append(kids, leaf("BUILD", map[string]interface{}{
+		"buildMixerVersion": "1.7.6+", "buildMixerModulesGitSha": "0000000", "buildGuiVersion": "1.7.6", "buildGuiModulesGitSha": "0000000", "buildCallMeVersion": "1.7.6",
+	}))
+	kids = append(kids, leaf("OAUTH", map[string]interface{}{
+		"requestSignIn": false, "requestSignOut": false, "responsePending": false, "hasValidToken": false,
+		"verificationURL": "", "verificationURLBare": "", "userCode": "", "userName": "", "errorMessage": "",
+		"cloudUploadRequestUID": int64(0), "cloudUploadCancelUID": int64(0),
 	}))
 	kids = append(kids, leaf("RECORDER", map[string]interface{}{
 		"recordState": 0, "recordTimeMs": 0, "requestDropMarker": 0, "requestRecordState": 255, "recordBytesPerSecond": 384000,
@@ -166,13 +187,21 @@ func BuildTree() []byte {
 	kids = append(kids, leaf("CURRENTSHOW", map[string]interface{}{"currentShowName": "Meine Show", "currentShowIcon": int64(0), "currentShowUUID": ""}))
 	// The main knob (idle: int 0 + true) and the recording storage.
 	kids = append(kids, leaf("ENCODER", map[string]interface{}{"encoderSignal": "0105010000000001" + "0102", "encoderPressed": false, "encoderColour": 7}))
+	// The three volumes: microSD, USB storage, the pads' internal storage.
 	kids = append(kids, leaf("STORAGEVOLUME", map[string]interface{}{
 		"storageVolumeInserted": true, "storageVolumeMounted": true, "storageVolumeFormatted": true,
 		"storageVolumeCapacity": 64e9, "storageVolumeFree": 41e9, "storageVolumeRecDestination": true,
+		"storageVolumeEject": false, "storageVolumeErase": false, "storageVolumeTransfer": false, "storageVolumeName": "", "storageVolumeState": "64000000000|41000000000|0|1|1",
 	}))
 	kids = append(kids, leaf("STORAGEVOLUME", map[string]interface{}{
 		"storageVolumeInserted": false, "storageVolumeMounted": false, "storageVolumeFormatted": false,
-		"storageVolumeCapacity": 0, "storageVolumeFree": 0, "storageVolumeRecDestination": false,
+		"storageVolumeCapacity": 0, "storageVolumeFree": 0, "storageVolumeRecDestination": true,
+		"storageVolumeEject": false, "storageVolumeErase": false, "storageVolumeTransfer": false, "storageVolumeName": "", "storageVolumeState": "0|0|0|0|0",
+	}))
+	kids = append(kids, leaf("STORAGEVOLUME", map[string]interface{}{
+		"storageVolumeInserted": true, "storageVolumeMounted": true, "storageVolumeFormatted": true,
+		"storageVolumeCapacity": 5277638656, "storageVolumeFree": 5064294400, "storageVolumeRecDestination": false,
+		"storageVolumeEject": false, "storageVolumeErase": false, "storageVolumeName": "", "storageVolumeState": "5277638656|5064294400|0|1|1",
 	}))
 	// 30 input sources with gain/power/colour.
 	for i := 0; i < 30; i++ {
