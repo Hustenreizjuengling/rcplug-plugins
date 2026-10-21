@@ -6,6 +6,15 @@ may break compatibility).
 
 ## 0.5.38 - Unreleased
 
+### Fixed
+- **Screen 0.5.1: the browser page and the device's screen after the update.** 0.5.0
+  did not declare its web page to the host, so the dashboard had no Screen page and
+  nothing could take the device's screen; and a fresh install or an update that lost the
+  screen left RØDE's interface on the device with no way back. The page is declared
+  now, and the plugin remembers itself whether the interface belongs on the device's
+  screen (it does until "Back to RØDE"): when RØDE's program has the screen and nobody
+  else, it asks the host for it once RØDE's program is up.
+
 ## 0.5.37 - 2026-10-21
 
 ### Changed

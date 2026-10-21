@@ -23,6 +23,7 @@ import (
 	"image/png"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -183,13 +184,27 @@ type panelController struct {
 	reg    *ext.Registry
 }
 
+// rodeScreenRunning reports whether RØDE's screen program runs (the device
+// has finished starting its display).
+func rodeScreenRunning() bool {
+	dirs, _ := filepath.Glob("/proc/[0-9]*/comm")
+	for _, d := range dirs {
+		if b, err := os.ReadFile(d); err == nil && strings.TrimSpace(string(b)) == "rc_gui_juce" {
+			return true
+		}
+	}
+	return false
+}
+
 func (pc *panelController) run(ctx context.Context) {
 	self := sdk.Name()
 	var (
 		cancel  context.CancelFunc
 		done    chan struct{}
 		retryAt time.Time
+		askedAt time.Time
 	)
+	started := time.Now()
 	tick := time.NewTicker(300 * time.Millisecond)
 	defer tick.Stop()
 	for {
@@ -202,8 +217,21 @@ func (pc *panelController) run(ctx context.Context) {
 			return
 		case <-tick.C:
 		}
-		held := self != "" && ext.ScreenHolder() == self
+		holder := ext.ScreenHolder()
+		held := self != "" && holder == self
 		running := done != nil
+		// Nobody has the screen but RØDE, and the interface belongs on it:
+		// ask the host (once RØDE's program is up, as the host does at
+		// boot; again every half minute if the host said no).
+		if !held && holder == "" && pc.reg != nil && ext.PanelWish() && time.Since(started) > 3*time.Second &&
+			time.Since(askedAt) > 30*time.Second && rodeScreenRunning() {
+			askedAt = time.Now()
+			go func() {
+				if err := pc.reg.TakeScreen(); err != nil {
+					log.Printf("screen: asking for the device's screen: %v", err)
+				}
+			}()
+		}
 		if running {
 			select {
 			case <-done:
@@ -255,6 +283,7 @@ func (pc *panelController) once(ctx context.Context) error {
 	}
 	release := false
 	a.OnRode = func() { release = true; a.Quit() }
+	ext.SetPanelWish(true)
 	// A desk nobody has set up yet starts with the welcome flow and the
 	// setup assistant, as RØDE's screen does on its first start.
 	if firstRun() {
