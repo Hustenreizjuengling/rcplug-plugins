@@ -72,6 +72,7 @@ func (m *Model) flushWrites(ctx context.Context) {
 		cctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		if err := m.conn.Set(cctx, op.epoch, op.path, op.name, op.value); err != nil {
 			m.logf("screen: write %v.%s=%v: %v", op.path, op.name, op.value, err)
+			m.noteWriteError(op.name, err)
 		}
 		cancel()
 	}

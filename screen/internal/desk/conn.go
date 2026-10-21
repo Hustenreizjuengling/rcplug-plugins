@@ -36,11 +36,17 @@ func Dial(hostURL string) *Conn {
 // post sends a JSON body to one of the console's write endpoints, with the
 // headers the host and the console expect.
 func (c *Conn) post(ctx context.Context, path string, body interface{}) error {
+	return c.postURL(ctx, c.base+path, body)
+}
+
+// postURL is post to a full URL (the host's own endpoints live beside the
+// console's).
+func (c *Conn) postURL(ctx context.Context, url string, body interface{}) error {
 	raw, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+path, bytes.NewReader(raw))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(raw))
 	if err != nil {
 		return err
 	}

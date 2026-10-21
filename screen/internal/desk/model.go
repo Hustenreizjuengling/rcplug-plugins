@@ -49,6 +49,7 @@ type Model struct {
 
 	wmu     sync.Mutex
 	pending map[string]writeOp // coalesced writes, flushed by runWriter
+	denied  map[string]string  // properties the console refused, by name (see denied.go)
 
 	enc *encoderState // the main knob's turns and presses
 }
