@@ -25,6 +25,7 @@ func (p *rcplugPage) Build(env *Env, r image.Rectangle) ui.View {
 	c := &ui.Container{}
 	c.SetBounds(r)
 	th := env.Ctx.Theme
+	kickPlugins(env)
 
 	cells := tileGrid(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+280), 2, 2, 200, 40)
 	plugins := ui.NewTile(env.T("Plugins"), "IconSystem", func() { env.Nav.Open(IDPlugins) })
@@ -89,6 +90,14 @@ func (p *rcplugPage) Build(env *Env, r image.Rectangle) ui.View {
 	return c
 }
 
+// kickPlugins asks the plugin source to refresh its list now, so a page
+// that lists the plugins shows one installed or removed a moment ago.
+func kickPlugins(env *Env) {
+	if k, ok := env.Plugins.(interface{ Kick() }); ok {
+		k.Kick()
+	}
+}
+
 type pluginsPage struct{}
 
 func (p *pluginsPage) Title() string { return "Plugins" }
@@ -97,6 +106,7 @@ func (p *pluginsPage) Build(env *Env, r image.Rectangle) ui.View {
 	c := &ui.Container{}
 	c.SetBounds(r)
 	th := env.Ctx.Theme
+	kickPlugins(env)
 	if env.Plugins == nil {
 		lbl := ui.NewLabel("—", th.Fonts.Body, th.TextDim, font.Center)
 		lbl.SetBounds(r)

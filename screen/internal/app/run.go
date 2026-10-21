@@ -41,6 +41,8 @@ func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.Touc
 
 	wasDown := false
 	lastOnline, lastStrips := false, -1
+	var lastPlugins uint64
+	pluginsRev, _ := a.plugins.(interface{ Rev() uint64 })
 	knob := a.model.Encoder()
 	button := a.model.ChannelButton()
 
@@ -73,6 +75,14 @@ func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.Touc
 			if on, n := a.model.Online(), a.model.StripCount(); on != lastOnline || n != lastStrips {
 				lastOnline, lastStrips = on, n
 				a.Rebuild()
+			}
+			// A plugin installed, removed, started or stopped: the pages
+			// that list them show it.
+			if pluginsRev != nil {
+				if rev := pluginsRev.Rev(); rev != lastPlugins {
+					lastPlugins = rev
+					a.Rebuild()
+				}
 			}
 			a.expireToast()
 			a.mu.Lock()

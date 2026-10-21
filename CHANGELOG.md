@@ -6,6 +6,12 @@ may break compatibility).
 
 ## 0.5.28 - Unreleased
 
+### Fixed
+- **Screen 0.3.10: the rcplug and plugin pages show a plugin installed or removed a
+  moment ago** without a restart. The list is refreshed when such a page opens and the
+  pages are rebuilt when it changes (an install, a removal, a plugin starting or
+  stopping).
+
 ## 0.5.27 - 2026-10-21
 
 ### Fixed

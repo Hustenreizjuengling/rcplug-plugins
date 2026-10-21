@@ -33,6 +33,8 @@ type Registry struct {
 	cache   map[string]*pages.PluginPage
 	lang    string
 	polled  map[string]time.Time // when a page was last fetched on request
+	kick    chan struct{}        // a refresh asked for now
+	rev     uint64               // bumps when the plugin list changes
 	polling map[string]bool
 }
 
@@ -51,7 +53,7 @@ func New(hostURL, self string, logf func(string, ...interface{})) *Registry {
 		http:   &http.Client{Timeout: 4 * time.Second},
 		logf:   logf,
 		cache:  map[string]*pages.PluginPage{},
-		polled: map[string]time.Time{}, polling: map[string]bool{},
+		polled: map[string]time.Time{}, polling: map[string]bool{}, kick: make(chan struct{}, 1),
 	}
 }
 
@@ -102,7 +104,8 @@ func (r *Registry) Poll(name string) {
 	}()
 }
 
-// Run refreshes the registry until ctx ends.
+// Run refreshes the registry until ctx ends: every few seconds, and at once
+// when a page asks (Kick).
 func (r *Registry) Run(ctx context.Context) {
 	r.refresh(ctx)
 	t := time.NewTicker(5 * time.Second)
@@ -113,8 +116,26 @@ func (r *Registry) Run(ctx context.Context) {
 			return
 		case <-t.C:
 			r.refresh(ctx)
+		case <-r.kick:
+			r.refresh(ctx)
 		}
 	}
+}
+
+// Kick asks for a refresh now (a page that lists the plugins is opening).
+func (r *Registry) Kick() {
+	select {
+	case r.kick <- struct{}{}:
+	default:
+	}
+}
+
+// Rev counts the changes of the plugin list (which plugins there are, and
+// whether they run), so the UI can rebuild a page that lists them.
+func (r *Registry) Rev() uint64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.rev
 }
 
 type statusDoc struct {
@@ -156,9 +177,26 @@ func (r *Registry) refresh(ctx context.Context) {
 		}
 	}
 	r.mu.Lock()
+	if !samePlugins(r.plugins, list) {
+		r.rev++
+	}
 	r.plugins = list
 	r.cache = pagesByName
 	r.mu.Unlock()
+}
+
+// samePlugins reports whether two plugin lists show the same plugins in the
+// same states.
+func samePlugins(a, b []pages.PluginInfo) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // Plugins lists the installed plugins (from the cache).
