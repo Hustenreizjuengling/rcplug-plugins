@@ -85,8 +85,8 @@ func itoa(n int) string {
 	return itoa(n/10) + string(rune('0'+n%10))
 }
 
-// TestChannelButton: the strip's number is sent once when the button goes
-// down (systemChannelSelected leaves -1), never when it comes up.
+// TestChannelButton: every change of the selected channel is sent once: the
+// strip's number on a press, -1 when it is pressed again.
 func TestChannelButton(t *testing.T) {
 	m := New("http://127.0.0.1:0", nil)
 	for _, v := range []int64{0, -1, 2, -1, -1} {
@@ -102,14 +102,28 @@ func TestChannelButton(t *testing.T) {
 		}
 		break
 	}
-	if len(got) != 2 || got[0] != 0 || got[1] != 2 {
-		t.Fatalf("button presses %v, want [0 2]", got)
+	if len(got) != 4 || got[0] != 0 || got[1] != -1 || got[2] != 2 || got[3] != -1 {
+		t.Fatalf("button events %v, want [0 -1 2 -1]", got)
+	}
+	// SelectChannel writes the desk's property once per change.
+	m2 := NewOffline(nil)
+	tree := `{"epoch":1,"seq":1,"root":{"t":"Rodecaster","p":{},"y":"","c":[{"t":"SYSTEM","p":{"systemChannelSelected":-1},"y":"i","c":[]}]}}`
+	if err := m2.LoadRaw([]byte(tree)); err != nil {
+		t.Fatal(err)
+	}
+	m2.SelectChannel(2)
+	if m2.ChannelSelected() != 2 || m2.Int(SystemNode, 0, "systemChannelSelected") != 2 {
+		t.Fatalf("after SelectChannel(2): %d / %d", m2.ChannelSelected(), m2.Int(SystemNode, 0, "systemChannelSelected"))
+	}
+	m2.ReleaseChannel()
+	if m2.ChannelSelected() != -1 || m2.Int(SystemNode, 0, "systemChannelSelected") != -1 {
+		t.Fatal("ReleaseChannel did not clear the selection")
 	}
 }
 
 // TestChannelButtonFromChanges: a press arrives as a change of
-// SYSTEM.systemChannelSelected and reaches ChannelButton; a button held
-// while the tree loads is not a press.
+// SYSTEM.systemChannelSelected and reaches ChannelButton (so does the
+// release); a button held while the tree loads is not a press.
 func TestChannelButtonFromChanges(t *testing.T) {
 	m := NewOffline(nil)
 	tree := `{"epoch":1,"seq":1,"root":{"t":"Rodecaster","p":{},"y":"","c":[{"t":"SYSTEM","p":{"systemChannelSelected":1},"y":"i","c":[]}]}}`
@@ -127,7 +141,7 @@ func TestChannelButtonFromChanges(t *testing.T) {
 		}
 		break
 	}
-	if len(got) != 1 || got[0] != 0 {
-		t.Fatalf("button presses %v, want [0]", got)
+	if len(got) != 3 || got[0] != -1 || got[1] != 0 || got[2] != -1 {
+		t.Fatalf("button events %v, want [-1 0 -1]", got)
 	}
 }

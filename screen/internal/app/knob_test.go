@@ -97,11 +97,13 @@ func TestKnobOnMixer(t *testing.T) {
 	}
 }
 
-// TestChannelButton: the button above a fader opens that strip's channel
-// page, a second press on the same page returns to the mixer, and another
-// strip's button switches the page.
+// TestChannelButton: the desk selecting a channel (the button above a fader)
+// opens that strip's channel page, another strip switches the page, the
+// selection ending (the button pressed again) returns to the mixer; a page
+// opened or closed by touch sets the desk's selection, so the button's light
+// follows the pages.
 func TestChannelButton(t *testing.T) {
-	a, _ := newTestApp(t)
+	a, m := newTestApp(t)
 	a.ChannelButton(1)
 	if a.Depth() != 2 {
 		t.Fatalf("depth after the button: %d, want 2", a.Depth())
@@ -109,12 +111,31 @@ func TestChannelButton(t *testing.T) {
 	if ch, ok := a.Page().(*pages.ChannelPage); !ok || ch.Strip() != 1 {
 		t.Fatalf("top page after the button: %T", a.Page())
 	}
+	if m.ChannelSelected() != 1 {
+		t.Fatalf("selected %d after the button, want 1", m.ChannelSelected())
+	}
 	a.ChannelButton(2)
 	if ch, ok := a.Page().(*pages.ChannelPage); !ok || ch.Strip() != 2 || a.Depth() != 2 {
 		t.Fatalf("another strip's button should switch the page: %T depth %d", a.Page(), a.Depth())
 	}
-	a.ChannelButton(2)
-	if a.Depth() != 1 {
-		t.Fatalf("the same button again should return to the mixer, depth %d", a.Depth())
+	a.ChannelButton(-1)
+	if a.Depth() != 1 || m.ChannelSelected() != -1 {
+		t.Fatalf("the selection ending should return to the mixer: depth %d, selected %d", a.Depth(), m.ChannelSelected())
+	}
+
+	// By touch: opening selects, the channel's own pages keep the selection,
+	// closing clears it.
+	a.Push(pages.NewChannel(0))
+	if m.ChannelSelected() != 0 || m.Int(desk.SystemNode, 0, "systemChannelSelected") != 0 {
+		t.Fatalf("touch-opened channel 0: selected %d", m.ChannelSelected())
+	}
+	a.Push(pages.NewPresets(0))
+	if m.ChannelSelected() != 0 {
+		t.Fatal("a page of the channel should keep it selected")
+	}
+	a.Pop()
+	a.Pop()
+	if a.Depth() != 1 || m.ChannelSelected() != -1 || m.Int(desk.SystemNode, 0, "systemChannelSelected") != -1 {
+		t.Fatalf("after closing by touch: depth %d, selected %d", a.Depth(), m.ChannelSelected())
 	}
 }

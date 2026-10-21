@@ -18,6 +18,7 @@ import (
 func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.TouchEvent, turn int) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	defer a.model.ReleaseChannel() // no button stays lit for the next screen
 	a.mu.Lock()
 	a.quit = cancel
 	a.mu.Unlock()

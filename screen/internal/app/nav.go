@@ -21,6 +21,7 @@ func (a *App) Push(p pages.Page) {
 	a.dirty = true
 	a.mu.Unlock()
 	a.focus.reset()
+	a.syncChannel()
 }
 
 // Pop goes back one page.
@@ -33,6 +34,7 @@ func (a *App) Pop() {
 	a.dirty = true
 	a.mu.Unlock()
 	a.focus.reset()
+	a.syncChannel()
 }
 
 // Home returns to the mixer.
@@ -43,6 +45,7 @@ func (a *App) Home() {
 	a.dirty = true
 	a.mu.Unlock()
 	a.focus.reset()
+	a.syncChannel()
 }
 
 // Open shows a top-level page by its id.
@@ -65,6 +68,7 @@ func (a *App) Replace(p pages.Page) {
 	a.dirty = true
 	a.mu.Unlock()
 	a.focus.reset()
+	a.syncChannel()
 }
 
 // Refresh rebuilds the current page's views; the knob's focus stays where
@@ -133,27 +137,55 @@ func (a *App) clearOverlay() {
 	a.focus.reset()
 }
 
-// channelButton answers the button above a physical fader as RØDE's screen
-// does: it opens the strip's channel page; pressed again on that page, it
-// returns to the mixer.
-func (a *App) channelButton(strip int) {
-	if strip < 0 || strip >= a.model.StripCount() {
-		return
-	}
+// channelOpen is the strip whose channel pages are open (the channel page
+// itself or one of its pages above it), or -1.
+func (a *App) channelOpen() int {
 	a.mu.Lock()
-	top := a.stack[len(a.stack)-1]
+	defer a.mu.Unlock()
+	for i := len(a.stack) - 1; i >= 0; i-- {
+		if ch, ok := a.stack[i].(*pages.ChannelPage); ok {
+			return ch.Strip()
+		}
+	}
+	return -1
+}
+
+// syncChannel tells the desk which channel's pages are open after a page
+// change, as RØDE's screen does: the button above that fader lights, and
+// goes out when the pages close.
+func (a *App) syncChannel() {
+	a.model.SelectChannel(a.channelOpen())
+}
+
+// channelButton answers the desk's selected channel, which the buttons
+// above the physical faders change: a press selects the strip and opens its
+// channel page, the next press (or another strip's button) deselects it and
+// the pages close, as on RØDE's screen. The button's light is the desk's.
+func (a *App) channelButton(strip int) {
+	a.mu.Lock()
 	overlay := a.overlay
 	a.mu.Unlock()
 	if overlay != nil {
 		return
 	}
-	if ch, ok := top.(*pages.ChannelPage); ok && ch.Strip() == strip {
-		a.Home()
+	if strip < 0 {
+		if a.channelOpen() >= 0 {
+			a.Home()
+		}
 		return
 	}
-	a.Home()
-	a.Push(pages.NewChannel(strip))
+	if strip >= a.model.StripCount() || a.channelOpen() == strip {
+		return
+	}
+	a.mu.Lock()
+	a.stack = append(a.stack[:1], pages.NewChannel(strip))
+	a.overlay = nil
+	a.dirty = true
+	a.mu.Unlock()
+	a.focus.reset()
+	a.syncChannel()
 }
 
-// ChannelButton feeds a channel-button press (for tests and the preview).
+// ChannelButton feeds a change of the selected channel (for tests and the
+// preview): a strip's number, or -1.
 func (a *App) ChannelButton(strip int) { a.channelButton(strip) }

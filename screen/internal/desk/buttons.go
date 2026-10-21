@@ -1,17 +1,66 @@
 package desk
 
-// The channel buttons above the physical faders are read by the mixer, which
-// publishes SYSTEM.systemChannelSelected: the strip's number while a button
-// is held, -1 again when it is let go. (Seen on a Duo 1.7.6: 0…3 for the four
-// faders.) RØDE's screen opens the strip's channel page on the press; the
-// button's light is the mixer's own doing.
+import (
+	"context"
+	"time"
+)
 
-// ChannelButton is the stream of channel-button presses (the strip's number).
+// The channel buttons above the physical faders are read by the mixer, which
+// keeps the selected channel in SYSTEM.systemChannelSelected: a press sets
+// the strip's number, the next press (or RØDE's screen closing the channel
+// page) sets -1 again, and the button's light follows the property. (Seen on
+// a Duo 1.7.6: 0…3 for the four faders.) RØDE's screen writes the property
+// itself when a channel page opens or closes by touch, so the light always
+// says which channel's pages are open; this interface does the same.
+
+// ChannelButton is the stream of the selected channel's changes: the strip's
+// number when a button is pressed, -1 when it is pressed again or let go.
 func (m *Model) ChannelButton() <-chan int { return m.enc.buttons }
 
-// syncChannelButton takes the button's state from a freshly loaded tree
-// (under the model lock): a button held while the tree loaded is not a new
-// press.
+// ChannelSelected is the channel the desk has selected (-1 for none).
+func (m *Model) ChannelSelected() int {
+	m.enc.mu.Lock()
+	defer m.enc.mu.Unlock()
+	return m.enc.channel
+}
+
+// SelectChannel tells the desk which channel's pages are open (-1 for none),
+// which lights that channel's button and feeds the focus meters.
+func (m *Model) SelectChannel(n int) {
+	m.enc.mu.Lock()
+	same := m.enc.channel == n
+	m.enc.channel = n
+	m.enc.mu.Unlock()
+	if same {
+		return
+	}
+	m.SetInt(SystemNode, 0, "systemChannelSelected", int64(n))
+}
+
+// ReleaseChannel clears the selection at once, for the end of the
+// interface: the write goes out before the process ends, so no button stays
+// lit for the next screen.
+func (m *Model) ReleaseChannel() {
+	m.enc.mu.Lock()
+	was := m.enc.channel
+	m.enc.channel = -1
+	m.enc.mu.Unlock()
+	if was < 0 {
+		return
+	}
+	path, epoch, ok := m.writeLocal(SystemNode, 0, "systemChannelSelected", Int64(-1))
+	if !ok || m.offline {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := m.conn.Set(ctx, epoch, path, "systemChannelSelected", int64(-1)); err != nil {
+		m.logf("screen: write systemChannelSelected=-1: %v", err)
+	}
+}
+
+// syncChannelButton takes the selection from a freshly loaded tree (under
+// the model lock): a button held while the tree loaded is not a new press.
 func (m *Model) syncChannelButton() {
 	n := -1
 	if m.runs != nil {
@@ -34,10 +83,11 @@ func (m *Model) onChannelSelected(v Value) {
 	was := m.enc.channel
 	m.enc.channel = n
 	m.enc.mu.Unlock()
-	if n >= 0 && was < 0 {
-		select {
-		case m.enc.buttons <- n:
-		default:
-		}
+	if n == was {
+		return
+	}
+	select {
+	case m.enc.buttons <- n:
+	default:
 	}
 }

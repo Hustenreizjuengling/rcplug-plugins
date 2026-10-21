@@ -6,6 +6,15 @@ may break compatibility).
 
 ## 0.5.27 - Unreleased
 
+### Fixed
+- **Screen 0.3.9: the channel button and its light agree with the pages.** The desk
+  toggles its selected channel with every press (the light follows), but the interface
+  acted only on the press that selected one, so closing took two presses and the light
+  was out of step. Every change counts now: a press opens the channel page, the next
+  closes it; opening or closing a channel's pages by touch sets the desk's selection the
+  way RØDE's screen does, so the light goes out when the pages close, and the selection
+  is cleared when the interface ends.
+
 ## 0.5.26 - 2026-10-21
 
 ### Fixed
