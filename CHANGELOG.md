@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.39 - Unreleased
+## 0.5.39 - 2026-10-21
 
 ### Removed
 - **Screen 0.4.6 is Screen 0.4.5 again.** The browser interface and the device's screen
