@@ -200,6 +200,11 @@ func newRoutingMix(output int) Page { return &routingMix{output: output} }
 
 func (p *routingMix) Title() string { return "" }
 
+// MixOutput is the output whose mix the page edits; the app tells the desk
+// (SYSTEM.systemMixSelected) while the page is on the stack, as RØDE's
+// RoutingMixPage does on showing and hiding.
+func (p *routingMix) MixOutput() int { return p.output }
+
 // neighbours are the outputs before and after this one in tile order.
 func (p *routingMix) neighbours(env *Env) (prev, next int) {
 	top, bottom := routingOutputs(env)

@@ -431,11 +431,14 @@ func BuildTree() []byte {
 		"playerCurrentPositionTime": 4.0, "playerProgress": 0.18, "playerJumpToSample": "01050100000000010103",
 		"playerEnvStart": 0.0, "playerEnvFadeIn": 0.0, "playerEnvFadeOut": 1.0, "playerEnvStop": 1.0,
 	}))
+	// A recording's content is RØDE's fourteen "|" fields: name, hash, path,
+	// show, time (ms), length (s), multitrack, two flags, the envelope and
+	// the upload status (desk.ParseRecording).
 	var recs []node
 	for i, c := range []string{
-		"Recording 24|/media/sd/RODECaster/Recording 24.wav|1652324700|22|1",
-		"Recording 23|/media/sd/RODECaster/Recording 23.wav|1652238300|903|0",
-		"Recording 22|/media/sd/RODECaster/Recording 22.wav|1652151900|6275|1",
+		"Recording 24|3f2a9c|/media/sd/RODECaster/Recording 24.wav|Morgenrunde|1652324700000|22.5|1|0|0|0|0|1|1|0",
+		"Recording 23|8b1d04|/media/sd/RODECaster/Recording 23.wav|Morgenrunde|1652238300000|903.2|0|0|0|0|0|1|1|0",
+		"Recording 22|c07e51|/media/sd/RODECaster/Recording 22.wav|Interview|1652151900000|6275.8|1|0|0|0.05|0.1|0.9|0.95|0",
 	} {
 		recs = append(recs, leaf("RECORDING", map[string]interface{}{"recordingUID": int64(100 + i), "recordingContent": c}))
 	}

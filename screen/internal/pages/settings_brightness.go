@@ -86,13 +86,15 @@ func newBrightnessPage() Page {
 		}, func(i int) { dimAfterWrite(d, dimAfterOptions[i]) })
 		seg.SetBounds(image.Rect(r.Max.X-half, y+32, r.Max.X, y+32+72))
 		c.Add(seg)
+		c.Add(deniedNote(env, image.Rect(r.Min.X, r.Max.Y-50, r.Max.X, r.Max.Y), "screenDimAfterSeconds")...)
 		return c
 	}}
 }
 
-// dimAfterCurrent reads GUI.screenDimAfterSeconds. The screen program holds
-// it as a number of seconds; a desk that reports it as a flag counts true
-// as the first option.
+// dimAfterCurrent reads GUI.screenDimAfterSeconds the way RØDE's screen
+// does (a SyncProperty<int>; its buttons' handler 0x6f8a90 stores the
+// button's seconds): a number of seconds. The desk starts the property as
+// the flag false, which reads as 0 (Never) until the first write.
 func dimAfterCurrent(d *desk.Model) int64 {
 	v, ok := d.Get(desk.GUINode, 0, "screenDimAfterSeconds")
 	if !ok {
@@ -100,18 +102,17 @@ func dimAfterCurrent(d *desk.Model) int64 {
 	}
 	if v.Kind == 'b' {
 		if v.Bool {
-			return dimAfterOptions[0]
+			return 1 // a true flag is one second to the screen program: no button
 		}
 		return 0
 	}
 	return v.Int()
 }
 
-// dimAfterWrite writes the seconds in the property's own type.
+// dimAfterWrite writes the seconds as a number, as RØDE's screen does
+// whatever type the desk holds. The console refuses a number on a flag
+// property until it learns this one; the page then says so.
 func dimAfterWrite(d *desk.Model, secs int64) {
-	if v, ok := d.Get(desk.GUINode, 0, "screenDimAfterSeconds"); ok && v.Kind == 'b' {
-		d.SetBool(desk.GUINode, 0, "screenDimAfterSeconds", secs != 0)
-		return
-	}
+	d.ClearDenied("screenDimAfterSeconds")
 	d.SetInt(desk.GUINode, 0, "screenDimAfterSeconds", secs)
 }

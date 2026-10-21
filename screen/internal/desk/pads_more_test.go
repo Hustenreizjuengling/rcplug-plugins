@@ -80,18 +80,27 @@ func TestPadKindsAndPreview(t *testing.T) {
 	}
 }
 
-// TestParseRecording reads the list format and keeps unknown content as
-// the name.
+// TestParseRecording reads RØDE's fourteen-field content string and keeps
+// unknown content as the name.
 func TestParseRecording(t *testing.T) {
-	r := ParseRecording("Recording 24|/media/sd/RODECaster/Recording 24.wav|1652324700|22|1")
-	if r.Name != "Recording 24" || r.Path != "/media/sd/RODECaster/Recording 24.wav" || !r.Multi {
+	r := ParseRecording("Recording 24|3f2a9c|/media/sd/RODECaster/Recording 24.wav|Morgenrunde|1652324700000|22.5|1|0|1|0.1|0.2|0.8|0.9|4")
+	if r.Name != "Recording 24" || r.Hash != "3f2a9c" || r.Path != "/media/sd/RODECaster/Recording 24.wav" || r.Show != "Morgenrunde" {
 		t.Fatalf("parsed %+v", r)
 	}
-	if r.Duration != 22*time.Second || r.Date.Unix() != 1652324700 {
+	if !r.Multi || r.Flags != [2]bool{false, true} || r.Status != 4 {
+		t.Fatalf("flags: %+v", r)
+	}
+	if r.Duration != 22500*time.Millisecond || r.Date.UnixMilli() != 1652324700000 {
 		t.Fatalf("duration %v date %v", r.Duration, r.Date)
 	}
-	if r := ParseRecording("odd"); r.Name != "odd" || r.Multi {
+	if r.Env != [4]float64{0.1, 0.2, 0.8, 0.9} {
+		t.Fatalf("envelope %v", r.Env)
+	}
+	if r := ParseRecording("odd"); r.Name != "odd" || r.Multi || r.Env != [4]float64{0, 0, 1, 1} {
 		t.Fatalf("unknown content: %+v", r)
+	}
+	if r := ParseRecording("short|/a.wav|1|2|3"); r.Name != "short" || r.Path != "" {
+		t.Fatalf("a short string keeps only the name: %+v", r)
 	}
 }
 
