@@ -138,7 +138,7 @@ func BuildTree() []byte {
 		"systemHapticSetting": 1, "systemRecButtonSetting": 0, "systemMidiControl": false,
 		"systemDateTime24h": true, "systemDateTimeOnHome": true, "systemChannelSelected": -1, "systemDateTimeDaylightSavings": false, "systemDateTimezone": int64(49), "transferModeType": int64(0), "assignableMeterSource": 0,
 		"osUpdateAvailable": false, "appUpdateAvailable": false, "usb1Connected": true,
-		"disableAllHeadphoneOutputs": false,
+		"disableAllHeadphoneOutputs": false, "disableAllLineoutOutputs": false,
 		// Settings and requests of the system pages (values as on a real Duo).
 		"systemBetaMode": false, "shareAnom": true, "shareResource": true, "boardType": int64(1),
 		"updateCheckRequested": false, "updateChecking": false, "updateNoInternet": false, "updateVersion": "",
@@ -309,6 +309,7 @@ func BuildTree() []byte {
 	}
 	kids = append(kids, leaf("NETWORK", map[string]interface{}{
 		"wiredConnected": true, "wifi": false, "ipAddress": "192.168.0.50", "btConnectedAddress": "00:11:22:33:44:55", "btConnectedType": 0,
+		"wifiSSID": "", "wifiIpAddress": "", "cellEnabled": false, "cellUSBFound": false,
 	}))
 	kids = append(kids, leaf("RECORDINGS", map[string]interface{}{"recordingTotalCount": 3, "recordingTotalDuration": 7200}))
 

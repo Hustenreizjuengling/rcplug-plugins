@@ -4,7 +4,9 @@ import (
 	"image"
 	"time"
 
+	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/desk"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/font"
+	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/gfx"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
 )
 
@@ -23,7 +25,10 @@ func HeadphonePopup(env *Env, i int, w, h int) ui.View {
 	card := ui.NewPanelView(th.PanelHi)
 	card.Radius = 20
 	card.SetBounds(r)
-	icon := ui.NewIcon("IconHeadphones", th.Text)
+	// The headphones' picture is their type: NTH-100, or a high- or
+	// low-sensitivity pair (HEADPHONE[i].headphoneType, as the headphones
+	// page lists them).
+	icon := ui.NewIcon(headphoneTypeIcon(d.Int(HeadphoneNode, i, "headphoneType")), th.Text)
 	icon.SetBounds(image.Rect(r.Min.X+30, r.Min.Y+40, r.Min.X+120, r.Min.Y+130))
 	num := ui.NewLabel(intText(int64(i+1)), th.Fonts.Title, th.Text, font.Center)
 	num.SetBounds(image.Rect(r.Min.X+120, r.Min.Y+55, r.Min.X+170, r.Min.Y+115))
@@ -33,7 +38,46 @@ func HeadphonePopup(env *Env, i int, w, h int) ui.View {
 	sl.Step = 1.0 / 127
 	sl.SetBounds(image.Rect(r.Min.X+190, r.Min.Y+20, r.Max.X-24, r.Max.Y-20))
 	c.Add(card, icon, num, sl)
+	if d.Bool(desk.SystemNode, 0, "disableAllHeadphoneOutputs") {
+		// The outputs are switched off: a red cross over the picture, as
+		// the monitor shows it.
+		x := &crossView{col: th.Record}
+		x.SetBounds(icon.Bounds())
+		c.Add(x)
+	}
 	return c
+}
+
+// HeadphoneNode is the node type of a headphone output's settings.
+const HeadphoneNode = "HEADPHONE"
+
+// headphoneTypeIcon is the picture of a headphone type: 0 NTH-100, 1 a
+// high-sensitivity pair, 2 a low-sensitivity pair (the order of RØDE's
+// headphones page).
+func headphoneTypeIcon(t int64) string {
+	switch t {
+	case 1:
+		return "HeadphonesHighSensitivity"
+	case 2:
+		return "HeadphonesLowSensitivity"
+	}
+	return "HeadphonesNTH100"
+}
+
+// crossView draws a diagonal cross over its bounds.
+type crossView struct {
+	ui.Base
+	col gfx.Color
+}
+
+func (v *crossView) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
+	r := ui.Inset(v.Bounds(), 10)
+	p := &gfx.Path{}
+	p.MoveTo(float64(r.Min.X), float64(r.Min.Y))
+	p.LineTo(float64(r.Max.X), float64(r.Max.Y))
+	p.MoveTo(float64(r.Max.X), float64(r.Min.Y))
+	p.LineTo(float64(r.Min.X), float64(r.Max.Y))
+	dst.StrokePath(p, gfx.Identity, gfx.Stroke{Width: 6, Cap: gfx.RoundCap}, gfx.Solid(v.col), clip)
 }
 
 // transferPage covers the screen while the device's storage is mounted on

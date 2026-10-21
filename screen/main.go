@@ -169,6 +169,15 @@ func runDevice(ctx context.Context, card, touchDev, guiPath, langCode string, no
 			return lang.New(code, table)
 		})
 	}
+	// A desk nobody has set up yet starts with the welcome flow and the
+	// setup assistant, as RØDE's screen does on its first start.
+	if firstRun() {
+		a.Push(pages.NewWelcome(func() {
+			markWelcomeDone()
+			a.Home()
+		}))
+		log.Printf("screen: first start, showing the welcome flow")
+	}
 	log.Printf("screen: interface up (%s, %d texts, %d strips)", code, texts.Count(), model.StripCount())
 	return a.Run(ctx, scr, touches, panelTurn)
 }
@@ -219,6 +228,16 @@ func runPNG(out, resources, langCode, page string) error {
 		a.Push(pages.NewTransfer())
 	case page == "bluetooth-out":
 		a.Push(pages.Detail("bluetooth"))
+	case page == "welcome" || strings.HasPrefix(page, "welcome:"):
+		n, _ := strconv.Atoi(strings.TrimPrefix(page, "welcome:"))
+		w := pages.NewWelcome(nil).(*pages.WelcomePage)
+		w.SetStep(n)
+		a.Push(w)
+	case page == "wizard" || strings.HasPrefix(page, "wizard:"):
+		n, _ := strconv.Atoi(strings.TrimPrefix(page, "wizard:"))
+		w := pages.NewSetupAssistant(nil).(*pages.SetupAssistantPage)
+		w.SetStep(n)
+		a.Push(w)
 	case page == "keyboard":
 		a.Keyboard("Name", "Mic 1", nil)
 	case page == "dialog":
