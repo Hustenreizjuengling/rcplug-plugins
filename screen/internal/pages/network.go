@@ -173,7 +173,7 @@ func joinWifi(env *Env, raw string) {
 		join("")
 		return
 	}
-	env.Nav.Keyboard(env.T("ENTER PASSWORD FOR")+" "+ssid, "", func(psk string) {
+	env.Nav.Password(env.T("ENTER PASSWORD FOR")+" "+ssid, func(psk string) {
 		if psk != "" {
 			join(psk)
 		}
@@ -365,12 +365,8 @@ func newNetworkProxy() Page {
 		user := fieldButton(env, env.T("USERNAME"), func() string { return d.Str(proxyNode, 0, "proxyUsername") }, env.T("USERNAME"),
 			func(s string) { d.SetStr(proxyNode, 0, "proxyUsername", s) })
 		user.SetBounds(image.Rect(right.Min.X, right.Min.Y, right.Max.X, right.Min.Y+110))
-		pass := fieldButton(env, env.T("PASSWORD"), func() string {
-			if d.Str(proxyNode, 0, "proxyPassword") == "" {
-				return ""
-			}
-			return strings.Repeat("•", 8)
-		}, env.T("PASSWORD"), func(s string) { d.SetStr(proxyNode, 0, "proxyPassword", s) })
+		pass := secretButton(env, env.T("PASSWORD"), func() string { return d.Str(proxyNode, 0, "proxyPassword") },
+			func(s string) { d.SetStr(proxyNode, 0, "proxyPassword", s) })
 		pass.SetBounds(image.Rect(right.Min.X, right.Min.Y+130, right.Max.X, right.Min.Y+240))
 		c.Add(addr, port, user, pass)
 		return c

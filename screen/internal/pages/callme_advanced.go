@@ -173,14 +173,15 @@ func (p *callMeAdvancedPage) rowViews(env *Env, row advRow, rr image.Rectangle) 
 			}
 		}
 		b := ui.NewButton("", func() {
-			initial := value()
-			if row.kind == advSecret {
-				initial = ""
-			}
-			env.Nav.Keyboard(title, initial, func(s string) {
+			done := func(s string) {
 				d.SetStr(sipAdvancedNode, 0, row.prop, s)
 				env.Nav.Refresh()
-			})
+			}
+			if row.kind == advSecret {
+				env.Nav.Password(title, done)
+				return
+			}
+			env.Nav.Keyboard(title, value(), done)
 		})
 		b.Fill = th.Black
 		b.SetBounds(right)

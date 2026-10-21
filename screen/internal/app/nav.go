@@ -101,6 +101,18 @@ func (a *App) Keyboard(prompt, initial string, done func(string)) {
 	a.setOverlay(kb)
 }
 
+// Password asks for a secret with the on-screen keyboard (dots, an eye).
+func (a *App) Password(prompt string, done func(string)) {
+	kb := ui.NewKeyboard(prompt, "", func(s string) {
+		a.clearOverlay()
+		if done != nil {
+			done(s)
+		}
+	}, a.clearOverlay)
+	kb.Secret = true
+	a.setOverlay(kb)
+}
+
 // Confirm shows a modal dialog; onYes runs if confirmed.
 func (a *App) Confirm(title, message, yes string, danger bool, onYes func()) {
 	d := ui.NewDialog(title, message, yes, func() {

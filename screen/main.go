@@ -232,6 +232,8 @@ func runPNG(out, resources, langCode, page string) error {
 		a.Push(pages.CallMePage(page))
 	case page == "keyboard":
 		a.Keyboard("Name", "Mic 1", nil)
+	case page == "password":
+		a.Password("Enter password for Studio", nil)
 	case page == "dialog":
 		a.Confirm("CLEAR", "Are you sure you want to clear the pad?", "CLEAR", true, nil)
 	case page == "metering", page == "listen", page == "faders", page == "language", page == "datetime", page == "brightness", page == "haptics", page == "monitor", page == "multitrack":

@@ -55,6 +55,8 @@ type Nav interface {
 	Refresh()
 	// Keyboard asks for text with the on-screen keyboard, then calls done.
 	Keyboard(prompt, initial string, done func(string))
+	// Password is Keyboard for a secret: dots, with an eye to show them.
+	Password(prompt string, done func(string))
 	// Confirm shows a modal dialog; onYes runs if confirmed.
 	Confirm(title, message, yes string, danger bool, onYes func())
 	// Toast shows a brief message.

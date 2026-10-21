@@ -2,6 +2,7 @@ package pages
 
 import (
 	"image"
+	"strings"
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/font"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/gfx"
@@ -150,6 +151,25 @@ func fieldButton(env *Env, caption string, value func() string, prompt string, s
 	})
 	b.Fill = env.Ctx.Theme.Black
 	return &fieldView{Button: b, env: env, caption: caption, value: value, prompt: prompt}
+}
+
+// secretButton is fieldButton for a password: dots in the field, the
+// password keyboard to change it.
+func secretButton(env *Env, caption string, value func() string, set func(string)) ui.View {
+	b := ui.NewButton("", func() {
+		env.Nav.Password(caption, func(s string) {
+			set(s)
+			env.Nav.Refresh()
+		})
+	})
+	b.Fill = env.Ctx.Theme.Black
+	shown := func() string {
+		if value() == "" {
+			return ""
+		}
+		return strings.Repeat("•", 8)
+	}
+	return &fieldView{Button: b, env: env, caption: caption, value: shown, prompt: caption}
 }
 
 // fieldView draws a caption, the value (or the prompt, dimmed) in a black
