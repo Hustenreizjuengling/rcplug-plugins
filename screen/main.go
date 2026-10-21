@@ -200,7 +200,7 @@ func runPNG(out, resources, langCode, page string) error {
 		return err
 	}
 	switch {
-	case page == "":
+	case page == "", page == "home":
 	case page == "channel":
 		a.Push(pages.NewChannel(0))
 	case strings.HasPrefix(page, "channel:"):

@@ -6,6 +6,69 @@ may break compatibility).
 
 ## 0.5.31 - Unreleased
 
+### Added
+- **Screen 0.4.0: RØDE's screen, page for page.** Every page, control and text of
+  RØDE's screen program (firmware 1.7.6) was read from the program itself and rebuilt;
+  the plugin writes what that program writes and nothing else. Needs rcplug 0.8.22 for
+  the parts marked so.
+  - **Mixer and status bar:** the strip icon per source and input mode exactly as the
+    device chooses it (combo, headset, wireless, USB, Bluetooth, pads, CallMe, sync
+    sources), the network and cell indicators, the clock and date formats, the CallMe
+    arrows, the monitor ring's fixed, disabled and auto-muted states, the passing level
+    card for the monitor and Bluetooth, the headphone popup with the headphones' type and
+    a cross when the outputs are off, the marker hint when a recording starts, and the
+    knob's ring colour on the mixer (`ENCODER.encoderColour`).
+  - **Channel pages per source:** the assignment page with RØDE's tiles, descriptions,
+    the headset tile and the duplicate check; the combo input's gain per mode, the mic
+    carousel's hint texts; the headset input; the wireless channel with its transmitter
+    (type, battery, signal, gain assist, pad, pairing) and the wireless info page; the
+    USB 1, Chat, USB 2 and hosted USB microphone panels; Bluetooth; CallMe; sync sources;
+    the presets panel with save (keyboard, overwrite question) and delete (rcplug
+    0.8.22); the processing centre with RØDE's tabs, the Presets | Advanced foot and the
+    advanced dialog; every processor page with the program's scales, the EQ's draggable
+    band dots, the exciter, stereo panning and the hosted microphone's high-pass
+    switches; the echo, reverb (size knob with its five rooms), megaphone, robot,
+    voice-disguise and pitch panels; the master processing with its meter; the faders
+    page with drag and drop. Applying a preset sets the VoxLab-derived values the way the
+    program computes them.
+  - **Pads:** the bank page with RØDE's arrows, grid and colours; options, rename, the
+    twelve pad colours, the new-pad page per kind; the sound editor (envelope handles,
+    playhead, play mode, loop, replay, trim, record view, preview); the effects editor
+    (inputs, latching, the skeuomorphic panels); the mixer actions (censor, trash talk,
+    fade, back channel, ducking); MIDI triggers; CallMe quick dials; RØDECaster Video
+    actions; Icecast. Shows: main, new, load, import, export, icons, errors. Recordings:
+    the list, the player with jumps, markers, speed and edit handles, delete; the
+    unrecognised-disk popup.
+  - **Settings:** headphones (type per output with the volume warning), metering,
+    haptics, REC button, brightness with dim-after, multitrack with USB 1 modes and
+    confirmations, language, date and time with spinners and RØDE's 137 time zones
+    (the clock is set through rcplug 0.8.22), MIDI, information, device information
+    with regulatory and reset, analytics, firmware update states, storage with erase,
+    eject and format, transfer mode, operation mode, cloud connection, compression
+    quality, and a number pad. The menus carry RØDE's tiles in RØDE's order.
+  - **CallMe and network:** the configuration page with slot states, hosting with its
+    code and QR, licence activation, the advanced pages, quick dials and dialling
+    (rcplug 0.8.22 for new entries), fader assignment, incoming-call assignment, the
+    popups (incoming, conflict, recording warning, welcome, rating, time limit); the
+    network pages (status, join with the scan list and password keyboard, advanced,
+    DNS, proxy); Bluetooth pairing with discoverability, codes and the device lists.
+  - **First run:** the welcome flow and the setup assistant, step for step as the
+    program walks them (hearing warning, faders, inputs, microphones, gain, presets,
+    Bluetooth, USB, assignment, pads, shows, show name), entered once the way the
+    program decides it.
+
+### Changed
+- Screen: toasts stay four seconds, as RØDE's notification popup does.
+
+### Open
+- Screen: what the program did not give up — `assignableMeterSource` and
+  `systemMixSelected` (their value maps), the operation-mode page's binding beyond sync
+  mode, the recordings' `recordingContent` field order (shown as the whole text until a
+  capture with a card exists), the player's state and speed numbers, a transmitter's
+  status on the mixer strip, the RØDECaster Sync mixes, "new show from the current
+  show", and real waveforms (the files are the desk's). The pages say so where it
+  shows.
+
 ## 0.5.30 - 2026-10-21
 
 ### Fixed

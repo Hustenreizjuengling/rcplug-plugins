@@ -58,6 +58,16 @@ this plugin's own code.
   runs: a start before the desk had loaded begins in English and switches as
   soon as the setting is known, and the language page applies at once, as on
   RØDE's screen.
+- Since 0.4.0 it carries every page of RØDE's screen program (firmware
+  1.7.6), read from the program itself: the mixer, the channel pages per
+  source with the processors and effects, the pads with their editors,
+  shows and recordings, every settings page, CallMe, network and Bluetooth,
+  and the first-run welcome and setup assistant. It writes the desk's
+  properties the way that program does; saving presets and quick dials,
+  the system requests of the settings pages and setting the clock need
+  rcplug 0.8.22 or later (the console's screen level, `api/node/add` and
+  `api/node/remove`, `POST /api/system/clock`). What could not be read from
+  the program is listed in the CHANGELOG as open.
 - RØDE's screen comes back with the **Back to RØDE** button, when the plugin
   is stopped from the dashboard, or if it exits for any reason.
 - It is started in the dashboard the first time. With rcplug 0.8.17 or later

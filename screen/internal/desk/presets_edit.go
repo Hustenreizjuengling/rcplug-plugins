@@ -12,10 +12,9 @@ import (
 
 // Saving and deleting processing presets. RØDE's screen adds and removes
 // FXPRESET children of FXPRESETS (a child-added / child-removed message of
-// the desk's tree, not a property write), which the console plugin does not
-// pass on yet: the model asks the console for the two tree operations it
-// would need (api/tree/add and api/tree/remove) and reports when the host
-// has no such thing, so the pages can say so plainly.
+// the desk's tree, not a property write). The console passes those on for
+// the plugin with the screen (api/node/add and api/node/remove, rcplug
+// 0.8.22); an older host answers 404, which the pages say plainly.
 
 // ErrPresetsReadOnly says the console cannot add or remove tree nodes.
 var ErrPresetsReadOnly = errors.New("the console cannot add or remove presets")
@@ -131,16 +130,15 @@ func readOnlyIfMissing(err error) error {
 	return err
 }
 
-// AddChild asks the console to add a child node under a path (a tree
-// operation the desk's protocol has, which the console does not offer
-// yet: api/tree/add with the parent path, the node type and its properties).
+// AddChild asks the console to add a child node under a path (api/node/add
+// with the parent path, the node type and its properties; rcplug 0.8.22).
 func (c *Conn) AddChild(ctx context.Context, epoch uint64, parent []int, typ string, props map[string]interface{}) error {
-	return c.post(ctx, "api/tree/add", map[string]interface{}{"epoch": epoch, "path": parent, "type": typ, "props": props})
+	return c.post(ctx, "api/node/add", map[string]interface{}{"epoch": epoch, "path": parent, "type": typ, "props": props})
 }
 
-// RemoveChild asks the console to remove the node at a path (api/tree/remove).
+// RemoveChild asks the console to remove the node at a path (api/node/remove).
 func (c *Conn) RemoveChild(ctx context.Context, epoch uint64, path []int) error {
-	return c.post(ctx, "api/tree/remove", map[string]interface{}{"epoch": epoch, "path": path})
+	return c.post(ctx, "api/node/remove", map[string]interface{}{"epoch": epoch, "path": path})
 }
 
 // presetTimeout bounds a save or delete request.
