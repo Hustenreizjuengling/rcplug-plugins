@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.32 - Unreleased
+## 0.5.32 - 2026-10-21
 
 ### Fixed
 - **Screen 0.4.1: findings of a review of the assembled pages.** The new-show options
