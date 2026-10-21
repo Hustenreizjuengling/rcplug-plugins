@@ -13,6 +13,10 @@ may break compatibility).
   carry its options, so the tool left the whole entry out and the catalog showed a bare
   `plugrain`. The build uses rcplug 0.8.20 now (the plugins run with the same SDK).
 
+### Changed
+- All plugins are built with the rcplug SDK 0.8.20 (Backup 0.3.1, PlugRain 0.3.3,
+  Screen 0.3.8, Sonar 0.7.1); nothing changes in what they do.
+
 ## 0.5.25 - 2026-10-21
 
 ### Fixed
