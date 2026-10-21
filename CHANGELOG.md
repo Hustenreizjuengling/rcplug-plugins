@@ -4,6 +4,8 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
+## 0.5.26 - Unreleased
+
 ## 0.5.25 - 2026-10-21
 
 ### Fixed
