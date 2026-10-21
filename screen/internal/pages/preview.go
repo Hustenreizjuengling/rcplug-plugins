@@ -1,5 +1,7 @@
 package pages
 
+import "strings"
+
 // Detail returns a settings detail page by a short name (previews and
 // tests); unknown names give the metering page.
 func Detail(name string) Page {
@@ -57,11 +59,41 @@ func Detail(name string) Page {
 // PadPage returns a pad's options, new-pad or colour page by name (previews
 // and tests).
 func PadPage(idx int, name string) Page {
-	switch name {
-	case "new":
+	switch {
+	case name == "new":
 		return newPadNew(idx)
-	case "colour":
+	case name == "colour":
 		return newPadColour(idx)
+	case name == "sound":
+		return newPadSoundPage(idx)
+	case name == "mixer":
+		return newPadMixerPage(idx, false)
+	case name == "mixer:new":
+		return newPadMixerPage(idx, true)
+	case name == "trigger":
+		return newPadTriggerPage(idx)
+	case name == "dial":
+		return newPadDialPage(idx)
+	case name == "video":
+		return newPadVideoPage(idx)
+	case name == "icecast":
+		return newPadIcecastPage(idx)
+	case strings.HasPrefix(name, "fx"):
+		p := newPadFxPage(idx).(*padFxPage)
+		switch strings.TrimPrefix(name, "fx:") {
+		case "echo":
+			p.shown = fxEcho
+		case "megaphone":
+			p.shown = fxMegaphone
+		case "robot":
+			p.shown, p.voice = fxRobot, fxRobot
+		case "disguise":
+			p.shown, p.voice = fxDisguise, fxDisguise
+		case "pitch":
+			p.shown, p.voice = fxPitch, fxPitch
+		}
+		p.init = true
+		return p
 	}
 	return newPadOptions(idx)
 }

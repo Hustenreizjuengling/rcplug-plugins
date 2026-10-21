@@ -12,22 +12,19 @@ func init() {
 	register(IDPads, func() Page { return &padsPage{} })
 }
 
-// padsPage is the pad menu: ‹ › change the bank, the bank's pads sit in two
-// columns of three (slot 0…2 left, 3…5 right, as the device numbers them)
-// with their names beside the tiles, and the bank number underneath. A tap
-// on a used pad opens its options, on an empty one the new-pad page. The
-// mixer's pad area still plays the pads.
+// padsPage is RØDE's pad menu (PadsMainPage with its PadsBank): back and
+// home in the header and no title, a large ‹ and › at the sides to change
+// the bank, the bank's pads in two columns (slot 0…2 left, 3…5 right, as
+// the device numbers them) with each pad's name beside its tile — "Empty"
+// for a free slot, which shows a plus — and the bank's number under the
+// grid. A tap on a used pad opens its options, on an empty one the new-pad
+// page. The bank shown is the desk's live bank (GUI.selectedBank), so the
+// hardware pads follow, as on RØDE's screen.
 type padsPage struct{}
 
-func (p *padsPage) Title() string { return "SMART PADS" }
+func (p *padsPage) Title() string { return "" }
 
-func (p *padsPage) Header(env *Env, bar image.Rectangle) ([]ui.View, bool) {
-	th := env.Ctx.Theme
-	mid := (bar.Min.X + bar.Max.X) / 2
-	title := ui.NewLabel(env.T("SMART PADS"), th.Fonts.Title, th.Text, font.Center)
-	title.SetBounds(image.Rect(mid-250, bar.Min.Y, mid+250, bar.Max.Y))
-	return []ui.View{title}, false
-}
+func (p *padsPage) Header(env *Env, bar image.Rectangle) ([]ui.View, bool) { return nil, false }
 
 func (p *padsPage) Build(env *Env, r image.Rectangle) ui.View {
 	c := &ui.Container{}
@@ -36,73 +33,78 @@ func (p *padsPage) Build(env *Env, r image.Rectangle) ui.View {
 	d := env.Desk
 	per := d.PadsPerBank()
 	rows := (per + 1) / 2
-	gap := 18
-	side := min(150, (r.Dy()-60-(rows-1)*gap)/rows)
-	gridW := 2*side + 24 + 300 // tiles, their gap and the name columns
-	area := image.Rect((r.Min.X+r.Max.X)/2-gridW/2, r.Min.Y, (r.Min.X+r.Max.X)/2+gridW/2, r.Min.Y+rows*side+(rows-1)*gap)
+	gap := 28
+	side := min(124, (r.Dy()-70-(rows-1)*gap)/rows)
+	mid := (r.Min.X + r.Max.X) / 2
+	gridH := rows*side + (rows-1)*gap
+	top := r.Min.Y + (r.Dy()-70-gridH)/2
+	area := image.Rect(mid-side-gap/2, top, mid+side+gap/2, top+gridH)
 
-	// Bank arrows at the sides.
-	prev := chevron(env, false, true, func() {
-		if b := d.PadBank(); b > 0 {
-			d.SetPadBank(b - 1)
+	// The bank arrows: RØDE's own pictures, as tall as the grid.
+	arrow := func(next bool, x int) {
+		b := ui.NewButton("", func() {
+			bank := d.PadBank()
+			if next && int(bank)+1 < d.PadBanks() {
+				d.SetPadBank(bank + 1)
+			} else if !next && bank > 0 {
+				d.SetPadBank(bank - 1)
+			}
 			env.Nav.Refresh()
+		})
+		b.Icon = "IconPrevBank"
+		if next {
+			b.Icon = "IconNextBank"
 		}
-	})
-	prev.SetBounds(image.Rect(r.Min.X, area.Min.Y+area.Dy()/2-60, r.Min.X+90, area.Min.Y+area.Dy()/2+60))
-	next := chevron(env, true, true, func() {
-		if b := d.PadBank(); int(b)+1 < d.PadBanks() {
-			d.SetPadBank(b + 1)
-			env.Nav.Refresh()
-		}
-	})
-	next.SetBounds(image.Rect(r.Max.X-90, area.Min.Y+area.Dy()/2-60, r.Max.X, area.Min.Y+area.Dy()/2+60))
-	c.Add(prev, next)
+		b.Style = ui.StylePlain
+		b.SetBounds(image.Rect(x, area.Min.Y, x+110, area.Max.Y))
+		c.Add(b)
+	}
+	arrow(false, r.Min.X+20)
+	arrow(true, r.Max.X-130)
 
-	bank := int(d.PadBank())
 	for slot := 0; slot < per; slot++ {
 		slot := slot
 		col, row := slot/rows, slot%rows
 		y := area.Min.Y + row*(side+gap)
 		var tileR, nameR image.Rectangle
+		align := font.Right
 		if col == 0 {
-			tileR = image.Rect(area.Min.X+150, y, area.Min.X+150+side, y+side)
-			nameR = image.Rect(area.Min.X-40, y, area.Min.X+136, y+side)
+			tileR = image.Rect(area.Min.X, y, area.Min.X+side, y+side)
+			nameR = image.Rect(area.Min.X-330, y, area.Min.X-16, y+side)
 		} else {
-			tileR = image.Rect(area.Max.X-150-side, y, area.Max.X-150, y+side)
-			nameR = image.Rect(area.Max.X-136, y, area.Max.X+40, y+side)
+			tileR = image.Rect(area.Max.X-side, y, area.Max.X, y+side)
+			nameR = image.Rect(area.Max.X+16, y, area.Max.X+330, y+side)
+			align = font.Left
 		}
 		t := &padTile{env: env, slot: slot, menu: true}
 		t.SetBounds(tileR)
 		c.Add(t)
-		align := font.Right
-		if col == 1 {
-			align = font.Left
-		}
 		name := ui.NewLabel("", th.Fonts.Body, th.Text, align)
 		name.SetBounds(nameR)
 		c.Add(&updater{get: func() {
 			pad := d.PadAt(int(d.PadBank()), slot)
-			s := pad.Name
+			s, col := pad.Name, th.Text
 			if !pad.Exists {
-				s = env.T("EMPTY")
+				s, col = env.T("EMPTY"), th.TextDim
 			}
-			name.Set(s)
+			if s != name.Text || col != name.Color {
+				name.Text, name.Color = s, col
+				name.MarkDirty()
+			}
 		}}, name)
 	}
-	// The bank number.
-	num := ui.NewLabel("", th.Fonts.Label, th.TextDim, font.Center)
-	num.SetBounds(image.Rect(area.Min.X, area.Max.Y+8, area.Max.X, area.Max.Y+48))
-	c.Add(&updater{get: func() {
-		num.Set(env.TR("", "Bank", "Bank") + " " + intText(d.PadBank()+1) + " / " + intText(int64(d.PadBanks())))
-	}}, num)
-	_ = bank
+	// The bank number under the grid.
+	num := ui.NewLabel("", th.Fonts.Label, th.Text, font.Center)
+	num.SetBounds(image.Rect(area.Min.X-100, area.Max.Y+16, area.Max.X+100, area.Max.Y+60))
+	c.Add(&updater{get: func() { num.Set(intText(d.PadBank() + 1)) }}, num)
 	return c
 }
 
 // padTile is one pad: its kind's icon in the pad's colour and the name; a
 // tap plays it. compact is the mixer's smaller tile; menu is the pad menu's
 // tile, where a tap opens the pad's options (or the new-pad page) and the
-// name sits beside the tile.
+// name sits beside the tile. A used pad's tile in the menu is filled with
+// the pad's colour, as on RØDE's screen; an empty slot shows a plus.
 type padTile struct {
 	ui.Base
 	env     *Env
@@ -117,8 +119,7 @@ func (t *padTile) CanFocus() bool { return true }
 
 func (t *padTile) act() {
 	d := t.env.Desk
-	bank := int(d.PadBank())
-	pad := d.PadAt(bank, t.slot)
+	pad := d.PadAt(int(d.PadBank()), t.slot)
 	// On the device the pads play from the hardware buttons; the tiles on
 	// the screen open the pad (its options, or a new pad for an empty slot).
 	switch {
@@ -127,7 +128,6 @@ func (t *padTile) act() {
 	default:
 		t.env.Nav.Push(newPadNew(pad.Idx))
 	}
-	_ = bank
 }
 
 func (t *padTile) Activate() bool {
@@ -170,7 +170,7 @@ func (t *padTile) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
 	if !pad.Exists {
 		ui.Gradient(dst, b, th.Radius, gfx.Hex(0x1c1c1c), gfx.Hex(0x121212), clip)
 		if t.menu {
-			c.Icon(dst, "plus", centred(b, b.Dx()/3, b.Dy()/3), th.TextDim)
+			drawPlus(dst, centred(b, b.Dx()/3, b.Dy()/3), th.TextMuted, clip)
 		}
 		if t.Focused() {
 			ui.Focus(dst, b, th.Radius, false, th, clip)
@@ -179,20 +179,24 @@ func (t *padTile) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
 	}
 	col := padColour(pad.Colour)
 	switch {
+	case t.menu:
+		// The menu fills a used tile with the pad's colour.
+		fill := col
+		if t.pressed {
+			fill = gfx.Mix(col, th.Text, 0.25)
+		}
+		ui.Gradient(dst, b, th.Radius, gfx.Mix(fill, th.Text, 0.1), fill, clip)
+		c.Icon(dst, padTypeIcon(pad.Type), centred(b, b.Dx()*3/5, b.Dy()*3/5), th.TextOnLight)
 	case pad.Active || t.pressed:
 		ui.Gradient(dst, b, th.Radius, gfx.Mix(col, th.Text, 0.1), col, clip)
 	default:
 		ui.Gradient(dst, b, th.Radius, gfx.Hex(0x2a2a2a), gfx.Hex(0x161616), clip)
 	}
-	iconCol := col
-	textCol := th.Text
-	if pad.Active || t.pressed {
-		iconCol, textCol = th.TextOnLight, th.TextOnLight
-	}
-	if t.menu {
-		// The name sits beside the tile: the icon fills it.
-		c.Icon(dst, padTypeIcon(pad.Type), centred(b, b.Dx()*3/5, b.Dy()*3/5), iconCol)
-	} else {
+	if !t.menu {
+		iconCol, textCol := col, th.Text
+		if pad.Active || t.pressed {
+			iconCol, textCol = th.TextOnLight, th.TextOnLight
+		}
 		side := min(b.Dx(), b.Dy()) / 2
 		if t.compact {
 			side = min(b.Dx(), b.Dy()) * 2 / 5
@@ -204,4 +208,12 @@ func (t *padTile) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
 	if t.Focused() {
 		ui.Focus(dst, b, th.Radius, false, th, clip)
 	}
+}
+
+// drawPlus draws the "+" of an empty pad slot.
+func drawPlus(dst *gfx.Image, r image.Rectangle, col gfx.Color, clip image.Rectangle) {
+	cx, cy := (r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2
+	arm, thick := r.Dx()/2, max(3, r.Dx()/9)
+	ui.Fill(dst, image.Rect(cx-arm, cy-thick/2, cx+arm, cy+thick/2), col, clip)
+	ui.Fill(dst, image.Rect(cx-thick/2, cy-arm, cx+thick/2, cy+arm), col, clip)
 }
