@@ -153,11 +153,15 @@ func outputIcon(id string) string {
 	return "IconRouting"
 }
 
-// padPalette are the SMART-pad colours by index.
+// padPalette are the SMART-pad colours by index (padColourIndex 0…11), as
+// RØDE's screen program keeps them in its colour table at 0xbc93b0 (the
+// four headphone colours come first; the twelve pad colours follow): red,
+// orange, amber, yellow, lime, green, teal, cyan, blue, violet, purple,
+// magenta.
 var padPalette = []gfx.Color{
-	gfx.Hex(0xe8302a), gfx.Hex(0xf5c518), gfx.Hex(0xf07f1a), gfx.Hex(0x3bd33b),
-	gfx.Hex(0x1e62e6), gfx.Hex(0x2ad0d0), gfx.Hex(0x9b4de0), gfx.Hex(0xff5fb0),
-	gfx.Hex(0xffffff), gfx.Hex(0x8c8c8c), gfx.Hex(0xb6e34a), gfx.Hex(0x33a3ff),
+	gfx.Hex(0xdd1919), gfx.Hex(0xff7a00), gfx.Hex(0xffb800), gfx.Hex(0xffe600),
+	gfx.Hex(0x7ecc00), gfx.Hex(0x00b800), gfx.Hex(0x00daa6), gfx.Hex(0x00cbf8),
+	gfx.Hex(0x0047ff), gfx.Hex(0x7000ff), gfx.Hex(0xad00ff), gfx.Hex(0xff00e5),
 }
 
 func padColour(i int64) gfx.Color {
@@ -167,7 +171,7 @@ func padColour(i int64) gfx.Color {
 	return gfx.Hex(0x9a9a9a)
 }
 
-// padTypeIcon is the picture of a pad's kind.
+// padTypeIcon is the picture of a pad's kind (RØDE's tile icons by padType).
 func padTypeIcon(t int64) string {
 	switch t {
 	case 2:
@@ -178,6 +182,10 @@ func padTypeIcon(t int64) string {
 		return "smart_pads_trigger"
 	case 5:
 		return "smart_pads_quick_dial"
+	case 6:
+		return "smart_pads_video"
+	case 7:
+		return "pads_icecast"
 	}
 	return "smart_pads_sound"
 }
