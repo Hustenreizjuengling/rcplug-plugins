@@ -6,6 +6,26 @@ may break compatibility).
 
 ## 0.5.33 - Unreleased
 
+### Added
+- **Screen 0.4.2: the last open values, read from the screen program.** The routing
+  mix pages write the desk's selected mix (`SYSTEM.systemMixSelected`: the output's
+  index while a mix page is open, 13 when none); the processing pages set the
+  assignable meter's source the way the program does (gain panel 0, compressor 1,
+  de-esser 2, noise gate 3, panning 4); the operation-mode page binds Podcast, Karaoke
+  and RØDECaster Sync to `systemMainMode` with the program's dialogs and the reboot
+  request; the recordings list reads the record's fourteen fields (name, path, time in
+  milliseconds, length, multitrack, envelope, upload state), the player loads and saves
+  the envelope as the program does and reads the markers from the WAV file's cue chunk;
+  leaving a wireless channel while it pairs cancels the pairing (`radioPair` −1), unpair
+  writes the transmitter's serial; the hosted USB microphone is named from the program's
+  product table; the brightness page writes the dim time as seconds (rcplug 0.8.23
+  takes it while the device still holds the factory's bool).
+
+### Open
+- Screen: the player's state and speed numbers and "new show from the current show"
+  stay as before (their final writes were not found); the strip shows no transmitter
+  status, as the program's strip does not either.
+
 ## 0.5.32 - 2026-10-21
 
 ### Fixed
