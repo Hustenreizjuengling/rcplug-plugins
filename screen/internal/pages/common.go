@@ -60,23 +60,21 @@ func pct(v float64) string {
 // intText formats a whole number.
 func intText(v int64) string { return strconv.FormatInt(v, 10) }
 
-// clockText formats a time as the device shows it: "12:34:45" with " pm"
-// when the clock is 12-hour.
+// clockText formats a time as the device shows it (1.7.x): "04:39:52" with
+// a small "am"/"pm" beside it on the 12-hour clock, "16:39:52" on the
+// 24-hour clock.
 func clockText(t time.Time, h24 bool) (main, suffix string) {
 	if h24 {
 		return t.Format("15:04:05"), ""
 	}
-	return t.Format("3:04:05"), t.Format("pm")
+	return t.Format("03:04:05"), t.Format("pm")
 }
 
-var germanMonths = []string{"Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"}
-
-// dateText formats a date as "14 March 2023" / "14. März 2023".
-func dateText(t time.Time, german bool) string {
-	if german {
-		return fmt.Sprintf("%d. %s %d", t.Day(), germanMonths[t.Month()-1], t.Year())
-	}
-	return t.Format("2 January 2006")
+// dateText formats a date as the device shows it: "07 February 2025". The
+// month names are not translated (the device's screen keeps the English
+// names in every language).
+func dateText(t time.Time) string {
+	return t.Format("02 January 2006")
 }
 
 // hoursText shortens a duration to the device's "12+ hrs" / "45 min".

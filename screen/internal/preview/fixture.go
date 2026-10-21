@@ -138,7 +138,8 @@ func BuildTree() []byte {
 		"systemHapticSetting": 1, "systemRecButtonSetting": 0, "systemMidiControl": false,
 		"systemDateTime24h": true, "systemDateTimeOnHome": true, "systemChannelSelected": -1, "systemDateTimeDaylightSavings": false, "systemDateTimezone": int64(49), "transferModeType": int64(0), "assignableMeterSource": 0,
 		"osUpdateAvailable": false, "appUpdateAvailable": false, "usb1Connected": true,
-		"disableAllHeadphoneOutputs": false,
+		"disableAllHeadphoneOutputs": false, "disableAllLineoutOutputs": false, "boardType": int64(1),
+		"systemMixSelected": int64(13), "rcSyncState": int64(0),
 	}))
 	kids = append(kids, leaf("RECORDER", map[string]interface{}{
 		"recordState": 0, "recordTimeMs": 0, "requestDropMarker": 0, "requestRecordState": 255, "recordBytesPerSecond": 384000,
@@ -280,7 +281,13 @@ func BuildTree() []byte {
 	}
 	kids = append(kids, leaf("NETWORK", map[string]interface{}{
 		"wiredConnected": true, "wifi": false, "ipAddress": "192.168.0.50", "btConnectedAddress": "00:11:22:33:44:55", "btConnectedType": 0,
+		"wifiSSID": "", "wifiIpAddress": "", "cellEnabled": false, "cellUSBFound": false,
 	}))
+	// The headphone outputs' types (a Duo: a low-sensitivity pair on 1, the
+	// default NTH-100 on 2).
+	for _, t := range []int64{2, 0} {
+		kids = append(kids, leaf("HEADPHONE", map[string]interface{}{"headphoneType": t, "headphoneColour": "ffd43580"}))
+	}
 	kids = append(kids, leaf("RECORDINGS", map[string]interface{}{"recordingTotalCount": 3, "recordingTotalDuration": 7200}))
 
 	root := node{T: "Rodecaster", P: map[string]interface{}{}, C: kids}

@@ -3,6 +3,7 @@ package app
 import (
 	"time"
 
+	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/desk"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/pages"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
 )
@@ -127,6 +128,7 @@ func (a *App) setOverlay(v ui.View) {
 	a.dirty = true
 	a.mu.Unlock()
 	a.focus.reset()
+	a.syncEncoderRing()
 }
 
 func (a *App) clearOverlay() {
@@ -135,6 +137,7 @@ func (a *App) clearOverlay() {
 	a.dirty = true
 	a.mu.Unlock()
 	a.focus.reset()
+	a.syncEncoderRing()
 }
 
 // channelOpen is the strip whose channel pages are open (the channel page
@@ -155,6 +158,21 @@ func (a *App) channelOpen() int {
 // goes out when the pages close.
 func (a *App) syncChannel() {
 	a.model.SelectChannel(a.channelOpen())
+	a.syncEncoderRing()
+}
+
+// syncEncoderRing sets the main knob's ring as RØDE's screen does: lit in
+// the monitor colour while the mixer is shown, off on every other page and
+// under a dialog or keyboard.
+func (a *App) syncEncoderRing() {
+	a.mu.Lock()
+	home := len(a.stack) == 1 && a.overlay == nil
+	a.mu.Unlock()
+	if home {
+		a.model.SetEncoderColour(desk.EncoderRingHome)
+	} else {
+		a.model.SetEncoderColour(desk.EncoderRingOff)
+	}
 }
 
 // channelButton answers the desk's selected channel, which the buttons

@@ -21,6 +21,23 @@ type HomePage struct {
 	barUntil time.Time // when the bar hides again
 	knob     int       // the knob's focus: 0 monitor, 1… the virtual strips
 	knobOn   bool      // a turn or press happened (shows the focus)
+
+	overlay      int       // the level overlay shown: 0 none, 1 monitor, 2 Bluetooth
+	overlayUntil time.Time // when it passes
+}
+
+// showLevel brings up the level overlay of the monitor (bt false) or the
+// Bluetooth output for a moment.
+func (p *HomePage) showLevel(env *Env, bt bool) {
+	was := p.overlay
+	p.overlay = 1
+	if bt {
+		p.overlay = 2
+	}
+	p.overlayUntil = time.Now().Add(overlayFor)
+	if was != p.overlay {
+		env.Nav.Refresh()
+	}
 }
 
 // NewHome makes the mixer page.
@@ -73,6 +90,16 @@ func (p *HomePage) Build(env *Env, r image.Rectangle) ui.View {
 			}
 		}})
 	}
+	// The passing level overlay of the monitor or the Bluetooth output.
+	if p.overlay != 0 && time.Now().Before(p.overlayUntil) {
+		c.Add(newLevelOverlay(env, p.overlay == 2, r.Dx(), r.Dy()))
+		c.Add(&updater{get: func() {
+			if time.Now().After(p.overlayUntil) {
+				p.overlay = 0
+				env.Nav.Refresh()
+			}
+		}})
+	}
 	return c
 }
 
@@ -99,7 +126,7 @@ func (p *HomePage) statusBar(env *Env, bar image.Rectangle) []ui.View {
 	rec := newRecButton(env)
 	rec.SetBounds(image.Rect(bar.Min.X+28, bar.Min.Y+9, bar.Min.X+128, bar.Min.Y+109))
 	out = append(out, rec)
-	clock := &clockView{env: env}
+	clock := &clockView{env: env, lastRec: env.Desk.RecordState()}
 	clock.SetBounds(image.Rect(bar.Min.X+150, bar.Min.Y, bar.Min.X+470, bar.Max.Y))
 	out = append(out, clock)
 
@@ -121,13 +148,23 @@ func (p *HomePage) statusBar(env *Env, bar image.Rectangle) []ui.View {
 
 	// Master meter L/R with its scale.
 	mm := &masterMeter{env: env}
-	mm.SetBounds(image.Rect(bar.Min.X+820, bar.Min.Y+30, bar.Min.X+1206, bar.Min.Y+108))
+	mm.SetBounds(image.Rect(bar.Min.X+820, bar.Min.Y+30, bar.Min.X+1096, bar.Min.Y+108))
 	out = append(out, mm)
 
+	// The network indicator and, on a desk with CallMe, its arrows, then the
+	// settings cog.
 	cog := ui.NewButton("", func() { env.Nav.Open(IDSettings) })
 	cog.Icon, cog.Style = "settings_icon", ui.StylePlain
 	cog.SetBounds(image.Rect(bar.Max.X-86, bar.Min.Y+24, bar.Max.X-14, bar.Min.Y+96))
-	out = append(out, cog)
+	cm := &callMeIndicator{env: env}
+	cm.SetBounds(image.Rect(bar.Max.X-156, bar.Min.Y+36, bar.Max.X-100, bar.Min.Y+92))
+	si := &sysIndicator{env: env}
+	right := bar.Max.X - 100
+	if cm.callMeState() != "" {
+		right = bar.Max.X - 168
+	}
+	si.SetBounds(image.Rect(right-80, bar.Min.Y+44, right, bar.Min.Y+84))
+	out = append(out, si, cm, cog)
 	_ = th
 	return out
 }
@@ -147,6 +184,7 @@ type clockView struct {
 	ui.Base
 	env     *Env
 	last    string
+	lastRec int64 // the recorder's state as last seen (−1 before the first look)
 	pressed bool
 }
 
@@ -160,7 +198,7 @@ func (v *clockView) text() (big, small, sub string) {
 	}
 	now := time.Now()
 	main, suffix := clockText(now, d.Clock24h())
-	return main, suffix, dateText(now, v.env.Text.German())
+	return main, suffix, dateText(now)
 }
 
 func (v *clockView) Dirty() []image.Rectangle {
@@ -168,6 +206,14 @@ func (v *clockView) Dirty() []image.Rectangle {
 	if cur := a + b + c; cur != v.last {
 		v.last = cur
 		v.MarkDirty()
+	}
+	// A recording that starts (not one resumed from a pause) brings the
+	// marker hint for a moment, as RØDE's REC button handler does.
+	if st := v.env.Desk.RecordState(); st != v.lastRec {
+		if st == 2 && v.lastRec != 1 && v.lastRec >= 0 {
+			v.env.Nav.Toast(v.env.T("TAP TIMER TO DROP MARKER"))
+		}
+		v.lastRec = st
 	}
 	return v.Base.Dirty()
 }
@@ -252,12 +298,24 @@ func (v *storageView) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) 
 type monitorKnob struct {
 	ui.Base
 	env   *Env
-	page  *HomePage
-	bt    bool // the Bluetooth output's ring instead (shown while a device is connected)
+	page  *HomePage // nil on the overlay
+	bt    bool      // the Bluetooth output's ring instead (shown while a device is connected)
+	plain bool      // the overlay's copy: it shows, it does not take touches
 	last  string
 	lastY int
 	drag  bool
 	moved bool
+}
+
+// fixed reports a locked level: the monitor's 'Fixed Output Level'. The
+// ring is then white and neither drag nor knob change it.
+func (k *monitorKnob) fixed() bool {
+	return !k.bt && k.env.Desk.Bool(desk.OutputNode, 0, "outputMonFixed")
+}
+
+// disabled reports outputs switched off at the system (red ring and cross).
+func (k *monitorKnob) disabled() bool {
+	return !k.bt && k.env.Desk.Bool(desk.SystemNode, 0, "disableAllLineoutOutputs")
 }
 
 // level, muted and autoMuted read the output the ring stands for.
@@ -269,6 +327,9 @@ func (k *monitorKnob) level() float64 {
 }
 
 func (k *monitorKnob) setLevel(v float64) {
+	if k.fixed() {
+		return
+	}
 	if k.bt {
 		k.env.Desk.SetFloat(desk.OutputNode, 0, "outputBTLevel", math.Max(0, math.Min(1, v)))
 		return
@@ -290,7 +351,9 @@ func (k *monitorKnob) autoMuted() bool {
 	return k.env.Desk.MonitorAutoMuted()
 }
 
-func (k *monitorKnob) focused() bool { return !k.bt && k.page.knobOn && k.page.knob == 0 }
+func (k *monitorKnob) focused() bool {
+	return !k.bt && k.page != nil && k.page.knobOn && k.page.knob == 0
+}
 
 func (k *monitorKnob) state() string {
 	s := ""
@@ -302,6 +365,12 @@ func (k *monitorKnob) state() string {
 	}
 	if k.focused() {
 		s += "f"
+	}
+	if k.fixed() {
+		s += "x"
+	}
+	if k.disabled() {
+		s += "d"
 	}
 	return s + pct(k.level())
 }
@@ -315,6 +384,9 @@ func (k *monitorKnob) Dirty() []image.Rectangle {
 }
 
 func (k *monitorKnob) Touch(phase ui.TouchPhase, p image.Point) bool {
+	if k.plain || k.page == nil {
+		return false
+	}
 	switch phase {
 	case ui.Down:
 		k.drag, k.moved, k.lastY = true, false, p.Y
@@ -324,16 +396,17 @@ func (k *monitorKnob) Touch(phase ui.TouchPhase, p image.Point) bool {
 				k.moved = true
 				k.setLevel(k.level() + float64(dy)/200)
 				k.lastY = p.Y
+				k.page.showLevel(k.env, k.bt)
 			}
 		}
 	case ui.Up:
 		if k.drag && !k.moved {
-			if k.bt {
-				k.env.Nav.Toast(k.env.T("BLUETOOTH") + ": " + pct(k.level()))
-			} else {
+			// A tap: the level overlay; the monitor also takes the knob's
+			// focus.
+			if !k.bt {
 				k.page.knob, k.page.knobOn = 0, true
-				k.env.Nav.Toast(k.env.T("MONITOR") + ": " + pct(k.level()))
 			}
+			k.page.showLevel(k.env, k.bt)
 		}
 		k.drag = false
 	}
@@ -348,10 +421,12 @@ func (k *monitorKnob) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) 
 	ui.Circle(dst, cx, cy, rad-4, gfx.Hex(0x101010), clip)
 	ring := th.Accent
 	switch {
-	case k.muted():
+	case k.muted(), k.disabled():
 		ring = th.Record
 	case k.autoMuted():
 		ring = th.Warn
+	case k.fixed():
+		ring = gfx.Hex(0xc4c4c4) // the locked level: a white ring
 	}
 	// The track and the level arc, from the bottom around.
 	const start = math.Pi * 0.5
@@ -366,7 +441,7 @@ func (k *monitorKnob) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) 
 		icon = "bluetooth"
 	}
 	c.Icon(dst, icon, ic, th.Text)
-	if k.muted() || k.autoMuted() {
+	if k.muted() || k.autoMuted() || k.disabled() {
 		cross := &gfx.Path{}
 		cross.MoveTo(cx-16, cy-16)
 		cross.LineTo(cx+16, cy+16)
@@ -622,16 +697,16 @@ func (s *stripView) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
 	if d.Cue(s.strip) {
 		iconCol = th.Accent
 	}
-	icon := sourceIcon(name.ID)
+	icon := stripIcon(s.env, s.strip)
 	if src < 0 {
-		icon = "IconNotAssigned"
-		iconCol = th.TextMuted
+		// An unassigned strip: RØDE's dim grey "+".
+		iconCol = gfx.Hex(0xc4c4c4).WithAlpha(0.3)
 	}
 	iw := min(ic.Dx()-16, 62)
 	ir := image.Rect((ic.Min.X+ic.Max.X)/2-iw/2, ic.Min.Y+2, (ic.Min.X+ic.Max.X)/2+iw/2, ic.Min.Y+2+58)
 	if icon != "" {
 		c.Icon(dst, icon, ir, iconCol)
-	} else {
+	} else if src >= 0 {
 		ui.Text(dst, th.Fonts.Small, name.Label, ir, font.Center, iconCol, clip)
 	}
 	if col := d.InputColour(s.strip); col != "" && src >= 0 {
@@ -680,9 +755,9 @@ func (p *HomePage) stripBar(env *Env, area image.Rectangle, w, n int) []ui.View 
 	listen.Icon, listen.Toggle = "IconListen", true
 	listen.SetBounds(cells[0])
 	ch := ui.NewButton("", func() { env.Nav.Push(NewChannel(strip)) })
-	ch.Icon = sourceIcon(env.Desk.SourceName(env.Desk.SourceOf(strip)).ID)
+	ch.Icon = stripIcon(env, strip)
 	if ch.Icon == "" {
-		ch.Icon = "IconNotAssigned"
+		ch.Icon = plusIcon
 	}
 	ch.SetBounds(cells[1])
 	mute := ui.NewButton("", func() { env.Desk.SetMute(strip, !env.Desk.Muted(strip)); p.barUntil = time.Now().Add(4 * time.Second) })
@@ -727,7 +802,12 @@ func (p *HomePage) Encoder(env *Env, ev desk.EncoderEvent) bool {
 	switch {
 	case ev.Delta != 0:
 		if p.knob == 0 {
-			d.SetMonitorLevel(d.MonitorLevel() + float64(ev.Delta)*0.01)
+			// The monitor level in steps of 0.01 per detent; a fixed output
+			// level only shows itself.
+			if !d.Bool(desk.OutputNode, 0, "outputMonFixed") {
+				d.SetMonitorLevel(d.MonitorLevel() + float64(ev.Delta)*0.01)
+			}
+			p.showLevel(env, false)
 			return true
 		}
 		strip := physical + p.knob - 1

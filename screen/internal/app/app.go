@@ -180,6 +180,9 @@ func (a *App) build() {
 	}
 	a.root.SetView(rootView)
 	a.focus.collect(focusRoot)
+	if a.model.Online() {
+		a.syncEncoderRing() // the first frame after the desk came up
+	}
 }
 
 // header is the bar across the top: back and home, the title, or the page's
