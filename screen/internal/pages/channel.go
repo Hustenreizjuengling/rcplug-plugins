@@ -80,10 +80,18 @@ func (p *ChannelPage) inputCard(env *Env, strip int, area image.Rectangle) []ui.
 
 	src := d.SourceOf(strip)
 	input := d.InputIndex(strip)
-	// The source tile: a big icon on the strip's colour, the name under it.
-	tile := &sourceBanner{env: env, strip: strip}
-	tile.SetBounds(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+250))
-	out = append(out, tile)
+	// The top of the card: a combo input's microphone choice (the carousel),
+	// else the source tile with a big icon on the strip's colour.
+	top := image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+250)
+	if d.HasMicType(input) && d.MicType(input) != desk.MicWireless {
+		car := newMicCarousel(env, strip, input)
+		car.SetBounds(top)
+		out = append(out, car)
+	} else {
+		tile := &sourceBanner{env: env, strip: strip}
+		tile.SetBounds(top)
+		out = append(out, tile)
+	}
 	if src < 0 {
 		assign := ui.NewButton(env.T("CHANNEL ASSIGNMENT"), func() { env.Nav.Push(NewAssign(strip)) })
 		assign.SetBounds(image.Rect(area.Min.X+40, area.Min.Y+300, area.Max.X-40, area.Min.Y+396))

@@ -6,6 +6,16 @@ may break compatibility).
 
 ## 0.5.29 - Unreleased
 
+### Added
+- **Screen 0.3.11: the microphone choice on a combo input's channel page**, as on
+  RØDE's screen: a carousel of the models with their pictures (Line-In, Instrument,
+  Dynamic, Condenser, PodMic, Broadcaster, Procaster, NT1, NT1-A, RE20, SM7B), the
+  chosen one in the middle on the channel's colour. A swipe slides through, a tap on a
+  neighbour chooses it, a tap on the middle opens the channel assignment. The list,
+  its order and the pictures are RØDE's own (`INPUTSOURCE.inputMicrophoneType` 0…10,
+  read from the screen program); the desk sets the model's gain, phantom power and
+  voicing.
+
 ## 0.5.28 - 2026-10-21
 
 ### Fixed

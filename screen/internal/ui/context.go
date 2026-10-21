@@ -64,6 +64,19 @@ func (c *Context) Icon(dst *gfx.Image, name string, r image.Rectangle, tint gfx.
 	dst.Draw(img, r.Min.X+(r.Dx()-img.W)/2, r.Min.Y+(r.Dy()-img.H)/2, 255)
 }
 
+// IconIn is Icon with an opacity (0…255), limited to the clip rectangle
+// (for pictures that slide partly out of view).
+func (c *Context) IconIn(dst *gfx.Image, name string, r image.Rectangle, tint gfx.Color, alpha uint8, clip image.Rectangle) {
+	if r.Empty() || c.Icons == nil {
+		return
+	}
+	img := c.iconImage(name, r.Dx(), r.Dy(), tint)
+	if img == nil {
+		return
+	}
+	dst.DrawIn(img, r.Min.X+(r.Dx()-img.W)/2, r.Min.Y+(r.Dy()-img.H)/2, alpha, clip)
+}
+
 func (c *Context) iconImage(name string, w, h int, tint gfx.Color) *gfx.Image {
 	tinted := tint.A() != 0
 	key := iconKey{name, w, h, tint, tinted}

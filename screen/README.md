@@ -26,6 +26,13 @@ this plugin's own code.
   haptics, the clock, the pads' names and modes, and more).
 - The buttons above the physical faders open the strip's channel page
   (`SYSTEM.systemChannelSelected`), as on RØDE's screen.
+- A combo input's channel page carries RØDE's microphone choice: a carousel
+  of the models with their pictures (`INPUTSOURCE.inputMicrophoneType`, the
+  values 0…10 in the order RØDE's screen program adds them: Line-In,
+  Instrument, Dynamic, Condenser, PodMic, Broadcaster, Procaster, NT1, NT1-A,
+  RE20, SM7B). A tap on a neighbour or a swipe chooses; only the type is
+  written, as RØDE's screen does — the mixer then sets the model's gain,
+  phantom power and voicing.
 - The channel page's **Preset** button lists the desk's processing presets
   and applies one (`FXPRESET.fxPresetContents`, `Name|value|…` in the order
   read off a device: depth, sparkle and punch, APHEX, compressor, de-esser,

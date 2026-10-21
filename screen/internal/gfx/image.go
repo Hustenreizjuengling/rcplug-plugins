@@ -122,7 +122,12 @@ func (m *Image) FillRect(r image.Rectangle, c Color) {
 // Draw blends src over m with its top left at (x, y), with extra opacity
 // alpha (0…255).
 func (m *Image) Draw(src *Image, x, y int, alpha uint8) {
-	dr := image.Rect(x, y, x+src.W, y+src.H).Intersect(m.Bounds())
+	m.DrawIn(src, x, y, alpha, m.Bounds())
+}
+
+// DrawIn is Draw limited to the clip rectangle.
+func (m *Image) DrawIn(src *Image, x, y int, alpha uint8, clip image.Rectangle) {
+	dr := image.Rect(x, y, x+src.W, y+src.H).Intersect(m.Bounds()).Intersect(clip)
 	if dr.Empty() || alpha == 0 {
 		return
 	}

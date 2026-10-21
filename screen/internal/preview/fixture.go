@@ -180,7 +180,7 @@ func BuildTree() []byte {
 		switch {
 		case i < 4: // combo mic inputs
 			p["inputMicrophoneGain"] = int64(38 + i*2)
-			p["inputMicrophoneType"] = 4
+			p["inputMicrophoneType"] = []int64{4, 8, 10, 0}[i] // PodMic, NT1-A, SM7B, line-in
 			p["inputPower"] = 1
 			p["inputPhaseFlip"] = false
 			p["inputInstrumentGain"] = 0
