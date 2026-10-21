@@ -85,6 +85,7 @@ func New(w, h int, ctx *ui.Context, model *desk.Model, text *lang.Texts, plugins
 	a.stack = []pages.Page{pages.NewHome()}
 	a.dirty = true
 	a.focus.idx = -1
+	ui.GrabFocus = a.focus.grab
 	return a
 }
 
