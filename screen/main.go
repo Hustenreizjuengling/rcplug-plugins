@@ -36,6 +36,7 @@ import (
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/preview"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/rode"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
+	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/web"
 	"github.com/Hustenreizjuengling/rcplug/sdk"
 )
 
@@ -47,10 +48,6 @@ var version, release = "dev", ""
 // page's top on the panel's right (the Duo), which is a 90° clockwise turn.
 const panelTurn = 90
 
-// screenMarker is where rcplugd writes the name of the plugin it gave the
-// screen to (rcplug 0.8.11 and later).
-const screenMarker = "/run/rcplug-screen"
-
 func main() {
 	var (
 		pngOut    = flag.String("png", "", "draw one frame into this PNG file and exit (development)")
@@ -61,7 +58,6 @@ func main() {
 		touchDev  = flag.String("touch", "", "the touchscreen's event device (default: found by its name)")
 		langCode  = flag.String("lang", "", "language: en | de | … (default: the device's)")
 		guiPath   = flag.String("rode", rode.GUIProgram, "RØDE's screen program, read for its icons and text")
-		noCheck   = flag.Bool("no-handover-check", false, "skip the check that rcplug handed the screen over (development)")
 		showVer   = flag.Bool("version", false, "print the version and exit")
 	)
 	flag.Parse()
@@ -83,10 +79,10 @@ func main() {
 			log.Fatalf("screen: %v", err)
 		}
 	default:
-		if err := runDevice(ctx, *card, *touchDev, *guiPath, *langCode, *noCheck); err != nil && !errors.Is(err, context.Canceled) {
-			log.Fatalf("screen: %v; RØDE's screen comes back", err)
+		if err := runDevice(ctx, *card, *touchDev, *guiPath, *langCode); err != nil && !errors.Is(err, context.Canceled) {
+			log.Fatalf("screen: %v", err)
 		}
-		log.Printf("screen: done; RØDE's screen comes back")
+		log.Printf("screen: done")
 	}
 }
 
@@ -115,13 +111,10 @@ func langFile(code string) string {
 	return "english.txt"
 }
 
-// runDevice is the real plugin: take the screen and run until stopped.
-func runDevice(ctx context.Context, card, touchDev, guiPath, langCode string, noCheck bool) error {
-	if !noCheck {
-		if err := handoverOK(sdk.Name()); err != nil {
-			return err
-		}
-	}
+// runDevice is the real plugin: the desk model and the browser interface
+// run for as long as the plugin does; the device's screen is taken and given
+// back on request (the host's marker says who has it).
+func runDevice(ctx context.Context, card, touchDev, guiPath, langCode string) error {
 	res, err := rode.Open(guiPath)
 	if err != nil {
 		return fmt.Errorf("reading the device's icons and text from %s: %w", guiPath, err)
@@ -145,30 +138,123 @@ func runDevice(ctx context.Context, card, touchDev, guiPath, langCode string, no
 	reg := ext.New("", sdk.Name(), log.Printf)
 	reg.SetLang(code)
 	go reg.Run(ctx)
+	go pages.WarmMicPictures(ctxUI) // the icon cache is safe to fill from here
 
-	defer panel.Light(log.Printf)()
-	scr, err := openScreenWait(ctx, card, log.Printf)
-	if err != nil {
-		return err
-	}
-	defer scr.Close()
-	w, h := scr.Size()
-
-	touches := make(chan panel.TouchEvent, 32)
-	panelW, panelH := h, w
-	go panel.ReadTouch(ctx, panelW, panelH, touches, log.Printf)
-
-	a := app.New(w, h, ctxUI, model, texts, reg)
 	// Follow the desk's language: a start before the desk had loaded began
 	// in English, and the language page changes it while running.
+	var loader func(code string) *lang.Texts
 	if langCode == "" {
-		a.FollowLanguage(func(code string) *lang.Texts {
+		loader = func(code string) *lang.Texts {
 			table, _ := res.Translations(rode.Language(code))
 			reg.SetLang(code)
 			log.Printf("screen: language %s (%d texts)", code, len(table))
 			return lang.New(code, table)
-		})
+		}
 	}
+	current := func() *lang.Texts { return texts }
+
+	// The browser interface, on the port the host gave us.
+	if addr := sdk.ListenAddr(""); addr != "" {
+		srv := web.New(ctxUI, model, current, loader, reg, log.Printf)
+		go func() {
+			if err := sdk.Serve(ctx, addr, srv.Handler()); err != nil && !errors.Is(err, context.Canceled) {
+				log.Printf("screen: web: %v", err)
+			}
+		}()
+		log.Printf("screen: browser interface on %s", addr)
+	}
+	log.Printf("screen: up (%s, %d texts, %d strips)", code, texts.Count(), model.StripCount())
+
+	// The device's screen, whenever the host's marker names us.
+	pc := &panelController{card: card, ctxUI: ctxUI, model: model, texts: current, loader: loader, reg: reg}
+	pc.run(ctx)
+	return nil
+}
+
+// panelController opens the device's screen while the host's marker names
+// this plugin and closes it when the marker changes (a handover, a release)
+// or "Back to RØDE" asks for it.
+type panelController struct {
+	card   string
+	ctxUI  *ui.Context
+	model  *desk.Model
+	texts  func() *lang.Texts
+	loader func(string) *lang.Texts
+	reg    *ext.Registry
+}
+
+func (pc *panelController) run(ctx context.Context) {
+	self := sdk.Name()
+	var (
+		cancel  context.CancelFunc
+		done    chan struct{}
+		retryAt time.Time
+	)
+	tick := time.NewTicker(300 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			if cancel != nil {
+				cancel()
+				<-done
+			}
+			return
+		case <-tick.C:
+		}
+		held := self != "" && ext.ScreenHolder() == self
+		running := done != nil
+		if running {
+			select {
+			case <-done:
+				done, cancel = nil, nil
+				running = false
+			default:
+			}
+		}
+		switch {
+		case held && !running && time.Now().After(retryAt):
+			pctx, c := context.WithCancel(ctx)
+			d := make(chan struct{})
+			cancel, done = c, d
+			go func() {
+				defer close(d)
+				if err := pc.once(pctx); err != nil && !errors.Is(err, context.Canceled) {
+					log.Printf("screen: panel: %v", err)
+					retryAt = time.Now().Add(3 * time.Second)
+				}
+			}()
+		case !held && running:
+			cancel()
+			<-done
+			done, cancel = nil, nil
+			log.Printf("screen: the device's screen went to %q; the panel is closed", ext.ScreenHolder())
+		}
+	}
+}
+
+// once runs the interface on the device's screen until the marker moves on,
+// the plugin ends or "Back to RØDE" is pressed (then the screen is handed
+// back after the panel closed, so RØDE's program finds the display free).
+func (pc *panelController) once(ctx context.Context) error {
+	defer panel.Light(log.Printf)()
+	scr, err := openScreenWait(ctx, pc.card, log.Printf)
+	if err != nil {
+		return err
+	}
+	w, h := scr.Size()
+	tctx, tcancel := context.WithCancel(ctx)
+	defer tcancel()
+	touches := make(chan panel.TouchEvent, 32)
+	panelW, panelH := h, w
+	go panel.ReadTouch(tctx, panelW, panelH, touches, log.Printf)
+
+	a := app.New(w, h, pc.ctxUI, pc.model, pc.texts(), pc.reg)
+	if pc.loader != nil {
+		a.FollowLanguage(pc.loader)
+	}
+	release := false
+	a.OnRode = func() { release = true; a.Quit() }
 	// A desk nobody has set up yet starts with the welcome flow and the
 	// setup assistant, as RØDE's screen does on its first start.
 	if firstRun() {
@@ -179,18 +265,26 @@ func runDevice(ctx context.Context, card, touchDev, guiPath, langCode string, no
 		a.Push(pages.NewWelcome(func() { a.Home() }))
 		log.Printf("screen: first start, showing the welcome flow")
 	}
-	log.Printf("screen: interface up (%s, %d texts, %d strips)", code, texts.Count(), model.StripCount())
-	go pages.WarmMicPictures(ctxUI) // the icon cache is safe to fill from here
-	return a.Run(ctx, scr, touches, panelTurn)
+	log.Printf("screen: on the device's screen (%d strips)", pc.model.StripCount())
+	err = a.Run(ctx, scr, touches, panelTurn)
+	scr.Close() // black, and the display free before RØDE's program starts
+	if release {
+		log.Printf("screen: back to RØDE")
+		if err := pc.reg.ReleaseScreen(); err != nil {
+			log.Printf("screen: giving the screen back: %v", err)
+		}
+		return nil
+	}
+	return err
 }
 
 // runServe shows the interface in a browser over a representative state.
 func runServe(ctx context.Context, addr, resources, langCode string) error {
-	a, _, err := offlineApp(resources, langCode)
+	a, model, err := offlineApp(resources, langCode)
 	if err != nil {
 		return err
 	}
-	srv := preview.NewServer(a)
+	srv := web.New(a.Ctx(), model, a.Texts, nil, preview.NewPlugins(), log.Printf)
 	log.Printf("screen: preview at http://%s/", addr)
 	return sdk.Serve(ctx, addr, srv.Handler())
 }
@@ -335,15 +429,6 @@ func offlineApp(resources, langCode string) (*app.App, *desk.Model, error) {
 	}
 	a := app.New(1280, 720, ctxUI, model, texts, preview.NewPlugins())
 	return a, model, nil
-}
-
-// handoverOK checks that rcplug stopped RØDE's screen for this plugin.
-func handoverOK(name string) error {
-	b, err := os.ReadFile(screenMarker)
-	if err != nil || name == "" || strings.TrimSpace(string(b)) != name {
-		return errors.New("rcplug did not hand the screen over (this plugin needs rcplug 0.8.11 or later and the \"screen\" permission)")
-	}
-	return nil
 }
 
 // openScreenWait takes the display, giving RØDE's screen program a moment to

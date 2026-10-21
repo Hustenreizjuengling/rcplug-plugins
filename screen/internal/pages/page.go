@@ -114,6 +114,15 @@ type Leaver interface {
 // EncoderHandler is an optional interface: a page that drives the main knob
 // itself (the mixer: monitor level and the virtual faders). It returns false
 // to leave the event to the app's focus navigation.
+// ScreenControl is a plugin source that can take the device's screen for
+// this interface and tell whether it has it (the host hands it over on
+// request).
+type ScreenControl interface {
+	ScreenHeld() bool
+	TakeScreen() error
+	ReleaseScreen() error
+}
+
 type EncoderHandler interface {
 	Encoder(env *Env, ev desk.EncoderEvent) bool
 }

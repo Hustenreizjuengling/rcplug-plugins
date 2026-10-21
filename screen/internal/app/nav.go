@@ -167,6 +167,15 @@ func (a *App) Overlay() ui.View {
 
 // RodeScreen hands the screen back to RØDE's interface (ends the UI).
 func (a *App) RodeScreen() {
+	if a.OnRode != nil {
+		a.OnRode()
+		return
+	}
+	a.Quit()
+}
+
+// Quit ends the interface's run.
+func (a *App) Quit() {
 	a.mu.Lock()
 	q := a.quit
 	a.mu.Unlock()

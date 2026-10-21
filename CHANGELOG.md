@@ -6,6 +6,19 @@ may break compatibility).
 
 ## 0.5.37 - Unreleased
 
+### Changed
+- **Screen 0.5.0: the interface in the browser, the device's screen on request.** The
+  plugin now runs like any other plugin and serves the same interface to browsers (the
+  dashboard's Screen page, opened as the dashboard's start page): a picture stream of
+  the parts that change, the pointer as the finger, the mouse wheel and arrow keys as
+  the main knob, buttons for press, hold and the headphone knobs. Every browser gets a
+  page stack of its own over the one desk. The device's touchscreen is taken with
+  **Take the device's screen** on the rcplug page and given back with **Back to RØDE**
+  while the browser interface stays; the host remembers who holds the screen across a
+  restart of the device. The welcome flow and the physical knobs and buttons belong to
+  the device's screen only. Needs rcplug 0.8.24 or later (permission
+  `screen:request`); the old preview server is gone, `--serve` streams the same way.
+
 ## 0.5.36 - 2026-10-21
 
 ### Fixed
