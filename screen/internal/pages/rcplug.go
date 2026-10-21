@@ -58,9 +58,15 @@ func (p *rcplugPage) Build(env *Env, r image.Rectangle) ui.View {
 					env.TR("", title+" übernimmt den Bildschirm; diese Oberfläche kommt zurück, wenn es endet.",
 						title+" takes over the screen; this interface comes back when it ends."),
 					env.T("OK"), false, func() {
-						if err := env.Plugins.Handover(pi.Name); err != nil {
-							env.Nav.Toast(err.Error())
-						}
+						// Off the interface's loop: the host stops this plugin
+						// while the request is pending, and the loop must be free
+						// to end cleanly (else the host kills it after 3 s and the
+						// screen stays black that long).
+						go func() {
+							if err := env.Plugins.Handover(pi.Name); err != nil {
+								env.Nav.Toast(err.Error())
+							}
+						}()
 					})
 			})
 			b.SetBounds(dcells[i])

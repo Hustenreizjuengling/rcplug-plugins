@@ -372,11 +372,30 @@ func (d *Display) free(b buffer) {
 	}
 }
 
-// Close gives the panel up: the buffers go; RØDE's screen program sets its
-// own when it starts again.
+// Close gives the panel up black: the buffers are cleared and the panel
+// shown one more refresh before they go, so what it keeps showing until the
+// next program (RØDE's screen or another plugin) sets its own buffer is
+// black, not a remnant of the last page. The display hardware may read the
+// freed memory for a moment, and the next program's buffers may land in it:
+// a page left there flickers through on the panel's last rows (the page's
+// right side) as it is overwritten.
 func (d *Display) Close() {
+	d.blank()
 	for _, b := range d.bufs {
 		d.free(b)
 	}
 	_ = d.f.Close()
+}
+
+// blank clears every buffer and waits for a refresh that shows the black.
+func (d *Display) blank() {
+	for _, b := range d.bufs {
+		clear(b.mem)
+	}
+	if d.Flips {
+		if _, err := d.Present(); err == nil {
+			return
+		}
+	}
+	time.Sleep(25 * time.Millisecond)
 }

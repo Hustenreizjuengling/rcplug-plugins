@@ -74,7 +74,7 @@ func BuildTree() []byte {
 			"channelCueEnable":          false,
 			"channelBypassProcessing":   i >= 4,
 			"channelAdvancedProcessing": false,
-			"channelDepth":              0.5, "channelSparkle": 0.35, "channelPunch": 0.4,
+			"channelDepth":              0.5, "channelSparkle": 0.35, "channelPunch": 0.4, "channelCurrentFxPreset": int64(1),
 			"channelPan": 0.5, "channelPanOn": false, "channelPanL": 0.0, "channelPanR": 1.0,
 			"hpfOn": i == 0, "hpfFrequency": 0.25, "hpfSlope": 0.33,
 			"noiseGateOn": false, "noiseGateThreshold": 0.3, "noiseGateRange": 0.5,
@@ -148,6 +148,17 @@ func BuildTree() []byte {
 		"masterCompellorRelease": 0.5, "masterCompellorGain": 0.3, "masterDelayOn": false, "masterDelaySeconds": 0.0,
 	}))
 	kids = append(kids, leaf("DUCKER", map[string]interface{}{"duckerDepth": -9.0}))
+	// The processing presets (the first two as a Duo with 1.7.6 holds them).
+	var presets []node
+	for i, c := range []string{
+		"Neutral|0.3|0.35|0.2|0.3|0.3|0.2|0|1|0.811844|0.315|0.345|0.27|1|0.713333|0.408248|0.422549|0.38903|0.0666667|1|0.755929|0.566667|0.471405|0.422549|0.38903|0|1|0.283333|0.61928|0|0.375804|0.161245|0.2|1|1|0.666667|0.020202|0.5375|1|0.333333|0.040404|0.48125|1|0.894427|0.020202|0.5375|1|0.527046|0.333333|1|0.5|0|1",
+		"Podcast Studio|0.75|0.8|0.7|0.7|0.75|0.7|0|1|0.811844|0.72|0.345|0.675|1|0.58|0.408248|0.422549|0.38903|0.233333|1|0.755929|0.525|0.471405|0.422549|0.38903|0|1|0.366667|0.61928|0|0.375804|0.301662|0.2|1|1|0.666667|0.020202|0.59375|1|0.333333|0.040404|0.453125|1|0.894427|0.020202|0.59375|1|0.527046|0.333333|1|0.5|0|1",
+		"Broadcast|0.6|0.6|0.6|0.6|0.6|0.6|0|1|0.811844|0.5|0.345|0.5|1|0.65|0.408248|0.422549|0.38903|0.15|1|0.755929|0.55|0.471405|0.422549|0.38903|0|1|0.33|0.61928|0|0.375804|0.25|0.2|1|1|0.666667|0.020202|0.55|1|0.333333|0.040404|0.47|1|0.894427|0.020202|0.55|1|0.527046|0.333333|1|0.5|0|1",
+		"Voice Over|0.5|0.5|0.5|0.5|0.5|0.5|0|1|0.811844|0.4|0.345|0.4|1|0.6|0.408248|0.422549|0.38903|0.1|1|0.755929|0.5|0.471405|0.422549|0.38903|0|1|0.3|0.61928|0|0.375804|0.2|0.2|1|1|0.666667|0.020202|0.5|1|0.333333|0.040404|0.5|1|0.894427|0.020202|0.5|1|0.527046|0.333333|1|0.5|0|1",
+	} {
+		presets = append(presets, leaf("FXPRESET", map[string]interface{}{"fxPresetContents": c, "fxPresetIdx": int64(i)}))
+	}
+	kids = append(kids, node{T: "FXPRESETS", P: map[string]interface{}{}, C: presets})
 	// The headphone knobs and the current show.
 	for _, lv := range []int64{46, 8} {
 		kids = append(kids, leaf("POT", map[string]interface{}{"potMin": int64(0), "potMax": int64(127), "potLevel": lv}))

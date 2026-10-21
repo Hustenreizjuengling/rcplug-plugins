@@ -14,8 +14,10 @@ func (m *Model) Headphones() int {
 	if m.headphones > 0 {
 		return m.headphones
 	}
-	if n := len(m.runs.byType[PotNode]); m.runs != nil && n > 0 && n < 4 {
-		return n
+	if m.runs != nil {
+		if n := len(m.runs.byType[PotNode]); n > 0 && n < 4 {
+			return n
+		}
 	}
 	return 2
 }

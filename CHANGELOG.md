@@ -6,6 +6,26 @@ may break compatibility).
 
 ## 0.5.24 - Unreleased
 
+### Added
+- **Screen 0.3.6: processing presets.** The channel page shows the current preset (or
+  *custom settings*) above Depth, Sparkle and Punch; a tap lists the desk's presets and
+  applies one, as on RØDE's screen. The preset format (`Name|value|…`) was read off a
+  device's diagnostics: depth, sparkle and punch, APHEX, compressor, de-esser, noise gate,
+  EQ and high-pass filter in a fixed order. Saving and deleting presets stay on RØDE's
+  screen. The log names the presets now instead of printing their contents.
+
+### Fixed
+- **Screen 0.3.6** no longer crashes when rcplug starts it before the console is up (the
+  headphone-knob watch asked the desk before it had loaded; the supervisor started it
+  again, so the screen came a second late). Handing the screen to PlugRain is done off the
+  interface's loop, so the plugin ends cleanly at once instead of being killed after three
+  seconds of black screen (with rcplug 0.8.18 too). On ending it leaves the display black:
+  the buffers are cleared and shown once more, so nothing of the last page flickers
+  through when the next program takes the panel.
+- **PlugRain 0.3.1** leaves the display black on ending the same way: the glitch on the
+  right side of the screen when the Screen plugin came back was the last rain frame
+  showing through the memory the new buffers landed in.
+
 ## 0.5.23 - 2026-10-20
 
 ### Added

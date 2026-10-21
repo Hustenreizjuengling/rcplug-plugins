@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 	"time"
 
@@ -340,9 +341,9 @@ func min2(a, b time.Duration) time.Duration {
 	return b
 }
 
-// logPresetsOnce writes the first processing preset's contents to the log
-// once (shortened): the format is not documented, and a device's
-// diagnostics are how it gets known.
+// logPresetsOnce notes the processing presets once: their names, and the
+// contents of any the package does not understand (the format, see
+// presets.go, was read off a device's diagnostics).
 func (m *Model) logPresetsOnce() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -354,10 +355,14 @@ func (m *Model) logPresetsOnce() {
 		return
 	}
 	m.presetsLogged = true
-	for i, p := range ps {
-		if i >= 2 {
-			break
+	var names []string
+	for _, n := range ps {
+		p, ok := ParsePreset(n.Str("fxPresetContents"))
+		if !ok || !p.Complete() {
+			m.logf("screen: processing preset %d not understood: %.80s", n.Int("fxPresetIdx"), n.Str("fxPresetContents"))
+			continue
 		}
-		m.logf("screen: processing preset %d of %d: %s", i+1, len(ps), p.Str("fxPresetContents"))
+		names = append(names, p.Name)
 	}
+	m.logf("screen: %d processing presets: %s", len(ps), strings.Join(names, ", "))
 }

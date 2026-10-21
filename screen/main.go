@@ -191,6 +191,9 @@ func runPNG(out, resources, langCode, page string) error {
 		a.Push(pages.NewAssign(0))
 	case strings.HasPrefix(page, "proc:"):
 		a.Push(pages.Processor(0, strings.TrimPrefix(page, "proc:")))
+	case strings.HasPrefix(page, "presets:"):
+		n, _ := strconv.Atoi(strings.TrimPrefix(page, "presets:"))
+		a.Push(pages.NewPresets(n))
 	case page == "master":
 		a.Push(pages.NewMasterRack())
 	case page == "fx":

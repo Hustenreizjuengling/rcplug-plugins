@@ -352,10 +352,22 @@ func (p *ChannelPage) processingCard(env *Env, strip int, area image.Rectangle) 
 		out = append(out, title)
 	}
 
+	// The processing presets, with the channel's current one (or its own
+	// settings) under the label; the page lists them.
+	row := image.Rect(area.Min.X+40, area.Min.Y+120, area.Max.X-40, area.Min.Y+300)
+	if len(d.Presets()) > 0 {
+		cur := d.PresetName(strip)
+		if cur == "" {
+			cur = env.TR("", "Eigene Einstellungen", "Custom settings")
+		}
+		pb := ui.NewButton(env.T("PRESET")+": "+cur, func() { env.Nav.Push(NewPresets(strip)) })
+		pb.SetBounds(image.Rect(area.Min.X+40, area.Min.Y+98, area.Max.X-40, area.Min.Y+154))
+		out = append(out, pb)
+		row = image.Rect(area.Min.X+40, area.Min.Y+166, area.Max.X-40, area.Min.Y+320)
+	}
 	knobs := []struct{ key, prop, icon string }{
 		{"DEPTH", "channelDepth", "IconDepth"}, {"SPARKLE", "channelSparkle", "IconSparkle"}, {"PUNCH", "channelPunch", "IconPunch"},
 	}
-	row := image.Rect(area.Min.X+40, area.Min.Y+120, area.Max.X-40, area.Min.Y+300)
 	cells := columns(row, 3, 20)
 	for i, k := range knobs {
 		prop := k.prop

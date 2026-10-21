@@ -35,3 +35,22 @@ func TestHeadphones(t *testing.T) {
 		t.Fatal("transfer mode should be on")
 	}
 }
+
+// TestHeadphonesBeforeTheDesk: the interface's loop asks the model before
+// the desk has loaded (at boot the console may still be coming up); every
+// reading then has a default, none a crash.
+func TestHeadphonesBeforeTheDesk(t *testing.T) {
+	m := &Model{}
+	if n := m.Headphones(); n != 2 {
+		t.Fatalf("headphones without a desk = %d, want 2", n)
+	}
+	if f := m.HeadphoneFrac(0); f != 0 {
+		t.Fatalf("headphone level without a desk = %v, want 0", f)
+	}
+	if m.TransferMode() || m.Online() || m.StripCount() != 0 {
+		t.Fatal("a model without a desk is offline, with no strips, not in transfer mode")
+	}
+	if m.PadBanks() != 8 || m.PadByIndex(0).Exists || m.EffectsSlot(0) >= 0 {
+		t.Fatal("pads and effects without a desk")
+	}
+}

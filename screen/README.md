@@ -26,6 +26,15 @@ this plugin's own code.
   haptics, the clock, the pads' names and modes, and more).
 - The buttons above the physical faders open the strip's channel page
   (`SYSTEM.systemChannelSelected`), as on RØDE's screen.
+- The channel page's **Preset** button lists the desk's processing presets
+  and applies one (`FXPRESET.fxPresetContents`, `Name|value|…` in the order
+  read off a device: depth, sparkle and punch, APHEX, compressor, de-esser,
+  noise gate, EQ, high-pass filter). Saving and deleting presets stay on
+  RØDE's screen: they change the tree's nodes, which the console does not
+  pass on.
+- When it ends it leaves the display black (the buffers cleared and shown
+  once more), so nothing of its last page flickers through while the next
+  program takes the panel.
 - The main knob works as on RØDE's screen (package `internal/app`, the
   focus): on the mixer it sets the monitor level, a press moves it on to the
   virtual faders (and back), holding it mutes the focused one. On every other
