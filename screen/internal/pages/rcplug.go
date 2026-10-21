@@ -30,27 +30,10 @@ func (p *rcplugPage) Build(env *Env, r image.Rectangle) ui.View {
 	cells := tileGrid(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+280), 2, 2, 200, 40)
 	plugins := ui.NewTile(env.T("Plugins"), "IconSystem", func() { env.Nav.Open(IDPlugins) })
 	plugins.SetBounds(cells[0])
-	// The device's screen: this interface gives it back to RØDE's, or takes
-	// it (from a browser, while RØDE's screen program has it).
-	var rode *ui.Button
-	if sc, ok := env.Plugins.(ScreenControl); ok && !sc.ScreenHeld() {
-		takeLabel := env.TR("", "Bildschirm übernehmen", "Take the device's screen")
-		rode = ui.NewTile(takeLabel, "IconHome", func() {
-			env.Nav.Confirm(takeLabel, env.TR("", "Diese Oberfläche auf dem Bildschirm des Geräts zeigen? RØDEs Oberfläche wird dafür beendet.",
-				"Show this interface on the device's screen? RØDE's interface ends for it."), env.T("OK"), false, func() {
-				go func() {
-					if err := sc.TakeScreen(); err != nil {
-						env.Nav.Toast(err.Error())
-					}
-				}()
-			})
-		})
-	} else {
-		rodeLabel := env.TR("", "Zurück zu RØDE", "Back to RØDE")
-		rode = ui.NewTile(rodeLabel, "IconHome", func() {
-			env.Nav.Confirm(rodeLabel, env.TR("", "Zurück zur RØDE-Oberfläche?", "Switch back to RØDE's interface?"), env.T("OK"), false, env.Nav.RodeScreen)
-		})
-	}
+	rodeLabel := env.TR("", "Zurück zu RØDE", "Back to RØDE")
+	rode := ui.NewTile(rodeLabel, "IconHome", func() {
+		env.Nav.Confirm(rodeLabel, env.TR("", "Zurück zur RØDE-Oberfläche?", "Switch back to RØDE's interface?"), env.T("OK"), false, env.Nav.RodeScreen)
+	})
 	rode.SetBounds(cells[1])
 	c.Add(plugins, rode)
 	// A tile per plugin that takes the screen itself (PlugRain): a tap hands

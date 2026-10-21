@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/desk"
 	"image"
 	"strconv"
 	"time"
@@ -18,29 +17,6 @@ import (
 // touch carries finger events in the panel's portrait coordinates; turn is
 // how the page lies on the panel (see the panel package).
 func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.TouchEvent, turn int) error {
-	return a.RunWith(ctx, out, Inputs{Touch: touch, Turn: turn, Knob: a.model.Encoder(), Button: a.model.ChannelButton()})
-}
-
-// Inputs are where an interface's events come from: the device's panel and
-// knobs, or a browser.
-type Inputs struct {
-	Touch  <-chan panel.TouchEvent  // the panel's touches (portrait), turned by Turn
-	Turn   int                      // how the panel is turned against the page
-	Page   <-chan PageTouch         // touches already in page coordinates (a browser)
-	Knob   <-chan desk.EncoderEvent // the main knob (nil: none)
-	Button <-chan int               // the channel buttons (nil: none)
-	Do     <-chan func()            // work for the interface's loop (a browser's buttons)
-}
-
-// PageTouch is a touch in page coordinates.
-type PageTouch struct {
-	Phase ui.TouchPhase
-	At    image.Point
-}
-
-// RunWith runs the interface on out with the given inputs until ctx ends or
-// the interface quits (RodeScreen).
-func (a *App) RunWith(ctx context.Context, out panel.Output, in Inputs) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	defer a.model.ReleaseChannel() // no button stays lit for the next screen
@@ -48,16 +24,6 @@ func (a *App) RunWith(ctx context.Context, out panel.Output, in Inputs) error {
 	a.mu.Lock()
 	a.quit = cancel
 	a.mu.Unlock()
-	touch, turn, knob, button := in.Touch, in.Turn, in.Knob, in.Button
-	// Turns and presses that queued up while no interface ran are stale.
-	for drained := false; !drained; {
-		select {
-		case <-knob:
-		case <-button:
-		default:
-			drained = true
-		}
-	}
 
 	pageW, pageH := out.Size()
 	if pageW != a.w || pageH != a.h {
@@ -79,17 +45,13 @@ func (a *App) RunWith(ctx context.Context, out panel.Output, in Inputs) error {
 	lastOnline, lastStrips := false, -1
 	var lastPlugins uint64
 	pluginsRev, _ := a.plugins.(interface{ Rev() uint64 })
+	knob := a.model.Encoder()
+	button := a.model.ChannelButton()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case f := <-in.Do:
-			f()
-			if err := a.frame(out); err != nil {
-				return err
-			}
-		case t := <-in.Page:
-			a.root.Touch(t.Phase, t.At)
 		case ev, ok := <-touch:
 			if !ok {
 				touch = nil

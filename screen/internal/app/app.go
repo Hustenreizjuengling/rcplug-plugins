@@ -51,10 +51,6 @@ type App struct {
 	// follows the desk's language setting (GUI.lang) while it runs.
 	textLoader func(code string) *lang.Texts
 
-	// OnRode runs for "Back to RØDE" instead of ending the run: the panel
-	// gives the device's screen back, a browser asks the host to.
-	OnRode func()
-
 	focus focus
 }
 
@@ -84,9 +80,6 @@ func (a *App) followLanguage() {
 
 // Texts are the interface's current texts.
 func (a *App) Texts() *lang.Texts { return a.text }
-
-// Ctx is the drawing context (fonts, icons, theme) the interface draws with.
-func (a *App) Ctx() *ui.Context { return a.ctx }
 
 // New makes an app for a w × h screen.
 func New(w, h int, ctx *ui.Context, model *desk.Model, text *lang.Texts, plugins pages.PluginSource) *App {

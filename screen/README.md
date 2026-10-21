@@ -12,15 +12,9 @@ this plugin's own code.
 
 ## How it runs on the device
 
-- Since 0.5.0 the plugin runs like any other plugin and serves the interface
-  to browsers (the dashboard's **Screen** page, a WebSocket picture stream of
-  the parts that change, the pointer as the finger, buttons for the knobs).
-  The device's touchscreen is taken on request (permission `screen:request`,
-  rcplug 0.8.24 or later): **Take the device's screen** on the rcplug page
-  asks the host, which stops RØDE's screen program; **Back to RØDE** gives it
-  back and the browser interface stays. The host remembers who holds the
-  screen across a restart of the device. Audio keeps running the whole time;
-  only the screen changes.
+- The plugin has the `screen` permission, so the host stops RØDE's screen
+  program while the plugin runs and starts it again afterwards. Audio keeps
+  running the whole time; only the screen changes.
 - It draws with the kernel's DRM interface and reads the touchscreen through
   evdev (package `internal/panel`, shared with PlugRain).
 - It controls the desk through the **console** plugin's HTTP API (package
@@ -76,9 +70,9 @@ this plugin's own code.
   the program is listed in the CHANGELOG as open.
 - RØDE's screen comes back with the **Back to RØDE** button, when the plugin
   is stopped from the dashboard, or if it exits for any reason.
-- It starts with rcplug. The device's screen comes back to it at every start
-  of the device (once RØDE's screen program is up) if it had it when the
-  device last ran; if the plugin should ever crash three times in ten
+- It is started in the dashboard the first time. With rcplug 0.8.17 or later
+  it then comes back at every start of the device (once RØDE's screen program
+  is up) until it is stopped there; if it should ever crash three times in ten
   minutes, rcplug switches it off and RØDE's screen stays.
 
 ## Safety

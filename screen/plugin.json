@@ -2,16 +2,16 @@
   "$schema": "https://raw.githubusercontent.com/Hustenreizjuengling/rcplug/main/plugin.schema.json",
   "name": "screen",
   "title": "Screen",
-  "description": "RØDE's screen interface, page for page, in the browser and on the device's touchscreen: the mixer, channel and processing pages, SMART pads, shows and recordings, the menus and settings, CallMe and network, and pages for rcplug and other plugins. It reads RØDE's icons and text from the device at run time (no RØDE files are shipped). The browser page is always there; the device's screen is taken with “Take the device's screen” and given back with “Back to RØDE” (RØDE's own interface runs meanwhile). Needs rcplug 0.8.24 or later.",
-  "version": "0.5.0",
+  "description": "An alternative interface on the device's touchscreen: a mixer, channel and processing pages, SMART pads, the menus and settings, and pages for rcplug and other plugins — built to look and work like RØDE's own screen. It reads RØDE's icons and text from the device at run time (no RØDE files are shipped). The main knob works as on RØDE's screen: it sets the monitor level, a press moves it to the virtual faders, and on the menus it steps through the controls. RØDE's screen comes back with the “Back to RØDE” button or when the plugin is stopped. Starts from the dashboard.",
+  "version": "0.4.5",
   "exec": [
     "./screen"
   ],
-  "autostart": true,
+  "autostart": false,
   "order": 95,
   "icon": "▣",
   "permissions": [
-    "screen:request",
+    "screen",
     "desk:write"
   ],
   "update": {
@@ -24,14 +24,8 @@
       "title": "Language",
       "default": "de",
       "choices": [
-        {
-          "value": "de",
-          "title": "Deutsch"
-        },
-        {
-          "value": "en",
-          "title": "English"
-        }
+        {"value": "de", "title": "Deutsch"},
+        {"value": "en", "title": "English"}
       ],
       "arg": "--lang={value}"
     }
@@ -39,8 +33,7 @@
   "translations": {
     "de": {
       "title": "Bildschirm",
-      "description": "RØDEs Bildschirmoberfläche, Seite für Seite, im Browser und auf dem Touchscreen des Geräts: Mischpult, Kanal- und Bearbeitungsseiten, SMART Pads, Shows und Aufnahmen, Menüs und Einstellungen, CallMe und Netzwerk sowie Seiten für rcplug und andere Plugins. Sie liest RØDEs Symbole und Texte zur Laufzeit vom Gerät (es werden keine RØDE-Dateien mitgeliefert). Die Browserseite ist immer da; den Bildschirm des Geräts übernimmt sie mit „Bildschirm übernehmen“ und gibt ihn mit „Zurück zu RØDE“ wieder frei (RØDEs eigene Oberfläche läuft dann). Braucht rcplug 0.8.24 oder neuer."
+      "description": "Eine alternative Oberfläche auf dem Touchscreen des Geräts: Mischpult, Kanal- und Bearbeitungsseiten, SMART Pads, die Menüs und Einstellungen sowie Seiten für rcplug und andere Plugins – im Aussehen und in der Bedienung wie RØDEs eigener Bildschirm. Sie liest RØDEs Symbole und Texte zur Laufzeit vom Gerät (es werden keine RØDE-Dateien mitgeliefert). Der Hauptregler funktioniert wie auf RØDEs Bildschirm: Er stellt den Monitorpegel, ein Druck wechselt zu den virtuellen Fadern, und in den Menüs läuft er durch die Bedienelemente. RØDEs Bildschirm kommt mit der Schaltfläche „Zurück zu RØDE“ oder beim Stoppen des Plugins zurück. Startet vom Dashboard."
     }
-  },
-  "primary": true
+  }
 }
