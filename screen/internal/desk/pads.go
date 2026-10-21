@@ -7,15 +7,19 @@ package desk
 // pad's settings sit in the EFFECTS_PARAMETERS node under PADEFFECTS whose
 // effectsIdx is the pad's number.
 
-// Pad kinds (padType).
+// Pad kinds (padType), as RØDE's new-pad page writes them (1.7.6,
+// PadsNewPage::buttonClicked at 0x806b60 and the quick-dial/Icecast tiles
+// at 0x7fd910: Sound 1, Effect 2, Mixer 3, Trigger 4, CallMe quick dial 5,
+// RØDECaster Video (RCVSync) 6, CallMe Icecast 7).
 const (
 	PadEmpty   = 0
 	PadSound   = 1
 	PadEffects = 2
 	PadMixer   = 3
 	PadTrigger = 4
-	PadVideo   = 5
-	PadDial    = 6
+	PadDial    = 5
+	PadVideo   = 6
+	PadIcecast = 7
 )
 
 // PadsPerBank is how many pads a bank holds (6 on the Duo).
@@ -123,15 +127,13 @@ func (m *Model) TriggerPad(bank, slot int) {
 	m.Press(PadButtonNode, slot, "padButtonPressed", 120)
 }
 
-// PreviewPad plays a pad's sound for the editor (PADBUTTON[slot].padButtonPreview,
-// held for a moment), selecting its bank first as TriggerPad does.
+// PreviewPad plays or stops a pad from its editor as RØDE's play button
+// does (1.7.6, 0x7df5f0): the bank is selected first and the slot's pad
+// button pressed (PADBUTTON[slot].padButtonPressed), which the mixer takes
+// as a press of the pad.
 func (m *Model) PreviewPad(bank, slot int) {
 	if int(m.PadBank()) != bank {
 		m.SetPadBank(int64(bank))
-	}
-	if m.Has(PadButtonNode, slot, "padButtonPreview") {
-		m.Press(PadButtonNode, slot, "padButtonPreview", 120)
-		return
 	}
 	m.Press(PadButtonNode, slot, "padButtonPressed", 120)
 }
