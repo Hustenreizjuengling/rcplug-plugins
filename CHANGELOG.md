@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.38 - Unreleased
+## 0.5.38 - 2026-10-21
 
 ### Fixed
 - **Screen 0.5.1: the browser page and the device's screen after the update.** 0.5.0
