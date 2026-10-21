@@ -6,6 +6,11 @@ may break compatibility).
 
 ## 0.5.25 - Unreleased
 
+### Changed
+- The font atlas tool (`tools/fontatlas`, not shipped with any plugin) uses
+  `golang.org/x/image` 0.41, which closes two advisories in its TIFF decoder; the tool
+  only ever reads TrueType fonts.
+
 ## 0.5.24 - 2026-10-21
 
 ### Added
