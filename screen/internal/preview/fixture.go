@@ -235,9 +235,10 @@ func BuildTree() []byte {
 	// 21 pads with every field the device keeps: bank 0 named, bank 1 the
 	// factory effects and mixer actions, the rest empty.
 	padNames := []string{"Intro", "Applaus", "Lacher", "Jingle", "Stinger", "Outro",
-		"Nachhall", "Roboter", "Zensur", "Ducking", "MIDI", "Ausblenden"}
-	padTypes := []int64{1, 1, 1, 2, 3, 1, 2, 2, 3, 3, 4, 3}
-	padMixerModes := []int64{0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 2}
+		"Nachhall", "Roboter", "Zensur", "Ducking", "MIDI", "Ausblenden",
+		"CallMe 13", "Scene A", "CallMe Icecast"}
+	padTypes := []int64{1, 1, 1, 2, 3, 1, 2, 2, 3, 3, 4, 3, 5, 6, 7}
+	padMixerModes := []int64{0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 2, 0, 0, 0}
 	for i := 0; i < 21; i++ {
 		p := map[string]interface{}{
 			"padIdx": i, "padColourIndex": int64(i % 12), "padActive": false, "padName": "", "padType": int64(0),
@@ -251,6 +252,15 @@ func BuildTree() []byte {
 			"padEffectInput": int64(0), "padEffectTriggerMode": int64(1),
 			"padTriggerMode": int64(1), "padTriggerSend": int64(2), "padTriggerType": int64(0), "padTriggerControl": int64(i),
 			"padTriggerChannel": int64(1), "padTriggerOn": int64(127), "padTriggerOff": int64(0), "padTriggerCustom": false,
+			"padFilePath": "", "padMixerCensorFilePath": "", "padIsInternal": false,
+			"padRCVSyncPadType": int64(0), "padSIPCallSlot": int64(0), "padSIPFlashState": int64(0), "padSIPPhoneBookEntry": int64(0), "padSIPQdLock": false,
+			"padProgressRequestSignal": "0109040000000000000000" + "0102",
+		}
+		if i < 6 || i == 2 {
+			p["padFilePath"] = "/Application/emmc-data/pads/" + strconv.Itoa(i+1) + "/sound.wav"
+		}
+		if i == 13 {
+			p["padRCVSyncPadType"] = int64(13)
 		}
 		if i < len(padNames) {
 			p["padName"] = padNames[i]
@@ -278,10 +288,51 @@ func BuildTree() []byte {
 	for i := 0; i < 8; i++ {
 		kids = append(kids, leaf("PADBUTTON", map[string]interface{}{"padButtonPressed": false, "padButtonPreview": false}))
 	}
+	// The pad recorder, the recording player and the recordings and shows
+	// the desk lists (values as a Duo 1.7.6 holds them).
+	kids = append(kids, leaf("PADRECORDER", map[string]interface{}{
+		"padRecordIdx": int64(0), "padRecordState": int64(0), "padRecordSeconds": 0.0,
+		"padRecordStateRequest": "01050100000000010102", "padRecordClear": "01050100000000010103", "padRecordMemoryFull": "010103010102",
+	}))
+	kids = append(kids, leaf("PLAYER", map[string]interface{}{
+		"playerState": int64(0), "playerSpeed": int64(0), "playerFilePath": "", "playerFileSize": 0.0,
+		"playerCurrentPositionTime": 4.0, "playerProgress": 0.18, "playerJumpToSample": "01050100000000010103",
+		"playerEnvStart": 0.0, "playerEnvFadeIn": 0.0, "playerEnvFadeOut": 1.0, "playerEnvStop": 1.0,
+	}))
+	var recs []node
+	for i, c := range []string{
+		"Recording 24|/media/sd/RODECaster/Recording 24.wav|1652324700|22|1",
+		"Recording 23|/media/sd/RODECaster/Recording 23.wav|1652238300|903|0",
+		"Recording 22|/media/sd/RODECaster/Recording 22.wav|1652151900|6275|1",
+	} {
+		recs = append(recs, leaf("RECORDING", map[string]interface{}{"recordingUID": int64(100 + i), "recordingContent": c}))
+	}
+	kids = append(kids, node{T: "RECORDINGS", P: map[string]interface{}{"recordingTotalCount": 3, "recordingTotalDuration": 7200, "requestDeleteUID": int64(0)}, C: recs})
+	var shows []node
+	for i, n := range []string{"Morgenrunde", "Interview"} {
+		shows = append(shows, leaf("SHOW", map[string]interface{}{
+			"showName": n, "showIcon": int64(i + 1), "showUID": int64(10 + i), "showUUID": "", "showStorageType": int64(0),
+			"showSnapshotIndex": int64(i + 1), "showLastModification": int64(1652324700 - i*86400),
+		}))
+	}
+	kids = append(kids, node{T: "SHOWS", P: map[string]interface{}{}, C: shows})
+	kids = append(kids, leaf("SHOWCONTROL", map[string]interface{}{
+		"showControlUpdating": false, "showControlExport": false, "showControlImport": int64(-1), "showControlDelete": int64(-1),
+		"showControlExportImport": int64(-1), "showControlNewFromDefault": false, "showControlNewFromDefaultMuted": false,
+		"showControlLockoutCentral": false, "showControlProgress": 0.0, "showControlLastError": int64(0),
+	}))
+	kids = append(kids, leaf("SIPADVANCED", map[string]interface{}{
+		"icecastAddress": "", "icecastPort": int64(8000), "icecastTLS": false, "icecastBitrate": int64(128000), "icecastConnect": false, "icecastState": "",
+	}))
+	for i := 0; i < 3; i++ {
+		kids = append(kids, leaf("SIPCALLSLOTS", map[string]interface{}{"sipCallSlotId": int64(i), "sipSlotCallState": "Idle"}))
+	}
+	kids = append(kids, node{T: "SIPPHONEBOOKARRAY", P: map[string]interface{}{}, C: []node{
+		leaf("SIPPHONEBOOK", map[string]interface{}{"phoneBookIdx": int64(0), "phoneBookName": "Studio", "phoneBookCallAddress": "", "phoneBookCallType": int64(0)}),
+	}})
 	kids = append(kids, leaf("NETWORK", map[string]interface{}{
 		"wiredConnected": true, "wifi": false, "ipAddress": "192.168.0.50", "btConnectedAddress": "00:11:22:33:44:55", "btConnectedType": 0,
 	}))
-	kids = append(kids, leaf("RECORDINGS", map[string]interface{}{"recordingTotalCount": 3, "recordingTotalDuration": 7200}))
 
 	root := node{T: "Rodecaster", P: map[string]interface{}{}, C: kids}
 	doc := map[string]interface{}{

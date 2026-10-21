@@ -233,16 +233,21 @@ func runPNG(out, resources, langCode, page string) error {
 		a.Open(pages.IDRouting)
 		a.Push(pages.RoutingMix(n))
 	case strings.HasPrefix(page, "pad:"):
-		// pad:<idx>[:options|new|colour]
+		// pad:<idx>[:options|new|colour|mixer:<mode>|fx:<effect>]
 		parts := strings.Split(strings.TrimPrefix(page, "pad:"), ":")
 		n, _ := strconv.Atoi(parts[0])
 		a.Open(pages.IDPads)
 		if len(parts) > 1 {
-			a.Push(pages.PadPage(n, parts[1]))
+			a.Push(pages.PadPage(n, strings.Join(parts[1:], ":")))
 		} else {
 			a.Push(pages.PadEdit(n))
 			a.RenderOnce() // the opener swaps in the editor
 		}
+	case strings.HasPrefix(page, "show:"), page == "player", page == "storage":
+		// show:new|import|import:<n>|export|icon|loading, player, storage
+		a.Open(pages.IDShows)
+		a.Push(pages.ShowPage(strings.TrimPrefix(page, "show:")))
+		a.RenderOnce()
 	default:
 		a.Open(page)
 	}

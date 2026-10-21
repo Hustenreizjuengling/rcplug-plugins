@@ -40,6 +40,7 @@ type App struct {
 	toastUntil time.Time
 	popup      ui.View // a passing view over the page (the headphone level)
 	popupUntil time.Time
+	diskAsked  int       // the volume the unrecognised-disk question was asked for (+1), 0 for none
 	hpLast     []float64 // the headphone levels as last seen
 	dirty      bool      // the view tree must be rebuilt
 	quit       func()
@@ -145,6 +146,19 @@ func (a *App) build() {
 	a.mu.Unlock()
 	if a.model.TransferMode() {
 		page, depth = pages.NewTransfer(), 1
+	}
+	// A card or drive the desk cannot read: RØDE's popup asks to format it,
+	// once per insertion.
+	if overlay == nil {
+		if vol, title, msg, yes, onYes, ok := pages.UnrecognisedDisk(a.env()); ok && a.diskAsked != vol+1 {
+			a.diskAsked = vol + 1
+			a.Confirm(title, msg, yes, true, onYes)
+			a.mu.Lock()
+			overlay = a.overlay
+			a.mu.Unlock()
+		} else if !ok {
+			a.diskAsked = 0
+		}
 	}
 
 	full := image.Rect(0, 0, a.w, a.h)
