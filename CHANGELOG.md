@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.31 - Unreleased
+## 0.5.31 - 2026-10-21
 
 ### Added
 - **Screen 0.4.0: RØDE's screen, page for page.** Every page, control and text of
