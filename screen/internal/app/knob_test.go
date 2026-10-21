@@ -34,12 +34,12 @@ func TestAssignOnlyWritesOnTick(t *testing.T) {
 	}
 	a.Push(pages.NewAssign(0))
 	a.RenderOnce()
-	tap(a, 840, 664) // "not assigned" at the bottom of the grid
+	tap(a, 840, 664) // "None" along the bottom of the grid
 	a.RenderOnce()
 	if got := model.SourceOf(0); got != before {
 		t.Fatalf("a tap on the list wrote the source (%d); it must wait for the tick", got)
 	}
-	tap(a, 66, 58) // the cross: discard
+	tap(a, 160, 50) // the cross in the first cell of the bar: discard
 	a.RenderOnce()
 	if a.Depth() != 1 || model.SourceOf(0) != before {
 		t.Fatalf("the cross must leave the source as it was (depth %d, source %d)", a.Depth(), model.SourceOf(0))
@@ -47,7 +47,7 @@ func TestAssignOnlyWritesOnTick(t *testing.T) {
 	a.Push(pages.NewAssign(0))
 	a.RenderOnce()
 	tap(a, 840, 664)
-	tap(a, 1214, 58) // the tick: apply
+	tap(a, 1120, 50) // the tick in the last cell of the bar: apply
 	a.RenderOnce()
 	if got := model.SourceOf(0); got != -1 {
 		t.Fatalf("after the tick the source is %d, want -1", got)

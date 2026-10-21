@@ -53,7 +53,7 @@ var fixtureFaders = []map[string]string{
 }
 
 // sources assigned to the 10 channels in the fixture (−1 = not assigned).
-var fixtureChannelSources = []int64{0, 1, 7, 10, 11, 17, -1, -1, -1, -1}
+var fixtureChannelSources = []int64{0, 1, 7, 10, 11, 17, 19, 2, 20, -1}
 var fixtureColours = []string{"ff7ad43a", "ff33a3ff", "ffe5322d", "fff0a830", "ffb060ff", "ff30d0c0"}
 var fixtureFaderLevels = []int64{96, 90, 104, 80, 90, 64, 40, 90, 90}
 var fixtureMeterL = []float64{0.35, 0.12, 0.06, 0.02, 0.2, 0.0, 0.0, 0.0, 0.0}
@@ -139,6 +139,7 @@ func BuildTree() []byte {
 		"systemDateTime24h": true, "systemDateTimeOnHome": true, "systemChannelSelected": -1, "systemDateTimeDaylightSavings": false, "systemDateTimezone": int64(49), "transferModeType": int64(0), "assignableMeterSource": 0,
 		"osUpdateAvailable": false, "appUpdateAvailable": false, "usb1Connected": true,
 		"disableAllHeadphoneOutputs": false,
+		"usbHostOnUsb2":              int64(0), "podMicOnUSB2": false, "usbHostUnspportedFirmware": false,
 	}))
 	kids = append(kids, leaf("RECORDER", map[string]interface{}{
 		"recordState": 0, "recordTimeMs": 0, "requestDropMarker": 0, "requestRecordState": 255, "recordBytesPerSecond": 384000,
@@ -184,15 +185,42 @@ func BuildTree() []byte {
 			p["inputPower"] = 1
 			p["inputPhaseFlip"] = false
 			p["inputInstrumentGain"] = 0
+		case i == 19 || i == 20: // the internal wireless receiver's channels (1.7.3+)
+			p["inputType"] = int64(3)
+			p["inputMicrophoneGain"] = int64(50)
+			p["inputMicrophoneType"] = int64(11)
+			p["inputPower"] = 0
+			p["inputPhaseFlip"] = false
+			p["inputInstrumentGain"] = 0
+			p["inputDigitalGain"] = 0
+			p["inputWirelessSN"] = ""
+			p["inputColour"] = "ffad00ff"
 		default:
 			p["inputDigitalGain"] = 0
 			p["inputPower"] = -1
+			if i >= 21 {
+				p["inputType"] = int64(-1)
+			}
 		}
 		if i < len(fixtureColours) {
 			p["inputColour"] = fixtureColours[i]
 		}
 		kids = append(kids, leaf("INPUTSOURCE", p))
 	}
+	// The wireless receiver: slot 0 has a Wireless ME paired, slot 1 is free.
+	kids = append(kids, node{T: "RADIO", P: map[string]interface{}{"radioPair": int64(-1), "radioPaired": int64(1), "radioUnpair": ""}, C: []node{
+		leaf("RADIOTX", map[string]interface{}{
+			"txConnectionId": int64(0), "txDeviceSN": "TX000001", "txDeviceType": int64(2), "txConnected": true,
+			"txRssi": int64(-48), "txSignalQuality": int64(4), "txBatteryLevel": int64(72), "txChargingState": false,
+			"txRecord": false, "txRemoteMute": false, "txGainAssist": int64(0), "txPad": false,
+		}),
+		leaf("RADIOTX", map[string]interface{}{
+			"txConnectionId": int64(1), "txDeviceSN": "", "txDeviceType": int64(-1), "txConnected": false,
+			"txRssi": int64(0), "txSignalQuality": int64(0), "txBatteryLevel": int64(0), "txChargingState": false,
+			"txRecord": false, "txRemoteMute": false, "txGainAssist": int64(2), "txPad": false,
+		}),
+	}})
+	kids = append(kids, leaf("RADIORX", map[string]interface{}{"rxRadioId": ""}))
 	// 11 effects slots, one per strip (as the Duo keeps them).
 	for i := 0; i < 11; i++ {
 		kids = append(kids, leaf("EFFECTS_PARAMETERS", map[string]interface{}{
