@@ -6,6 +6,13 @@ may break compatibility).
 
 ## 0.5.26 - Unreleased
 
+### Fixed
+- **PlugRain's catalog entry has its title, description, icon and permission again.**
+  The release tool that describes the packages came from rcplug 0.8.9, whose reader of
+  a plugin's translations knew only title and description; PlugRain's translations also
+  carry its options, so the tool left the whole entry out and the catalog showed a bare
+  `plugrain`. The build uses rcplug 0.8.20 now (the plugins run with the same SDK).
+
 ## 0.5.25 - 2026-10-21
 
 ### Fixed
