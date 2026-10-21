@@ -61,6 +61,9 @@ func (p *ChannelPage) Build(env *Env, r image.Rectangle) ui.View {
 	c := &ui.Container{}
 	c.SetBounds(r)
 	strip := p.strip
+	if k := callMeSlotOfStrip(env, strip); k >= 0 {
+		return p.callMeBody(env, strip, k, r)
+	}
 	left := image.Rect(r.Min.X, r.Min.Y, r.Min.X+596, r.Max.Y)
 	right := image.Rect(left.Max.X+26, r.Min.Y, r.Max.X, r.Max.Y)
 	c.Add(p.inputCard(env, strip, left)...)

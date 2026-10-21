@@ -59,6 +59,11 @@ type Nav interface {
 	Confirm(title, message, yes string, danger bool, onYes func())
 	// Toast shows a brief message.
 	Toast(msg string)
+	// Modal lays a view over the page that takes every touch until Dismiss
+	// (the CallMe popups: an incoming call, a rating, a warning).
+	Modal(v ui.View)
+	// Dismiss removes the modal view (or the keyboard / dialog).
+	Dismiss()
 	// RodeScreen hands the screen back to RØDE's own interface (ends the UI).
 	RodeScreen()
 }
@@ -81,6 +86,17 @@ type FullBleed interface {
 // ownNav the app adds no back and home buttons.
 type HeaderPage interface {
 	Header(env *Env, bar image.Rectangle) (views []ui.View, ownNav bool)
+}
+
+// Enterer is an optional interface: a page told when it comes on screen
+// (the Bluetooth page makes the desk discoverable, the Wi-Fi page scans).
+type Enterer interface {
+	Enter(env *Env)
+}
+
+// Leaver is an optional interface: a page told when it goes off the stack.
+type Leaver interface {
+	Leave(env *Env)
 }
 
 // EncoderHandler is an optional interface: a page that drives the main knob

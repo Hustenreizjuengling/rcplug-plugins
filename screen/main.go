@@ -219,6 +219,17 @@ func runPNG(out, resources, langCode, page string) error {
 		a.Push(pages.NewTransfer())
 	case page == "bluetooth-out":
 		a.Push(pages.Detail("bluetooth"))
+	case strings.HasPrefix(page, "callme:"):
+		// callme:<hosting|activate|advanced|dial|quickdial|quickdial-saved|sipdial|fader|assign>
+		a.Open(pages.IDCallMe)
+		a.Push(pages.CallMePage(strings.TrimPrefix(page, "callme:")))
+	case strings.HasPrefix(page, "popup:"):
+		// popup:<incoming|conflict|recording|welcome|rating|timelimit>
+		a.Open(pages.IDCallMe)
+		a.ShowCallMePopup(strings.TrimPrefix(page, "popup:"))
+	case page == "network-join", page == "network-advanced", page == "network-dns", page == "network-proxy":
+		a.Open(pages.IDNetwork)
+		a.Push(pages.CallMePage(page))
 	case page == "keyboard":
 		a.Keyboard("Name", "Mic 1", nil)
 	case page == "dialog":

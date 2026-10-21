@@ -22,12 +22,15 @@ func (a *App) Push(p pages.Page) {
 	a.mu.Unlock()
 	a.focus.reset()
 	a.syncChannel()
+	a.enter(p)
 }
 
 // Pop goes back one page.
 func (a *App) Pop() {
 	a.mu.Lock()
+	var gone pages.Page
 	if len(a.stack) > 1 {
+		gone = a.stack[len(a.stack)-1]
 		a.stack = a.stack[:len(a.stack)-1]
 	}
 	a.overlay = nil
@@ -35,17 +38,22 @@ func (a *App) Pop() {
 	a.mu.Unlock()
 	a.focus.reset()
 	a.syncChannel()
+	if gone != nil {
+		a.leave(gone)
+	}
 }
 
 // Home returns to the mixer.
 func (a *App) Home() {
 	a.mu.Lock()
+	gone := append([]pages.Page(nil), a.stack[1:]...)
 	a.stack = a.stack[:1]
 	a.overlay = nil
 	a.dirty = true
 	a.mu.Unlock()
 	a.focus.reset()
 	a.syncChannel()
+	a.leave(gone...)
 }
 
 // Open shows a top-level page by its id.
@@ -63,12 +71,15 @@ func (a *App) Replace(p pages.Page) {
 		return
 	}
 	a.mu.Lock()
+	gone := a.stack[len(a.stack)-1]
 	a.stack[len(a.stack)-1] = p
 	a.overlay = nil
 	a.dirty = true
 	a.mu.Unlock()
 	a.focus.reset()
 	a.syncChannel()
+	a.leave(gone)
+	a.enter(p)
 }
 
 // Refresh rebuilds the current page's views; the knob's focus stays where
@@ -102,13 +113,27 @@ func (a *App) Confirm(title, message, yes string, danger bool, onYes func()) {
 	a.setOverlay(d)
 }
 
-// Toast shows a brief message near the bottom.
+// Toast shows a brief message near the bottom. It stays four seconds, as
+// RØDE's notification popup does ("Marker added at …", "TX Disconnected").
 func (a *App) Toast(msg string) {
 	a.mu.Lock()
 	a.toast = msg
-	a.toastUntil = time.Now().Add(2500 * time.Millisecond)
+	a.toastUntil = time.Now().Add(4000 * time.Millisecond)
 	a.dirty = true
 	a.mu.Unlock()
+}
+
+// Modal lays a view over the page until Dismiss (the CallMe popups).
+func (a *App) Modal(v ui.View) { a.setOverlay(v) }
+
+// Dismiss removes the modal view, keyboard or dialog.
+func (a *App) Dismiss() { a.clearOverlay() }
+
+// Overlay is the modal view currently up, or nil (for tests).
+func (a *App) Overlay() ui.View {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.overlay
 }
 
 // RodeScreen hands the screen back to RØDE's interface (ends the UI).
@@ -178,12 +203,14 @@ func (a *App) channelButton(strip int) {
 		return
 	}
 	a.mu.Lock()
+	gone := append([]pages.Page(nil), a.stack[1:]...)
 	a.stack = append(a.stack[:1], pages.NewChannel(strip))
 	a.overlay = nil
 	a.dirty = true
 	a.mu.Unlock()
 	a.focus.reset()
 	a.syncChannel()
+	a.leave(gone...)
 }
 
 // ChannelButton feeds a change of the selected channel (for tests and the
