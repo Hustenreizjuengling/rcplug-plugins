@@ -91,7 +91,3 @@ func LanguageIndex(code string) int {
 	}
 	return -1
 }
-
-// IsDuo tells a Duo from a Pro II (the regulatory page and a few texts
-// differ between them).
-func (m *Model) IsDuo() bool { return m.Info().Model != "pro2" }

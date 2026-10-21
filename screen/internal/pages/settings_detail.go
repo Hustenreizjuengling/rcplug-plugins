@@ -4,7 +4,6 @@ import (
 	"image"
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/desk"
-	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/font"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/gfx"
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
 )
@@ -42,47 +41,7 @@ func newListenPage() Page {
 
 // --- Faders: a tile per strip, physical and virtual apart ---
 
-func newFadersPage() Page {
-	return &funcPage{title: "FADERS", build: func(env *Env, r image.Rectangle) ui.View {
-		c := &ui.Container{}
-		c.SetBounds(r)
-		th := env.Ctx.Theme
-		n := env.Desk.StripCount()
-		physical := env.Desk.PhysicalFaders()
-		if n == 0 {
-			return c
-		}
-		tileW, tileH, gap := 140, 210, 16
-		place := func(strips []int, y int, caption string) {
-			lbl := ui.NewLabel(caption, th.Fonts.Body, th.TextDim, font.Center)
-			lbl.SetBounds(image.Rect(r.Min.X, y-44, r.Min.X+120, y-4))
-			c.Add(lbl)
-			total := len(strips)*tileW + (len(strips)-1)*gap
-			x := r.Min.X + 140 + max(0, (r.Dx()-140-total)/2)
-			for _, s := range strips {
-				t := &faderTile{env: env, strip: s}
-				t.SetBounds(image.Rect(x, y, x+tileW, y+tileH))
-				c.Add(t)
-				x += tileW + gap
-			}
-		}
-		var phys, virt []int
-		for i := 0; i < n; i++ {
-			if i < physical {
-				phys = append(phys, i)
-			} else {
-				virt = append(virt, i)
-			}
-		}
-		if len(virt) == 0 {
-			place(phys, r.Min.Y+(r.Dy()-tileH)/2, env.TR("PHYSICAL", "Physisch", "Physical"))
-			return c
-		}
-		place(phys, r.Min.Y+50, env.TR("PHYSICAL", "Physisch", "Physical"))
-		place(virt, r.Min.Y+50+tileH+56, env.TR("VIRTUAL", "Virtuell", "Virtual"))
-		return c
-	}}
-}
+func newFadersPage() Page { return newFadersDragPage() }
 
 // faderTile is a strip on the faders page: its icon on a card with the
 // source colour along the bottom; a tap opens the channel page.

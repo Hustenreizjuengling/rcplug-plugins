@@ -126,6 +126,22 @@ func (a *App) Confirm(title, message, yes string, danger bool, onYes func()) {
 	a.setOverlay(d)
 }
 
+// Choose shows a modal dialog with several buttons; a chosen option's Do
+// runs after the dialog closed.
+func (a *App) Choose(title, message string, options []pages.Option) {
+	choices := make([]ui.DialogChoice, len(options))
+	for i, o := range options {
+		do := o.Do
+		choices[i] = ui.DialogChoice{Label: o.Label, Danger: o.Danger, OnTap: func() {
+			a.clearOverlay()
+			if do != nil {
+				do()
+			}
+		}}
+	}
+	a.setOverlay(ui.NewChoiceDialog(title, message, choices))
+}
+
 // Toast shows a brief message near the bottom. It stays four seconds, as
 // RØDE's notification popup does ("Marker added at …", "TX Disconnected").
 func (a *App) Toast(msg string) {

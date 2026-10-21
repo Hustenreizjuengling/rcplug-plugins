@@ -59,6 +59,9 @@ type Nav interface {
 	Password(prompt string, done func(string))
 	// Confirm shows a modal dialog; onYes runs if confirmed.
 	Confirm(title, message, yes string, danger bool, onYes func())
+	// Choose shows a modal dialog with several buttons (RØDE's three-way
+	// questions); the chosen option's Do runs, a nil Do only closes.
+	Choose(title, message string, options []Option)
 	// Toast shows a brief message.
 	Toast(msg string)
 	// Modal lays a view over the page that takes every touch until Dismiss
@@ -68,6 +71,13 @@ type Nav interface {
 	Dismiss()
 	// RodeScreen hands the screen back to RØDE's own interface (ends the UI).
 	RodeScreen()
+}
+
+// Option is one button of a Choose dialog.
+type Option struct {
+	Label  string
+	Danger bool // drawn red (a destructive action)
+	Do     func()
 }
 
 // Page is one screen. Build lays its body into r and returns the view; Title

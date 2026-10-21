@@ -151,6 +151,7 @@ type Knob struct {
 	Text    func(v float64) string // the value, shown under the label / beside the knob
 	Step    float64                // an encoder step (default 1/100)
 	OnLight bool                   // drawn on a light panel (dark text)
+	Dim     bool                   // greyed out and inert (the inactive half of a page)
 	last    float64
 	lastY   int
 	drag    bool
@@ -175,7 +176,7 @@ func (k *Knob) set(v float64) {
 	k.MarkDirty()
 }
 
-func (k *Knob) CanFocus() bool { return k.Change != nil }
+func (k *Knob) CanFocus() bool { return k.Change != nil && !k.Dim }
 func (k *Knob) Activate() bool { return k.toggleAdjust() }
 func (k *Knob) Adjust(d int) {
 	step := k.Step
@@ -192,7 +193,7 @@ func (k *Knob) SetFocus(on bool) {
 }
 
 func (k *Knob) Touch(phase TouchPhase, p image.Point) bool {
-	if k.Change == nil {
+	if k.Change == nil || k.Dim {
 		return false
 	}
 	switch phase {
@@ -246,19 +247,27 @@ func (k *Knob) Draw(dst *gfx.Image, c *Context, clip image.Rectangle) {
 	const start, sweep = math.Pi * 0.75, math.Pi * 1.5
 	switch k.Style {
 	case KnobRack:
-		// A black knob with a lighter rim and a green arc at its foot.
-		Circle(dst, cx, cy, rad-2, gfx.Hex(0x0e0e0e), clip)
-		Ring(dst, cx, cy, rad-5, 3, gfx.Hex(0x3a3a3a), clip)
-		Circle(dst, cx, cy, rad*0.55, gfx.Hex(0x1c1c1c), clip)
-		Arc(dst, cx, cy, rad-2, 5, start, start+sweep*math.Max(v, 0.005), t.Accent, clip)
+		// A black knob with a lighter rim and a green arc at its foot; a
+		// dimmed knob is drawn in greys.
+		body, rim, arc, dot := gfx.Hex(0x0e0e0e), gfx.Hex(0x3a3a3a), t.Accent, t.Text
+		if k.Dim {
+			body, rim, arc, dot = gfx.Hex(0x9a9a9a), gfx.Hex(0xb8b8b8), gfx.Hex(0xc8e8a0), gfx.Hex(0xdddddd)
+		}
+		Circle(dst, cx, cy, rad-2, body, clip)
+		Ring(dst, cx, cy, rad-5, 3, rim, clip)
+		Circle(dst, cx, cy, rad*0.55, gfx.Mix(body, rim, 0.3), clip)
+		Arc(dst, cx, cy, rad-2, 5, start, start+sweep*math.Max(v, 0.005), arc, clip)
 		// The pointer.
 		a := start + sweep*v
 		px, py := cx+math.Cos(a)*rad*0.5, cy+math.Sin(a)*rad*0.5
-		Circle(dst, px, py, 5, t.Text, clip)
+		Circle(dst, px, py, 5, dot, clip)
 		tx := d.Max.X + 18
 		name, val := t.Text, t.TextDim
 		if k.OnLight {
 			name, val = t.TextOnLight, gfx.Hex(0x555555)
+		}
+		if k.Dim {
+			name, val = gfx.Hex(0x9a9a9a), gfx.Hex(0xaaaaaa)
 		}
 		if k.Label != "" {
 			Text(dst, t.Fonts.Label, k.Label, image.Rect(tx, d.Min.Y, k.bounds.Max.X, d.Min.Y+d.Dy()/2), font.Left, name, clip)

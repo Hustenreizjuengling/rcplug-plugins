@@ -206,6 +206,24 @@ func runPNG(out, resources, langCode, page string) error {
 	case strings.HasPrefix(page, "channel:"):
 		n, _ := strconv.Atoi(strings.TrimPrefix(page, "channel:"))
 		a.Push(pages.NewChannel(n))
+	case strings.HasPrefix(page, "channelfx:"):
+		n, _ := strconv.Atoi(strings.TrimPrefix(page, "channelfx:"))
+		a.Push(pages.NewChannelTab(n, 1))
+	case strings.HasPrefix(page, "proc:") && strings.Contains(page, ":") && strings.Count(page, ":") == 2:
+		parts := strings.Split(page, ":")
+		n, _ := strconv.Atoi(parts[1])
+		a.Push(pages.Processor(n, parts[2]))
+	case page == "wireless-info":
+		a.Push(pages.NewChannel(6))
+		a.Push(pages.WirelessInfo())
+	case strings.HasPrefix(page, "fx:"):
+		parts := strings.Split(strings.TrimPrefix(page, "fx:"), ":")
+		n, _ := strconv.Atoi(parts[0])
+		idx := 0
+		if len(parts) > 1 {
+			idx, _ = strconv.Atoi(parts[1])
+		}
+		a.Push(pages.NewEffectsRack(n, idx))
 	case page == "assign":
 		a.Push(pages.NewAssign(0))
 	case strings.HasPrefix(page, "proc:"):
