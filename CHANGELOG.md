@@ -6,6 +6,14 @@ may break compatibility).
 
 ## 0.5.34 - Unreleased
 
+### Fixed
+- **Screen 0.4.3: a channel button opens its page without the felt delay.** The page
+  is built and shown with the press itself, not at the next frame; the microphone
+  pictures are scaled once at the start, not when the first channel page opens; rounded
+  panels and the gradients fill their straight parts row by row and run the rasterizer
+  only at the corners (a page opens five times faster, a mixer frame with moving meters
+  repaints only the meter columns); opaque fills copy rows instead of setting pixels.
+
 ## 0.5.33 - 2026-10-21
 
 ### Added

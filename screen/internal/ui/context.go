@@ -64,6 +64,14 @@ func (c *Context) Icon(dst *gfx.Image, name string, r image.Rectangle, tint gfx.
 	dst.Draw(img, r.Min.X+(r.Dx()-img.W)/2, r.Min.Y+(r.Dy()-img.H)/2, 255)
 }
 
+// Warm renders an icon at a size into the cache ahead of its first use (a
+// page's pictures, so its first opening is as quick as the next).
+func (c *Context) Warm(name string, w, h int) {
+	if c.Icons != nil && w > 0 && h > 0 {
+		c.iconImage(name, w, h, 0)
+	}
+}
+
 // IconIn is Icon with an opacity (0…255), limited to the clip rectangle
 // (for pictures that slide partly out of view).
 func (c *Context) IconIn(dst *gfx.Image, name string, r image.Rectangle, tint gfx.Color, alpha uint8, clip image.Rectangle) {

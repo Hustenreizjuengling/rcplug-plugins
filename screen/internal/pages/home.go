@@ -515,12 +515,13 @@ type stripView struct {
 	virtual  bool
 	lastPhys bool // the last physical strip (a brighter divider after it)
 
-	last    string
-	down    image.Point
-	dragged bool
-	dragY   int
-	shown   [2]float64 // the levels as drawn: they fall smoothly between readings
-	shownAt time.Time
+	last     string
+	lastLive string
+	down     image.Point
+	dragged  bool
+	dragY    int
+	shown    [2]float64 // the levels as drawn: they fall smoothly between readings
+	shownAt  time.Time
 }
 
 // meterFall is how fast a drawn level falls after the reading dropped, in
@@ -565,14 +566,25 @@ func (s *stripView) bars() (l, r image.Rectangle, stereo bool) {
 	return l, l, false
 }
 
-func (s *stripView) state() string {
+// state is what the strip draws, split into the parts that change its
+// whole look (source, colour, fader, mute, listen, focus) and the live
+// readings (levels, peaks, gain reduction), which only touch the meters.
+func (s *stripView) state() (look, live string) {
 	d := s.env.Desk
 	l, r := s.levels()
 	pl, pr := d.MeterPeakLR(s.strip)
 	focus := s.page.knobOn && s.virtual && s.page.knob == s.strip-d.PhysicalFaders()+1
-	return intText(d.SourceOf(s.strip)) + "|" + d.InputColour(s.strip) + "|" + intText(d.FaderLevel(s.strip)) +
-		"|" + fine(l) + fine(r) + pct(pl) + pct(pr) + "|" + boolText(d.Muted(s.strip)) + boolText(d.Cue(s.strip)) +
-		boolText(focus) + boolText(d.BroadcastMeters()) + pct(d.GainReductionDb(s.strip)/24)
+	look = intText(d.SourceOf(s.strip)) + "|" + d.InputColour(s.strip) + "|" + intText(d.FaderLevel(s.strip)) +
+		"|" + boolText(d.Muted(s.strip)) + boolText(d.Cue(s.strip)) + boolText(focus) + boolText(d.BroadcastMeters())
+	live = fine(l) + fine(r) + pct(pl) + pct(pr) + pct(d.GainReductionDb(s.strip)/24)
+	return look, live
+}
+
+// meterArea is the part of the strip the live readings paint: the bars,
+// the peak marks and the gain-reduction bar beside them.
+func (s *stripView) meterArea() image.Rectangle {
+	l, r, _ := s.bars()
+	return image.Rect(l.Min.X-4, meterTop-4, max(r.Max.X, l.Max.X)+12, meterBase+4)
 }
 
 // fine is a level rounded to the meter's pixel (for change detection).
@@ -586,9 +598,17 @@ func boolText(b bool) string {
 }
 
 func (s *stripView) Dirty() []image.Rectangle {
-	if st := s.state(); st != s.last {
-		s.last = st
+	look, live := s.state()
+	if look != s.last {
+		s.last, s.lastLive = look, live
 		s.MarkDirty()
+	} else if live != s.lastLive {
+		// Only the readings moved: repaint the meters, not the strip.
+		s.lastLive = live
+		if rest := s.Base.Dirty(); len(rest) > 0 {
+			return rest
+		}
+		return []image.Rectangle{s.meterArea().Intersect(s.Bounds())}
 	}
 	return s.Base.Dirty()
 }

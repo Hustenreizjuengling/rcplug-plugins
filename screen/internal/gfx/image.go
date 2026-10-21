@@ -35,6 +35,18 @@ func (c Color) WithAlpha(a float64) Color {
 	return Color(uint32(c)&0xffffff | uint32(na)<<24)
 }
 
+// Lerp mixes the colour with d: t 0 is the colour, 1 is d (straight alpha).
+func (c Color) Lerp(d Color, t float64) Color {
+	if t <= 0 {
+		return c
+	}
+	if t >= 1 {
+		return d
+	}
+	mix := func(a, b uint8) uint8 { return uint8(float64(a) + (float64(b)-float64(a))*t + 0.5) }
+	return RGBA(mix(c.R(), d.R()), mix(c.G(), d.G()), mix(c.B(), d.B()), mix(c.A(), d.A()))
+}
+
 // Premul is the colour as a premultiplied pixel.
 func (c Color) Premul() uint32 {
 	a := uint32(c >> 24)
@@ -91,12 +103,17 @@ func (m *Image) Clear(c Color) { m.Set(m.Bounds(), c) }
 // Set replaces the pixels in r with c (no blending).
 func (m *Image) Set(r image.Rectangle, c Color) {
 	r = r.Intersect(m.Bounds())
+	if r.Empty() {
+		return
+	}
 	p := c.Premul()
-	for y := r.Min.Y; y < r.Max.Y; y++ {
-		row := m.Pix[y*m.Stride+r.Min.X : y*m.Stride+r.Max.X]
-		for i := range row {
-			row[i] = p
-		}
+	// The first row pixel by pixel, the rest copied from it.
+	first := m.Pix[r.Min.Y*m.Stride+r.Min.X : r.Min.Y*m.Stride+r.Max.X]
+	for i := range first {
+		first[i] = p
+	}
+	for y := r.Min.Y + 1; y < r.Max.Y; y++ {
+		copy(m.Pix[y*m.Stride+r.Min.X:y*m.Stride+r.Max.X], first)
 	}
 }
 

@@ -15,21 +15,86 @@ func Panel(dst *gfx.Image, r image.Rectangle, radius int, fill gfx.Color, clip i
 	if r.Empty() || clip.Intersect(r).Empty() {
 		return
 	}
-	p := &gfx.Path{}
-	p.RoundRect(float64(r.Min.X), float64(r.Min.Y), float64(r.Dx()), float64(r.Dy()), float64(radius), float64(radius))
-	dst.Fill(p, gfx.Identity, gfx.NonZero, gfx.Solid(fill), clip)
+	rad := cornerRadius(r, radius)
+	if rad == 0 {
+		dst.FillRect(r.Intersect(clip), fill)
+		return
+	}
+	// The straight parts are plain row fills; only the four corners go
+	// through the rasterizer (the bulk of a panel is its middle).
+	dst.FillRect(image.Rect(r.Min.X, r.Min.Y+rad, r.Max.X, r.Max.Y-rad).Intersect(clip), fill)
+	dst.FillRect(image.Rect(r.Min.X+rad, r.Min.Y, r.Max.X-rad, r.Min.Y+rad).Intersect(clip), fill)
+	dst.FillRect(image.Rect(r.Min.X+rad, r.Max.Y-rad, r.Max.X-rad, r.Max.Y).Intersect(clip), fill)
+	var p *gfx.Path
+	for _, c := range corners(r, rad) {
+		cc := c.Intersect(clip)
+		if cc.Empty() {
+			continue
+		}
+		if p == nil {
+			p = &gfx.Path{}
+			p.RoundRect(float64(r.Min.X), float64(r.Min.Y), float64(r.Dx()), float64(r.Dy()), float64(rad), float64(rad))
+		}
+		dst.Fill(p, gfx.Identity, gfx.NonZero, gfx.Solid(fill), cc)
+	}
+}
+
+// cornerRadius is the radius a rounded rectangle really gets (no more than
+// half its size), 0 for a plain rectangle.
+func cornerRadius(r image.Rectangle, radius int) int {
+	if radius <= 0 {
+		return 0
+	}
+	return min(radius, r.Dx()/2, r.Dy()/2)
+}
+
+// corners are the four rad × rad squares of a rounded rectangle's corners.
+func corners(r image.Rectangle, rad int) [4]image.Rectangle {
+	return [4]image.Rectangle{
+		image.Rect(r.Min.X, r.Min.Y, r.Min.X+rad, r.Min.Y+rad),
+		image.Rect(r.Max.X-rad, r.Min.Y, r.Max.X, r.Min.Y+rad),
+		image.Rect(r.Min.X, r.Max.Y-rad, r.Min.X+rad, r.Max.Y),
+		image.Rect(r.Max.X-rad, r.Max.Y-rad, r.Max.X, r.Max.Y),
+	}
 }
 
 // Gradient fills a rounded card with a vertical gradient from top to bottom.
 func Gradient(dst *gfx.Image, r image.Rectangle, radius int, top, bottom gfx.Color, clip image.Rectangle) {
-	if r.Empty() || clip.Intersect(r).Empty() {
+	area := clip.Intersect(r)
+	if area.Empty() {
 		return
 	}
-	p := &gfx.Path{}
-	p.RoundRect(float64(r.Min.X), float64(r.Min.Y), float64(r.Dx()), float64(r.Dy()), float64(radius), float64(radius))
-	g := gfx.NewLinear(gfx.Pt{X: 0, Y: float64(r.Min.Y)}, gfx.Pt{X: 0, Y: float64(r.Max.Y)}, gfx.Identity,
-		[]gfx.Stop{{Offset: 0, Color: top}, {Offset: 1, Color: bottom}})
-	dst.Fill(p, gfx.Identity, gfx.NonZero, g, clip)
+	rad := cornerRadius(r, radius)
+	// A vertical gradient is one colour per row: the rows between the
+	// corners are plain fills, the corner rows are filled between the
+	// corner squares, and only the corners go through the rasterizer.
+	h := float64(r.Dy())
+	rowColour := func(y int) gfx.Color { return top.Lerp(bottom, (float64(y-r.Min.Y)+0.5)/h) }
+	for y := area.Min.Y; y < area.Max.Y; y++ {
+		x0, x1 := r.Min.X, r.Max.X
+		if y < r.Min.Y+rad || y >= r.Max.Y-rad {
+			x0, x1 = r.Min.X+rad, r.Max.X-rad
+		}
+		dst.FillRect(image.Rect(x0, y, x1, y+1).Intersect(area), rowColour(y))
+	}
+	if rad == 0 {
+		return
+	}
+	var p *gfx.Path
+	var g *gfx.Linear
+	for _, c := range corners(r, rad) {
+		cc := c.Intersect(clip)
+		if cc.Empty() {
+			continue
+		}
+		if p == nil {
+			p = &gfx.Path{}
+			p.RoundRect(float64(r.Min.X), float64(r.Min.Y), float64(r.Dx()), float64(r.Dy()), float64(rad), float64(rad))
+			g = gfx.NewLinear(gfx.Pt{X: 0, Y: float64(r.Min.Y)}, gfx.Pt{X: 0, Y: float64(r.Max.Y)}, gfx.Identity,
+				[]gfx.Stop{{Offset: 0, Color: top}, {Offset: 1, Color: bottom}})
+		}
+		dst.Fill(p, gfx.Identity, gfx.NonZero, g, cc)
+	}
 }
 
 // Card draws a tile in the theme's grey gradient.
@@ -142,15 +207,7 @@ func Fill(dst *gfx.Image, r image.Rectangle, col gfx.Color, clip image.Rectangle
 
 // PageBackground paints the gradient behind a menu page.
 func PageBackground(dst *gfx.Image, r image.Rectangle, t *Theme, clip image.Rectangle) {
-	area := clip.Intersect(r)
-	if area.Empty() {
-		return
-	}
-	p := &gfx.Path{}
-	p.Rect(float64(area.Min.X), float64(area.Min.Y), float64(area.Dx()), float64(area.Dy()))
-	g := gfx.NewLinear(gfx.Pt{X: 0, Y: float64(r.Min.Y)}, gfx.Pt{X: 0, Y: float64(r.Max.Y)}, gfx.Identity,
-		[]gfx.Stop{{Offset: 0, Color: t.PageTop}, {Offset: 1, Color: t.PageBottom}})
-	dst.Fill(p, gfx.Identity, gfx.NonZero, g, area)
+	Gradient(dst, r, 0, t.PageTop, t.PageBottom, clip)
 }
 
 // centre is the centre of a rectangle.

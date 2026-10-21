@@ -38,6 +38,18 @@ const (
 	micPitch   = micTileW + micTileGap
 )
 
+// micPictureSize is the size the carousel draws a picture at (the tile
+// less its margins and the name).
+const micPictureW, micPictureH = micTileW - 24, 250 - 20 - 8 - 56
+
+// WarmMicPictures scales the microphone pictures to the carousel's size
+// ahead of the first channel page, so it opens without that work.
+func WarmMicPictures(c *ui.Context) {
+	for _, m := range desk.Mics {
+		c.Warm(m.Picture, micPictureW, micPictureH)
+	}
+}
+
 func newMicCarousel(env *Env, strip, input int) *micCarousel {
 	m := &micCarousel{env: env, strip: strip, input: input}
 	m.target = float64(m.selected())

@@ -68,8 +68,16 @@ func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.Touc
 			wasDown = ev.Down
 		case ev := <-knob:
 			a.handleEncoder(ev)
+			if err := a.frame(out); err != nil {
+				return err
+			}
 		case n := <-button:
+			// The page opens with this event, not at the next tick: the
+			// press is answered as promptly as RØDE's screen does.
 			a.channelButton(n)
+			if err := a.frame(out); err != nil {
+				return err
+			}
 		case <-tick.C:
 			// The device coming online (or its strip count changing) needs a
 			// fresh layout.
@@ -87,20 +95,29 @@ func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.Touc
 				}
 			}
 			a.expireToast()
-			a.mu.Lock()
-			rebuild := a.dirty
-			a.mu.Unlock()
-			if rebuild {
-				a.build()
-			}
-			changed := a.root.Render()
-			if len(changed) > 0 {
-				if err := out.Present(a.root.Image(), changed); err != nil {
-					return err
-				}
+			if err := a.frame(out); err != nil {
+				return err
 			}
 		}
 	}
+}
+
+// frame rebuilds the views if something asked for it, renders what changed
+// and presents it.
+func (a *App) frame(out panel.Output) error {
+	a.mu.Lock()
+	rebuild := a.dirty
+	a.mu.Unlock()
+	if rebuild {
+		a.build()
+	}
+	changed := a.root.Render()
+	if len(changed) > 0 {
+		if err := out.Present(a.root.Image(), changed); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // expireToast clears a toast or popup that has timed out, and watches the

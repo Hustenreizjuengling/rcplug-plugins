@@ -180,6 +180,7 @@ func runDevice(ctx context.Context, card, touchDev, guiPath, langCode string, no
 		log.Printf("screen: first start, showing the welcome flow")
 	}
 	log.Printf("screen: interface up (%s, %d texts, %d strips)", code, texts.Count(), model.StripCount())
+	go pages.WarmMicPictures(ctxUI) // the icon cache is safe to fill from here
 	return a.Run(ctx, scr, touches, panelTurn)
 }
 

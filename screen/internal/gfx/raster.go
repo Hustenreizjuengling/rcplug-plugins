@@ -262,8 +262,13 @@ func (dst *Image) paintCoverage(c *coverage, rule FillRule, paint Paint, alpha u
 			shades = shades[:len(cov)]
 			paint.shade(y, x0, shades)
 		}
+		opaque := isSolid && alpha == 255 && sp>>24 == 255
 		for i, a := range cov {
 			if a == 0 {
+				continue
+			}
+			if a == 255 && opaque {
+				row[i] = sp // a covered pixel of an opaque colour: no blending
 				continue
 			}
 			s := sp
