@@ -76,6 +76,7 @@ func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.Touc
 				lastOnline, lastStrips = on, n
 				a.Rebuild()
 			}
+			a.followLanguage()
 			// A plugin installed, removed, started or stopped: the pages
 			// that list them show it.
 			if pluginsRev != nil {
@@ -147,6 +148,7 @@ func (a *App) Popup(v ui.View, keep time.Duration) {
 // RenderOnce builds and renders a single frame (for the PNG preview and
 // tests). It returns the rendered image's bounds as changed.
 func (a *App) RenderOnce() []image.Rectangle {
+	a.followLanguage()
 	a.build()
 	return a.root.Render()
 }

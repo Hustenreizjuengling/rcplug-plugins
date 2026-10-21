@@ -6,6 +6,13 @@ may break compatibility).
 
 ## 0.5.30 - Unreleased
 
+### Fixed
+- **Screen 0.3.12: the interface follows the desk's language.** When the plugin started
+  before the console had loaded the desk (after an update or at the device's start) it
+  came up in English and stayed so. It now switches to the desk's language as soon as
+  the setting is known, and a change on the language page applies at once, as on RØDE's
+  screen.
+
 ## 0.5.29 - 2026-10-21
 
 ### Added

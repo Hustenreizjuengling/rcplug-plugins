@@ -159,6 +159,16 @@ func runDevice(ctx context.Context, card, touchDev, guiPath, langCode string, no
 	go panel.ReadTouch(ctx, panelW, panelH, touches, log.Printf)
 
 	a := app.New(w, h, ctxUI, model, texts, reg)
+	// Follow the desk's language: a start before the desk had loaded began
+	// in English, and the language page changes it while running.
+	if langCode == "" {
+		a.FollowLanguage(func(code string) *lang.Texts {
+			table, _ := res.Translations(rode.Language(code))
+			reg.SetLang(code)
+			log.Printf("screen: language %s (%d texts)", code, len(table))
+			return lang.New(code, table)
+		})
+	}
 	log.Printf("screen: interface up (%s, %d texts, %d strips)", code, texts.Count(), model.StripCount())
 	return a.Run(ctx, scr, touches, panelTurn)
 }

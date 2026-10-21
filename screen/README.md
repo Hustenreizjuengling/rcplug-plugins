@@ -54,6 +54,10 @@ this plugin's own code.
   the next press deselects it and the pages close. Opening or closing a
   channel's pages by touch sets the same property, as RØDE's screen does, so
   the button's light always shows whose pages are open.
+- The texts follow the desk's language setting (`GUI.lang`) while the plugin
+  runs: a start before the desk had loaded begins in English and switches as
+  soon as the setting is known, and the language page applies at once, as on
+  RØDE's screen.
 - RØDE's screen comes back with the **Back to RØDE** button, when the plugin
   is stopped from the dashboard, or if it exits for any reason.
 - It is started in the dashboard the first time. With rcplug 0.8.17 or later

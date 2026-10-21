@@ -44,8 +44,39 @@ type App struct {
 	dirty      bool      // the view tree must be rebuilt
 	quit       func()
 
+	// textLoader builds the texts of a language code; set, the interface
+	// follows the desk's language setting (GUI.lang) while it runs.
+	textLoader func(code string) *lang.Texts
+
 	focus focus
 }
+
+// FollowLanguage makes the interface follow the desk's language setting:
+// when GUI.lang differs from the texts' language, load builds the new texts
+// and the pages are rebuilt. That covers a start before the desk had loaded
+// (the texts began as English) and a change on the language page, which
+// RØDE's screen also applies at once.
+func (a *App) FollowLanguage(load func(code string) *lang.Texts) {
+	a.textLoader = load
+}
+
+// followLanguage switches the texts when the desk's language changed.
+func (a *App) followLanguage() {
+	if a.textLoader == nil || !a.model.Online() {
+		return
+	}
+	code := a.model.Str(desk.GUINode, 0, "lang")
+	if code == "" || code == a.text.Code() {
+		return
+	}
+	if t := a.textLoader(code); t != nil {
+		a.text = t
+		a.Rebuild()
+	}
+}
+
+// Texts are the interface's current texts.
+func (a *App) Texts() *lang.Texts { return a.text }
 
 // New makes an app for a w × h screen.
 func New(w, h int, ctx *ui.Context, model *desk.Model, text *lang.Texts, plugins pages.PluginSource) *App {
