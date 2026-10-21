@@ -95,8 +95,11 @@ func (a *App) handleEncoder(ev desk.EncoderEvent) {
 	a.mu.Unlock()
 
 	if overlay == nil {
+		// The page's views follow the change through their own Dirty (the
+		// monitor ring, the fader caps); a page whose layout changes asks
+		// for a Refresh itself. Rebuilding the whole tree per detent would
+		// queue the turns behind the drawing.
 		if h, ok := page.(pages.EncoderHandler); ok && h.Encoder(a.env(), ev) {
-			a.Rebuild()
 			return
 		}
 	}

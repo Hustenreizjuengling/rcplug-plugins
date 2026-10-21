@@ -832,6 +832,9 @@ func (p *HomePage) Encoder(env *Env, ev desk.EncoderEvent) bool {
 		}
 		strip := physical + p.knob - 1
 		d.SetFaderFrac(strip, d.FaderFrac(strip)+float64(ev.Delta)/127)
+		if p.selected != strip {
+			env.Nav.Refresh() // the strip's listen/mute bar comes up
+		}
 		p.selected, p.barUntil = strip, time.Now().Add(4*time.Second)
 		return true
 	case ev.Release && ev.Held >= 900*time.Millisecond:

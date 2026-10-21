@@ -6,6 +6,14 @@ may break compatibility).
 
 ## 0.5.35 - Unreleased
 
+### Fixed
+- **Screen 0.4.4: the main knob no longer lags behind a quick turn.** Every detent
+  rebuilt the whole mixer page before it was drawn, so fast turns queued up behind the
+  drawing and the level kept moving long after the knob had stopped. The views now follow
+  the level themselves (the ring, the fader caps), a page rebuilds only when its layout
+  changes, and the turns that queued up while a frame was drawn are taken together
+  before the next one.
+
 ## 0.5.34 - 2026-10-21
 
 ### Fixed

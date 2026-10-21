@@ -68,6 +68,17 @@ func (a *App) Run(ctx context.Context, out panel.Output, touch <-chan panel.Touc
 			wasDown = ev.Down
 		case ev := <-knob:
 			a.handleEncoder(ev)
+			// Turns that queued up meanwhile are taken before the frame:
+			// the picture then shows where the knob is, not where it was.
+		drain:
+			for {
+				select {
+				case ev := <-knob:
+					a.handleEncoder(ev)
+				default:
+					break drain
+				}
+			}
 			if err := a.frame(out); err != nil {
 				return err
 			}
