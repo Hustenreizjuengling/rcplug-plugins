@@ -42,7 +42,10 @@ func (p *infoMainPage) Build(env *Env, r image.Rectangle) ui.View {
 	c.Add(card, head, qr, hint)
 	// Right: the three buttons.
 	right := image.Rect(left.Max.X+th.Pad, r.Min.Y, r.Max.X, r.Max.Y)
-	rows := rowRects(image.Rect(right.Min.X, right.Min.Y+20, right.Max.X, right.Max.Y), 130, 24)
+	var rows [3]image.Rectangle
+	for i := range rows {
+		rows[i] = image.Rect(right.Min.X, right.Min.Y+20+i*154, right.Max.X, right.Min.Y+20+i*154+130)
+	}
 	dev := ui.NewButton(env.T("VIEW DEVICE INFORMATION"), func() { env.Nav.Push(newInfoDevicePage()) })
 	dev.Icon = "IconInformation"
 	dev.SetBounds(rows[0])
@@ -209,7 +212,7 @@ func newAnalyticsPage() Page {
 			model = "RØDECaster Pro II"
 		}
 		intro := ui.NewParagraph(env.T("TO IMPROVE FUTURE UPDATES AND TO ASSIST WITH TROUBLESHOOTING, YOU CAN SHARE")+"\n"+
-			model+" "+env.T("USAGE DATA WITH RØDE."), th.Fonts.Body, th.Text)
+			model+" "+env.T("RØDECASTER PRO II USAGE DATA WITH RØDE."), th.Fonts.Body, th.Text)
 		intro.Align = font.Center
 		intro.SetBounds(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+90))
 		c.Add(intro)

@@ -79,7 +79,7 @@ func (p *padSoundPage) Build(env *Env, r image.Rectangle) ui.View {
 	default:
 		card := ui.NewPanelView(th.Black)
 		card.SetBounds(boxR)
-		hint := ui.NewParagraph(env.T("RECORD A SOUND OR ADD VIA THE RØDE CENTRAL APPLICATION"), th.Fonts.Body, th.TextDim)
+		hint := ui.NewParagraph(env.T("RECORD A SOUND OR ADD VIA THE RØDECASTER APP"), th.Fonts.Body, th.TextDim)
 		hint.Align = font.Center
 		hint.SetBounds(image.Rect(boxR.Min.X+100, boxR.Min.Y+110, boxR.Max.X-100, boxR.Max.Y-80))
 		c.Add(card, hint)

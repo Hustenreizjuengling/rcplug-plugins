@@ -172,10 +172,11 @@ func runDevice(ctx context.Context, card, touchDev, guiPath, langCode string, no
 	// A desk nobody has set up yet starts with the welcome flow and the
 	// setup assistant, as RØDE's screen does on its first start.
 	if firstRun() {
-		a.Push(pages.NewWelcome(func() {
-			markWelcomeDone()
-			a.Home()
-		}))
+		// The marker means "shown once": leaving the flow any other way
+		// (the home button, a channel button) must not bring it back at
+		// the next start.
+		markWelcomeDone()
+		a.Push(pages.NewWelcome(func() { a.Home() }))
 		log.Printf("screen: first start, showing the welcome flow")
 	}
 	log.Printf("screen: interface up (%s, %d texts, %d strips)", code, texts.Count(), model.StripCount())

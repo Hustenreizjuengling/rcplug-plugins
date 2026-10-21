@@ -35,7 +35,7 @@ func (p *recordingsPage) Build(env *Env, r image.Rectangle) ui.View {
 	d := env.Desk
 	recs := d.Recordings()
 	if len(recs) == 0 {
-		hint := ui.NewParagraph(env.T("TO VIEW ALL RECORDINGS, CONNECT TO RØDE CENTRAL"), th.Fonts.Body, th.TextDim)
+		hint := ui.NewParagraph(env.T("TO VIEW ALL RECORDINGS, CONNECT TO RØDECASTER APP"), th.Fonts.Body, th.TextDim)
 		hint.Align = font.Center
 		hint.SetBounds(image.Rect(r.Min.X+100, r.Min.Y+r.Dy()/2-40, r.Max.X-100, r.Min.Y+r.Dy()/2+60))
 		c.Add(hint)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"image"
+	"sync"
 	"time"
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/desk"
@@ -27,7 +28,11 @@ type dateTimePage struct {
 	zone int       // the index into desk.TimeZones
 	h24  bool
 	busy bool
+	pop  bool // leave the page once the clock is set
 	note string
+
+	mu     sync.Mutex
+	result *error // the clock call's outcome, picked up on the loop
 }
 
 func newDateTimePage() Page { return &dateTimePage{} }
@@ -39,7 +44,7 @@ func (p *dateTimePage) Header(env *Env, bar image.Rectangle) ([]ui.View, bool) {
 	x := ui.NewButton("", func() { env.Nav.Pop() })
 	x.Icon, x.Style, x.Fill = "Red_Cross", ui.StyleRound, gfx.Hex(0xb81e1e)
 	x.SetBounds(image.Rect(bar.Min.X+30, bar.Min.Y+22, bar.Min.X+102, bar.Min.Y+94))
-	tick := ui.NewButton("", func() { p.apply(env) })
+	tick := ui.NewButton("", func() { p.apply(env, true) })
 	tick.Icon, tick.Style, tick.Fill = "Green_Tick", ui.StyleRound, th.Accent
 	tick.SetBounds(image.Rect(bar.Max.X-102, bar.Min.Y+22, bar.Max.X-30, bar.Min.Y+94))
 	title := ui.NewLabel(env.T(p.Title()), th.Fonts.Title, th.Text, font.Center)
@@ -65,7 +70,7 @@ func (p *dateTimePage) set(year, month, day, hour, min, sec int) {
 }
 
 // apply writes the settings and asks the host to set the clock.
-func (p *dateTimePage) apply(env *Env) {
+func (p *dateTimePage) apply(env *Env, pop bool) {
 	d := env.Desk
 	if h := p.h24; h != d.Bool(desk.SystemNode, 0, "systemDateTime24h") {
 		d.SetBool(desk.SystemNode, 0, "systemDateTime24h", h)
@@ -77,23 +82,42 @@ func (p *dateTimePage) apply(env *Env) {
 	t := p.t
 	p.busy = true
 	env.Nav.Refresh()
+	p.pop = pop
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		err := d.SetClock(ctx, &t, zone)
-		p.busy = false
-		switch {
-		case err == nil:
-			env.Nav.Pop()
-		case errors.Is(err, desk.ErrNoClock):
-			p.note = env.TR("", "Uhrzeit und Zeitzone kann rcplug auf diesem Gerät noch nicht stellen; Format und Anzeige sind übernommen.",
-				"rcplug cannot set the clock and the zone on this device yet; the format and the display are applied.")
-			env.Nav.Refresh()
-		default:
-			p.note = env.TR("", "Die Uhr konnte nicht gestellt werden.", "The clock could not be set.") + " (" + err.Error() + ")"
-			env.Nav.Refresh()
-		}
+		p.mu.Lock()
+		p.result = &err
+		p.mu.Unlock()
 	}()
+}
+
+// settle picks up the clock call's outcome on the interface's loop: back
+// a page when it went through (if asked to), else the note.
+func (p *dateTimePage) settle(env *Env) {
+	p.mu.Lock()
+	res := p.result
+	p.result = nil
+	p.mu.Unlock()
+	if res == nil {
+		return
+	}
+	p.busy = false
+	err := *res
+	switch {
+	case err == nil:
+		if p.pop {
+			env.Nav.Pop()
+			return
+		}
+	case errors.Is(err, desk.ErrNoClock):
+		p.note = env.TR("", "Uhrzeit und Zeitzone kann rcplug auf diesem Gerät noch nicht stellen; Format und Anzeige sind übernommen.",
+			"rcplug cannot set the clock and the zone on this device yet; the format and the display are applied.")
+	default:
+		p.note = env.TR("", "Die Uhr konnte nicht gestellt werden.", "The clock could not be set.") + " (" + err.Error() + ")"
+	}
+	env.Nav.Refresh()
 }
 
 func (p *dateTimePage) Build(env *Env, r image.Rectangle) ui.View {
@@ -213,6 +237,7 @@ func (p *dateTimePage) Build(env *Env, r image.Rectangle) ui.View {
 		n.SetBounds(image.Rect(rr.Max.X+20, rr.Min.Y, r.Max.X, rr.Max.Y))
 		c.Add(n)
 	}
+	c.Add(&updater{get: func() { p.settle(env) }})
 	return c
 }
 

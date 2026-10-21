@@ -89,6 +89,10 @@ func (m *Model) SavePreset(ctx context.Context, strip int, name string, overwrit
 		return nil
 	}
 	m.mu.RLock()
+	if m.runs == nil {
+		m.mu.RUnlock()
+		return ErrPresetsReadOnly
+	}
 	parent := m.runs.byType["FXPRESETS"]
 	epoch := m.epoch
 	m.mu.RUnlock()
@@ -106,6 +110,10 @@ func (m *Model) DeletePreset(ctx context.Context, idx int64) error {
 		return nil
 	}
 	m.mu.RLock()
+	if m.runs == nil {
+		m.mu.RUnlock()
+		return ErrPresetsReadOnly
+	}
 	var path []int
 	for _, n := range m.runs.byType[PresetNode] {
 		if n.Int("fxPresetIdx") == idx {

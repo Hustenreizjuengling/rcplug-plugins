@@ -176,11 +176,11 @@ func (p *showsNewPage) Build(env *Env, r image.Rectangle) ui.View {
 			if o.act == nil {
 				return
 			}
-			env.Nav.Confirm(env.T("EXPORT"), env.T("WOULD YOU LIKE TO EXPORT YOUR CURRENT SHOW BEFORE PROCEEDING?"), env.T("EXPORT"), false, func() {
-				env.Nav.Push(newShowsExportPage())
+			// RØDE asks first: Export opens the export page, Skip carries on.
+			env.Nav.Choose(env.T("EXPORT"), env.T("WOULD YOU LIKE TO EXPORT YOUR CURRENT SHOW BEFORE PROCEEDING?"), []Option{
+				{Label: env.T("EXPORT"), Do: func() { env.Nav.Push(newShowsExportPage()) }},
+				{Label: env.T("SKIP"), Do: o.act},
 			})
-			// "Skip" is the dialog's other button: it carries on.
-			o.act()
 		})
 		b.Enabled = o.act != nil
 		b.SetBounds(image.Rect(r.Min.X, r.Min.Y+i*(h+20), r.Max.X, r.Min.Y+i*(h+20)+h))
@@ -278,7 +278,10 @@ func (p *showItemPage) Build(env *Env, r image.Rectangle) ui.View {
 
 // --- loading (ShowsLoadingPage) ---
 
-type showsLoadingPage struct{ started bool }
+type showsLoadingPage struct {
+	started bool
+	since   time.Time
+}
 
 func newShowsLoadingPage() Page { return &showsLoadingPage{} }
 
@@ -295,13 +298,18 @@ func (p *showsLoadingPage) Build(env *Env, r image.Rectangle) ui.View {
 	bar.SetBounds(image.Rect(r.Min.X+200, r.Min.Y+260, r.Max.X-200, r.Min.Y+340))
 	c.Add(msg, bar, &updater{get: func() {
 		sc := d.ShowControl()
+		if p.since.IsZero() {
+			p.since = time.Now()
+		}
 		if sc.Updating {
 			p.started = true
-		} else if p.started {
+		} else if p.started || time.Since(p.since) > 8*time.Second {
+			// Done (or the desk never reported the load): back to the
+			// mixer, then the error if there was one.
+			env.Nav.Home()
 			if sc.LastError != 0 {
 				env.Nav.Confirm("", importError(env, sc.LastError), env.T("OK"), false, nil)
 			}
-			env.Nav.Home()
 		}
 	}})
 	return c

@@ -92,6 +92,7 @@ func (p *SetupAssistantPage) FullBleed() bool { return true }
 
 // finish leaves the assistant.
 func (p *SetupAssistantPage) finish(env *Env) {
+	p.discoverable(env, false)
 	if p.done != nil {
 		p.done()
 		return
@@ -152,7 +153,20 @@ func (p *SetupAssistantPage) next(env *Env) {
 		}
 		p.step++
 	}
+	if p.step == stepBluetooth {
+		// Entering the step makes the desk discoverable, as the pairing
+		// page does; finish turns it off again.
+		p.discoverable(env, true)
+	}
 	env.Nav.Refresh()
+}
+
+// discoverable switches the desk's Bluetooth visibility (NETWORK.btVisible).
+func (p *SetupAssistantPage) discoverable(env *Env, on bool) {
+	d := env.Desk
+	if d.Has(desk.NetworkNode, 0, "btVisible") && d.Bool(desk.NetworkNode, 0, "btVisible") != on {
+		d.SetBool(desk.NetworkNode, 0, "btVisible", on)
+	}
 }
 
 func (p *SetupAssistantPage) Build(env *Env, r image.Rectangle) ui.View {
@@ -534,11 +548,6 @@ func (p *SetupAssistantPage) presetStep(env *Env, body image.Rectangle, strip in
 func (p *SetupAssistantPage) bluetoothStep(env *Env, body image.Rectangle) []ui.View {
 	th := env.Ctx.Theme
 	d := env.Desk
-	// Entering the step makes the desk discoverable, as the pairing page
-	// does.
-	if d.Has(desk.NetworkNode, 0, "btVisible") && !d.Bool(desk.NetworkNode, 0, "btVisible") {
-		d.SetBool(desk.NetworkNode, 0, "btVisible", true)
-	}
 	title := wizardTitle(env, env.T("BLUETOOTH"), body)
 	icon := ui.NewIcon("BluetoothPairing", th.Text)
 	icon.SetBounds(centred(image.Rect(body.Min.X, body.Min.Y+70, body.Max.X, body.Min.Y+230), 160, 160))

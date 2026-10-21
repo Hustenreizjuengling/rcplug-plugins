@@ -126,7 +126,11 @@ func (p *padMixerPage) Build(env *Env, r image.Rectangle) ui.View {
 		c.Add(t)
 	}
 	c.Add(&updater{get: func() {
-		if m := int(d.Int(desk.PadNode, node, "padMixerMode")); m != p.shown {
+		m := int(d.Int(desk.PadNode, node, "padMixerMode"))
+		if m < 0 || m >= len(mixerModes) {
+			m = 0
+		}
+		if m != p.shown {
 			env.Nav.Refresh()
 		}
 	}})

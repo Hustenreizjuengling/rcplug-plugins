@@ -95,7 +95,7 @@ func (v *callMeIndicator) callMeState() string {
 		return "CallMeNoNetwork"
 	}
 	for i := 0; i < d.Count("SIPCALLSLOTS"); i++ {
-		if st := d.Str("SIPCALLSLOTS", i, "sipSlotCallState"); st != "" && st != "Idle" {
+		if st, _ := parseCallState(d.Str("SIPCALLSLOTS", i, "sipSlotCallState")); st != callIdle {
 			return "CallMeArrows_WithDot"
 		}
 	}

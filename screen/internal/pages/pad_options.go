@@ -361,7 +361,7 @@ func (p *padNewPage) choose(env *Env, k padKind) {
 		return
 	}
 	if d.Bool(desk.ShowControlNode, 0, "showControlLockoutCentral") {
-		env.Nav.Confirm("", env.T("SOUND PAD EDITING IS UNAVAILABLE WHILST RODE CENTRAL IS ALSO EDITING SOUND PAD SETTINGS."), env.T("OK"), false, nil)
+		env.Nav.Confirm("", env.T("SOUND PAD EDITING IS UNAVAILABLE WHILST RODECASTER APP IS ALSO EDITING SOUND PAD SETTINGS."), env.T("OK"), false, nil)
 		return
 	}
 	n := pad.Node

@@ -25,6 +25,11 @@ func init() {
 type WelcomePage struct {
 	step int
 	done func()
+
+	// The language and date-time steps are the settings' own pages, kept
+	// so a pick survives a rebuild and is applied when the tick moves on.
+	lang *languagePage
+	dt   *dateTimePage
 }
 
 // The welcome's steps.
@@ -84,6 +89,12 @@ func (p *WelcomePage) Header(env *Env, bar image.Rectangle) ([]ui.View, bool) {
 
 // next goes on; after getting connected the setup assistant takes over.
 func (p *WelcomePage) next(env *Env) {
+	switch {
+	case p.step == welcomeLanguage && p.lang != nil:
+		p.lang.applyChoice(env)
+	case p.step == welcomeDateTime && p.dt != nil:
+		p.dt.apply(env, false)
+	}
 	if p.step < welcomeConnected {
 		p.step++
 		env.Nav.Refresh()
@@ -117,9 +128,15 @@ func (p *WelcomePage) Build(env *Env, r image.Rectangle) ui.View {
 	case welcomeStart:
 		return p.start(env, r)
 	case welcomeLanguage:
-		return Detail("language").Build(env, r)
+		if p.lang == nil {
+			p.lang = &languagePage{}
+		}
+		return p.lang.Build(env, r)
 	case welcomeDateTime:
-		return Detail("datetime").Build(env, r)
+		if p.dt == nil {
+			p.dt = &dateTimePage{}
+		}
+		return p.dt.Build(env, r)
 	case welcomeApp:
 		return p.app(env, r)
 	}

@@ -30,9 +30,7 @@ func (p *languagePage) Header(env *Env, bar image.Rectangle) ([]ui.View, bool) {
 	x.Icon, x.Style, x.Fill = "Red_Cross", ui.StyleRound, gfx.Hex(0xb81e1e)
 	x.SetBounds(image.Rect(bar.Min.X+30, bar.Min.Y+22, bar.Min.X+102, bar.Min.Y+94))
 	tick := ui.NewButton("", func() {
-		if p.sel >= 0 && p.sel < len(desk.Languages) && desk.Languages[p.sel].Code != env.Desk.Str(desk.GUINode, 0, "lang") {
-			env.Desk.SetStr(desk.GUINode, 0, "lang", desk.Languages[p.sel].Code)
-		}
+		p.applyChoice(env)
 		env.Nav.Pop()
 	})
 	tick.Icon, tick.Style, tick.Fill = "Green_Tick", ui.StyleRound, th.Accent
@@ -40,6 +38,14 @@ func (p *languagePage) Header(env *Env, bar image.Rectangle) ([]ui.View, bool) {
 	title := ui.NewLabel(env.TR("SELECT LANGUAGE", "Sprache wählen", "Select Language"), th.Fonts.Title, th.Text, font.Center)
 	title.SetBounds(image.Rect(bar.Min.X+120, bar.Min.Y, bar.Max.X-120, bar.Max.Y))
 	return []ui.View{x, title, tick}, true
+}
+
+// applyChoice writes the picked language to the desk (GUI.lang) if it
+// differs; the interface follows it.
+func (p *languagePage) applyChoice(env *Env) {
+	if p.sel >= 0 && p.sel < len(desk.Languages) && desk.Languages[p.sel].Code != env.Desk.Str(desk.GUINode, 0, "lang") {
+		env.Desk.SetStr(desk.GUINode, 0, "lang", desk.Languages[p.sel].Code)
+	}
 }
 
 func (p *languagePage) Build(env *Env, r image.Rectangle) ui.View {

@@ -122,6 +122,9 @@ func (a *App) expireToast() {
 // watchHeadphones shows the headphone popup when a knob's level changes
 // (not on the first reading, nor while the device is offline).
 func (a *App) watchHeadphones() {
+	if !a.model.Online() {
+		return // the first readings come with the desk, not before
+	}
 	n := a.model.Headphones()
 	first := a.hpLast == nil
 	if first {

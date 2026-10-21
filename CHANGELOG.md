@@ -6,6 +6,20 @@ may break compatibility).
 
 ## 0.5.32 - Unreleased
 
+### Fixed
+- **Screen 0.4.1: findings of a review of the assembled pages.** The new-show options
+  ask through RØDE's Export/Skip dialog before the show is replaced (the dialog was
+  skipped); the CallMe indicator reads the slot state the desk writes after a call
+  (JSON), so the dot goes out; the clock's result reaches the interface on its own loop
+  (no page popped from a background task); the welcome flow is marked as shown when it
+  starts, so leaving it by the home or a channel button does not bring it back, and its
+  language and date-time steps keep the pick and apply it on the tick; the show-loading
+  page leaves before showing an error and gives up waiting after eight seconds; no
+  headphone popup before the desk is online; a pad with an unknown mixer mode no longer
+  rebuilds every frame; the setup assistant makes the desk discoverable once and turns it
+  off when it ends; saving a preset before the first tree is refused instead of
+  crashing; four texts use RØDE's own keys.
+
 ## 0.5.31 - 2026-10-21
 
 ### Added
