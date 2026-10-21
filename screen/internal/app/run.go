@@ -116,6 +116,7 @@ func (a *App) expireToast() {
 	}
 	a.mu.Unlock()
 	a.watchHeadphones()
+	a.watchCallMe()
 }
 
 // watchHeadphones shows the headphone popup when a knob's level changes

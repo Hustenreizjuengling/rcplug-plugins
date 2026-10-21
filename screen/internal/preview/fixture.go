@@ -217,6 +217,10 @@ func BuildTree() []byte {
 			p["inputDigitalGain"] = 0
 			p["inputPower"] = -1
 		}
+		if i >= 16 && i <= 18 { // CallMe 1–3
+			p["inputType"] = -1
+			p["inputSipCallSlot"] = int64(i - 16)
+		}
 		if i < len(fixtureColours) {
 			p["inputColour"] = fixtureColours[i]
 		}
@@ -307,10 +311,77 @@ func BuildTree() []byte {
 	for i := 0; i < 8; i++ {
 		kids = append(kids, leaf("PADBUTTON", map[string]interface{}{"padButtonPressed": false, "padButtonPreview": false}))
 	}
-	kids = append(kids, leaf("NETWORK", map[string]interface{}{
-		"wiredConnected": true, "wifi": false, "ipAddress": "192.168.0.50", "btConnectedAddress": "00:11:22:33:44:55", "btConnectedType": 0,
-		"wifiSSID": "", "wifiIpAddress": "", "cellEnabled": false, "cellUSBFound": false,
+	// The network: wired with an address, Wi-Fi idle with a scan's results,
+	// a Bluetooth device paired, the proxy off.
+	network := map[string]interface{}{
+		"wiredConnected": true, "wifi": false, "ipAddress": "192.168.0.50", "subnetMask": "255.255.255.0", "gateway": "192.168.0.1",
+		"primaryDns": "192.168.0.1", "secondaryDns": "", "staticIpSet": false, "wifiDHCP": true,
+		"wifiSSID": "", "wifiPSK": "", "wifiIncorrectPSK": false, "wifiScan": false, "wifiIpAddress": "", "wifiSubnetMask": "", "wifiGateway": "",
+		"cellUSBFound": false, "cellEnabled": false, "cellAPN": "", "cellIpAddress": "", "cellSubnetMask": "", "cellGateway": "",
+		"btConnectedAddress": "00:11:22:33:44:55 - Studio Speaker", "btConnectedType": 0, "btVisible": false, "btDoScan": false,
+		"btDoPair": "", "btDoConnect": "", "btDoDisconnect": "", "btDoUnPair": "", "btPairCode": "",
+		"btPairedNumber1": "00:11:22:33:44:55 - Studio Speaker", "btPairedNumber2": "66:77:88:99:AA:BB - Phone",
+	}
+	for i := 1; i <= 10; i++ {
+		network["wifiScan"+strconv.Itoa(i)] = ""
+		network["btScan"+strconv.Itoa(i)] = ""
+	}
+	network["btScan1"] = "CC:DD:EE:FF:00:11 - Headphones"
+	for i := 3; i <= 5; i++ {
+		network["btPairedNumber"+strconv.Itoa(i)] = ""
+	}
+	var scan []node
+	for i := 0; i < 15; i++ {
+		ssid := ""
+		switch i {
+		case 0:
+			ssid = "Studio----PSK"
+		case 1:
+			ssid = "Guest"
+		case 2:
+			ssid = "Old Router----WEP"
+		}
+		scan = append(scan, leaf("WIFISCANRESULT", map[string]interface{}{"wifiScanResultSSID": ssid}))
+	}
+	scan = append(scan, leaf("PROXY", map[string]interface{}{"proxyEnabled": false, "proxyAddress": "", "proxyPort": int64(1080), "proxyUsername": "", "proxyPassword": ""}))
+	kids = append(kids, node{T: "NETWORK", P: network, C: scan})
+	// CallMe: three slots (the second on a fader with a call up), the
+	// service on the Lite tier with hosting on, two quick dials.
+	for k := 0; k < 3; k++ {
+		state := "Idle"
+		addr := ""
+		if k == 1 {
+			state, addr = `{"state": "Active", "reason": ""}`, "Studio B"
+		}
+		kids = append(kids, leaf("SIPCALLSLOTS", map[string]interface{}{
+			"sipCallSlotId": int64(k), "sipSlotCallState": state, "sipSlotCallUUID": "", "sipSlotCallAddress": addr,
+			"sipSlotCallQuality": int64(0), "sipSlotCallJitter": 0.0, "sipSlotCallBitrate": 0.0, "sipSlotCallPacketLoss": 0.0,
+			"sipSlotCallDisconnect": "010102010102", "sipSlotCallExtend": false, "sipSlotCallIsHost": k == 1, "sipSlotCallMode": int64(0),
+		}))
+	}
+	kids = append(kids, node{T: "SIPCALLING", P: map[string]interface{}{
+		"sipCallHostingEnabled": true, "sipCallHostingToggleEnabled": true, "sipLicenceMode": int64(0), "sipLicenceCheck": false,
+		"sipRodeCode": "AB12CD", "sipIncomingCallAccept": "", "sipIncomingCallDetails": "", "sipOutgoingCallDetails": "",
+		"sipSlotPendingCallSetup": int64(-1), "sipRemainingCalltime": int64(600), "sipRemainingWebCalltime": int64(300),
+		"sipRenewalDate": "October 27, 2026", "sipLicenceRenewal": "", "sipCallRating": "",
+	}, C: []node{
+		leaf("SIPREGISTRATION", map[string]interface{}{"sipRegistrationIndex": int64(0), "sipRegistrationDetails": "", "sipRegistrationIsRegistered": true}),
+		leaf("SIPREGISTRATION", map[string]interface{}{"sipRegistrationIndex": int64(1), "sipRegistrationDetails": "", "sipRegistrationIsRegistered": false}),
+	}})
+	kids = append(kids, leaf("SIPADVANCED", map[string]interface{}{
+		"forceCodecChoice": true, "enableVideoStream": true, "enableRFCDuplication": false, "incomingNameFilter": true, "usbNumberPad": true,
+		"nonHTTPSInterface": true, "autoReconnect": false, "incomingAudioRouting": "nextavailable", "dtmfMode": "auto",
+		"receiveJitterBufferMin": int64(100), "receiveJitterBufferMax": int64(5000), "sipWebPassword": "", "sipAccountRegister": "disabled",
+		"sipAccountUsername": "", "sipAccountPassword": "", "sipAccountDomain": "", "sipAccountProxyAddress": "", "sipAccountTransport": "auto",
+		"sipNATTraversalMode": "none", "sipNATTraversalServer": "", "sipNATTraversalUsername": "", "sipNATTraversalPassword": "",
+		"sipUnitName": "", "sipAccountAuthUsername": "", "rodeCallQuality": "good", "sipCallKeepalive": true,
+		"icecastAddress": "", "icecastPort": int64(8000), "icecastMountpoint": "", "icecastUsername": "", "icecastPassword": "",
+		"icecastTLS": false, "icecastBitrate": int64(128000), "icecastConnect": false, "icecastState": "",
 	}))
+	kids = append(kids, node{T: "SIPPHONEBOOKARRAY", P: map[string]interface{}{}, C: []node{
+		leaf("SIPPHONEBOOK", map[string]interface{}{"phoneBookIdx": int64(0), "phoneBookCallAddress": "XY34ZW", "phoneBookCallType": int64(0), "entryName": "Studio B", "transportType": "udp", "codecType": "Opus", "bitRate": int64(128000)}),
+		leaf("SIPPHONEBOOK", map[string]interface{}{"phoneBookIdx": int64(1), "phoneBookCallAddress": "1234.5678@zoomcrc.com", "phoneBookCallType": int64(1), "entryName": "Weekly Zoom", "transportType": "tls", "codecType": "G722", "bitRate": int64(64000)}),
+	}})
 	kids = append(kids, leaf("RECORDINGS", map[string]interface{}{"recordingTotalCount": 3, "recordingTotalDuration": 7200}))
 
 	root := node{T: "Rodecaster", P: map[string]interface{}{}, C: kids}

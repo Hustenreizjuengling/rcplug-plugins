@@ -41,7 +41,8 @@ type App struct {
 	popup      ui.View // a passing view over the page (the headphone level)
 	popupUntil time.Time
 	hpLast     []float64 // the headphone levels as last seen
-	dirty      bool      // the view tree must be rebuilt
+	callme     pages.CallMeWatch
+	dirty      bool // the view tree must be rebuilt
 	quit       func()
 
 	// textLoader builds the texts of a language code; set, the interface

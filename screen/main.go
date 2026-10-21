@@ -238,8 +238,21 @@ func runPNG(out, resources, langCode, page string) error {
 		w := pages.NewSetupAssistant(nil).(*pages.SetupAssistantPage)
 		w.SetStep(n)
 		a.Push(w)
+	case strings.HasPrefix(page, "callme:"):
+		// callme:<hosting|activate|advanced|dial|quickdial|quickdial-saved|sipdial|fader|assign>
+		a.Open(pages.IDCallMe)
+		a.Push(pages.CallMePage(strings.TrimPrefix(page, "callme:")))
+	case strings.HasPrefix(page, "popup:"):
+		// popup:<incoming|conflict|recording|welcome|rating|timelimit>
+		a.Open(pages.IDCallMe)
+		a.ShowCallMePopup(strings.TrimPrefix(page, "popup:"))
+	case page == "network-join", page == "network-advanced", page == "network-dns", page == "network-proxy":
+		a.Open(pages.IDNetwork)
+		a.Push(pages.CallMePage(page))
 	case page == "keyboard":
 		a.Keyboard("Name", "Mic 1", nil)
+	case page == "password":
+		a.Password("Enter password for Studio", nil)
 	case page == "dialog":
 		a.Confirm("CLEAR", "Are you sure you want to clear the pad?", "CLEAR", true, nil)
 	case page == "metering", page == "listen", page == "faders", page == "language", page == "datetime", page == "brightness", page == "haptics", page == "monitor", page == "multitrack",

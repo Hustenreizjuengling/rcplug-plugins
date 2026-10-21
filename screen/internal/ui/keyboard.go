@@ -14,6 +14,8 @@ import (
 type Keyboard struct {
 	Base
 	Prompt   string
+	Secret   bool // a password: dots unless the eye shows it
+	shown    bool
 	text     []rune
 	shift    bool
 	symbols  bool
@@ -93,6 +95,10 @@ func (k *Keyboard) build() {
 	add(image.Rect(r.Min.X+12+gap/2, y+gap/2, r.Min.X+12+symW-gap/2, y+rowH-gap/2), symLabel(k), "", "sym")
 	add(image.Rect(r.Min.X+12+symW+gap/2, y+gap/2, r.Max.X-12-symW-gap/2, y+rowH-gap/2), "", " ", "space")
 	add(image.Rect(r.Max.X-12-symW+gap/2, y+gap/2, r.Max.X-12-gap/2, y+rowH-gap/2), "⏎", "", "done")
+	// The eye of a password field, inside the field's right end.
+	if k.Secret {
+		add(image.Rect(r.Max.X-120-78, r.Min.Y+30, r.Max.X-120-18, r.Min.Y+90), "", "", "eye")
+	}
 	// The X and the tick beside the field.
 	add(image.Rect(r.Min.X+24, r.Min.Y+22, r.Min.X+24+76, r.Min.Y+22+76), "", "", "cancel")
 	add(image.Rect(r.Max.X-24-76, r.Min.Y+22, r.Max.X-24, r.Min.Y+22+76), "", "", "done")
@@ -142,6 +148,9 @@ func (k *Keyboard) hit(ky key) {
 	case "sym":
 		k.symbols = !k.symbols
 		k.build()
+	case "eye":
+		k.shown = !k.shown
+		k.MarkDirty()
 	case "back":
 		if len(k.text) > 0 {
 			k.text = k.text[:len(k.text)-1]
@@ -175,13 +184,27 @@ func (k *Keyboard) Draw(dst *gfx.Image, c *Context, clip image.Rectangle) {
 	Panel(dst, fr, t.Radius, t.Black, clip)
 	PanelOutline(dst, fr, t.Radius, 2, t.Line, clip)
 	txt := string(k.text)
+	if k.Secret && !k.shown {
+		txt = strings.Repeat("•", len(k.text))
+	}
+	tr := inset(fr, 16)
+	if k.Secret {
+		tr.Max.X -= 80
+	}
 	if txt == "" && k.Prompt != "" {
-		Text(dst, t.Fonts.Body, k.Prompt, inset(fr, 16), font.Left, t.TextMuted, clip)
+		Text(dst, t.Fonts.Body, k.Prompt, tr, font.Left, t.TextMuted, clip)
 	} else {
-		Text(dst, t.Fonts.Title, txt+"|", inset(fr, 16), font.Left, t.Text, clip)
+		Text(dst, t.Fonts.Title, txt+"|", tr, font.Left, t.Text, clip)
 	}
 	for i, ky := range k.keys {
 		switch ky.action {
+		case "eye":
+			icon := "pwhidden"
+			if k.shown {
+				icon = "pwshown"
+			}
+			c.IconIn(dst, icon, ky.r, t.TextDim, 255, clip)
+			continue
 		case "cancel":
 			col := gfx.Hex(0xb81e1e)
 			if i == k.pressed {
