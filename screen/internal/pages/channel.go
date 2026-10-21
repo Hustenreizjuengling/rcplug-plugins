@@ -10,15 +10,24 @@ import (
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/ui"
 )
 
-// ChannelPage is the set-up of one strip, as the device lays it out: the
-// header switches between strips; the left card shows the source, its gain
-// (or level) with a meter and target zone, phantom power and phase; the right
-// card holds Depth, Sparkle and Punch, the processing switch and the way to
-// the advanced processors.
-type ChannelPage struct{ strip int }
+// ChannelPage is the set-up of one strip, as the device lays it out
+// (InputMainPage): the header switches between strips; the left card is
+// the source's own panel (microphone choice, gain and meter, phantom power
+// and phase on a combo input; the transmitter on a wireless channel; the
+// level and routing on USB and Bluetooth); the right card holds the
+// processing: Depth, Sparkle and Punch or, in advanced mode, the eight
+// processors, the processing switch, and the presets and advanced buttons.
+type ChannelPage struct {
+	strip int
+	tab   int // 0 processing, 1 effects
+}
 
 // NewChannel makes a strip's channel page.
 func NewChannel(strip int) Page { return &ChannelPage{strip: strip} }
+
+// NewChannelTab makes a strip's channel page open at a tab (0 processing,
+// 1 effects), for previews and tests.
+func NewChannelTab(strip, tab int) Page { return &ChannelPage{strip: strip, tab: tab} }
 
 func (p *ChannelPage) Title() string { return "" }
 
@@ -33,7 +42,6 @@ func (p *ChannelPage) Header(env *Env, bar image.Rectangle) ([]ui.View, bool) {
 // stripHeader builds the strip switcher of the channel and rack pages: an
 // optional cog (to the assignment), ‹ icon ›, and a dot per strip.
 func stripHeader(env *Env, bar image.Rectangle, strip int, cog bool, page func(int) Page) []ui.View {
-	th := env.Ctx.Theme
 	n := env.Desk.StripCount()
 	var out []ui.View
 	if cog {
@@ -46,14 +54,14 @@ func stripHeader(env *Env, bar image.Rectangle, strip int, cog bool, page func(i
 	prev.SetBounds(image.Rect(mid-170, bar.Min.Y+14, mid-90, bar.Min.Y+102))
 	next := chevron(env, true, strip+1 < n, func() { env.Nav.Replace(page(strip + 1)) })
 	next.SetBounds(image.Rect(mid+90, bar.Min.Y+14, mid+170, bar.Min.Y+102))
-	icon := ui.NewIcon(sourceIcon(env.Desk.SourceName(env.Desk.SourceOf(strip)).ID), stripColour(env, strip))
+	src := env.Desk.SourceOf(strip)
+	icon := ui.NewIcon(sourceIcon(env.Desk.SourceInfo(src).ID), stripColour(env, strip))
 	if icon.Name == "" {
 		icon.Name = "IconNotAssigned"
 	}
 	icon.SetBounds(image.Rect(mid-40, bar.Min.Y+16, mid+40, bar.Min.Y+92))
 	dots := ui.NewDots(n, func() int { return strip })
 	dots.SetBounds(image.Rect(mid-200, bar.Max.Y-20, mid+200, bar.Max.Y))
-	_ = th
 	return append(out, prev, icon, next, dots)
 }
 
@@ -65,10 +73,31 @@ func (p *ChannelPage) Build(env *Env, r image.Rectangle) ui.View {
 	right := image.Rect(left.Max.X+26, r.Min.Y, r.Max.X, r.Max.Y)
 	c.Add(p.inputCard(env, strip, left)...)
 	c.Add(p.processingCard(env, strip, right)...)
+	// The page follows the strip's source: a change elsewhere (the
+	// assignment, the desk) rebuilds it with the right panels.
+	shown := env.Desk.SourceOf(strip)
+	hosted := env.Desk.USBMicHosted()
+	paired := wirelessPaired(env, shown)
+	c.Add(&updater{get: func() {
+		if s := env.Desk.SourceOf(strip); s != shown || env.Desk.USBMicHosted() != hosted || wirelessPaired(env, s) != paired {
+			env.Nav.Refresh()
+		}
+	}})
 	return c
 }
 
-// inputCard builds the source, gain/level, meter and input switches.
+// wirelessPaired reports whether a wireless source has a transmitter
+// (which changes the panel's layout).
+func wirelessPaired(env *Env, src int64) bool {
+	tx := env.Desk.WirelessTx(src)
+	return tx >= 0 && (env.Desk.Str(desk.RadioTxNode, tx, "txDeviceSN") != "" || env.Desk.Int(desk.RadioTxNode, tx, "txDeviceType") >= 0)
+}
+
+// CallMePanel builds the left card of a CallMe channel (InputCallMePanel);
+// the CallMe pages set it. Until then the call's channel shows its level.
+var CallMePanel func(env *Env, strip int, src int64, area image.Rectangle) []ui.View
+
+// inputCard builds the source's own panel into the left card.
 func (p *ChannelPage) inputCard(env *Env, strip int, area image.Rectangle) []ui.View {
 	th := env.Ctx.Theme
 	d := env.Desk
@@ -79,11 +108,41 @@ func (p *ChannelPage) inputCard(env *Env, strip int, area image.Rectangle) []ui.
 	out = append(out, card)
 
 	src := d.SourceOf(strip)
-	input := d.InputIndex(strip)
-	// The top of the card: a combo input's microphone choice (the carousel),
-	// else the source tile with a big icon on the strip's colour.
+	switch d.SourceKindOf(src) {
+	case desk.KindNone:
+		return append(out, notAssignedPanel(env, strip, area)...)
+	case desk.KindHeadset:
+		return append(out, headsetPanel(env, strip, src, area)...)
+	case desk.KindWireless:
+		return append(out, wirelessPanel(env, strip, src, area)...)
+	case desk.KindUSB, desk.KindVirtual:
+		return append(out, usbPanel(env, strip, src, area)...)
+	case desk.KindBluetooth:
+		return append(out, bluetoothPanel(env, strip, src, area)...)
+	case desk.KindPads:
+		return append(out, soundsPanel(env, strip, src, area)...)
+	case desk.KindSync:
+		return append(out, syncPanel(env, strip, src, area)...)
+	case desk.KindCallMe:
+		if CallMePanel != nil {
+			return append(out, CallMePanel(env, strip, src, area)...)
+		}
+		name := d.SourceInfo(src)
+		out = append(out, glyphTop(env, sourceIconBig(name.ID), name.Label, area, th.Text)...)
+		return append(out, gainRow(env, strip, int(src), area, "LEVEL")...)
+	}
+	return append(out, comboPanel(env, strip, src, area)...)
+}
+
+// comboPanel is a combo input (InputMicrophonePanel + InputGainPanel): the
+// microphone carousel, the gain with its meter, P48 and Ø.
+func comboPanel(env *Env, strip int, src int64, area image.Rectangle) []ui.View {
+	th := env.Ctx.Theme
+	d := env.Desk
+	input := int(src)
+	var out []ui.View
 	top := image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+250)
-	if d.HasMicType(input) && d.MicType(input) != desk.MicWireless {
+	if d.HasMicType(input) {
 		car := newMicCarousel(env, strip, input)
 		car.SetBounds(top)
 		out = append(out, car)
@@ -92,42 +151,7 @@ func (p *ChannelPage) inputCard(env *Env, strip int, area image.Rectangle) []ui.
 		tile.SetBounds(top)
 		out = append(out, tile)
 	}
-	if src < 0 {
-		assign := ui.NewButton(env.T("CHANNEL ASSIGNMENT"), func() { env.Nav.Push(NewAssign(strip)) })
-		assign.SetBounds(image.Rect(area.Min.X+40, area.Min.Y+300, area.Max.X-40, area.Min.Y+396))
-		out = append(out, assign)
-		return out
-	}
-
-	// Gain (microphones) or level (digital sources).
-	// Every input node carries all three gains; the kind of input says
-	// which one counts: a microphone (inputType 0), an instrument or line
-	// (1), or a digital source (−1) with its level.
-	gainProp, label, unit := "", "GAIN", "dB"
-	switch kind := d.Int(desk.InputNode, input, "inputType"); {
-	case kind < 0 && d.Has(desk.InputNode, input, "inputDigitalGain"):
-		gainProp, label = "inputDigitalGain", "LEVEL"
-	case kind == 1 && d.Has(desk.InputNode, input, "inputInstrumentGain"):
-		gainProp = "inputInstrumentGain"
-	case d.Has(desk.InputNode, input, "inputMicrophoneGain"):
-		gainProp = "inputMicrophoneGain"
-	case d.Has(desk.InputNode, input, "inputDigitalGain"):
-		gainProp, label = "inputDigitalGain", "LEVEL"
-	}
-	if gainProp != "" {
-		gp := gainProp
-		st := ui.NewStepper(func() float64 { return float64(d.Int(desk.InputNode, input, gp)) },
-			func(delta int) { d.SetInt(desk.InputNode, input, gp, d.Int(desk.InputNode, input, gp)+int64(delta)) })
-		st.Label = env.T(label)
-		st.Unit = unit
-		st.Text = func(v float64) string { return dbNum(v) }
-		st.SetBounds(image.Rect(area.Min.X+20, area.Min.Y+262, area.Max.X-20, area.Min.Y+392))
-		out = append(out, st)
-	}
-	// The level meter with its target zone.
-	lm := &levelBar{env: env, strip: strip}
-	lm.SetBounds(image.Rect(area.Min.X+44, area.Min.Y+398, area.Max.X-44, area.Min.Y+446))
-	out = append(out, lm)
+	out = append(out, gainRow(env, strip, input, area, "GAIN")...)
 
 	// P48 and phase for the inputs that have them.
 	y := area.Max.Y - 90
@@ -242,7 +266,7 @@ func (b *sourceBanner) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle)
 	th := c.Theme
 	r := b.Bounds()
 	src := b.env.Desk.SourceOf(b.strip)
-	name := b.env.Desk.SourceName(src)
+	name := b.env.Desk.SourceInfo(src)
 	tile := image.Rect(r.Min.X+186, r.Min.Y+10, r.Max.X-186, r.Max.Y-10)
 	col := stripColour(b.env, b.strip)
 	if src < 0 {
@@ -311,8 +335,10 @@ func (l *levelBar) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
 	ui.Fill(dst, image.Rect(x2, zone.Min.Y, zone.Max.X, zone.Max.Y), th.Record, clip)
 }
 
-// processingCard builds Depth / Sparkle / Punch, the processing switch and
-// the way to the advanced processors.
+// processingCard builds the right card (InputProcessingPanel): the
+// Processing | Effects tabs where the source has effects, Depth / Sparkle /
+// Punch or the processor menu, the processing switch, and the Presets and
+// Advanced buttons along the foot.
 func (p *ChannelPage) processingCard(env *Env, strip int, area image.Rectangle) []ui.View {
 	th := env.Ctx.Theme
 	d := env.Desk
@@ -323,88 +349,228 @@ func (p *ChannelPage) processingCard(env *Env, strip int, area image.Rectangle) 
 	out = append(out, card)
 
 	src := d.SourceOf(strip)
-	id := d.SourceName(src).ID
-	input := d.InputIndex(strip)
-	if id == "soundpad" {
-		// The pads' channel has no processing: the ducker instead.
-		title := ui.NewLabel(env.T("DUCKING"), th.Fonts.Label, th.Text, font.Center)
-		title.SetBounds(image.Rect(area.Min.X, area.Min.Y+20, area.Max.X, area.Min.Y+70))
-		desc := ui.NewParagraph(env.T("DUCKING WILL TEMPORARILY LOWER THE LEVEL OF OTHER CHANNELS WHILE SOUND IS PRESENT IN THE HOST'S MICROPHONE (MICROPHONE 1)."), th.Fonts.Small, th.TextDim)
-		desc.Align = font.Center
-		desc.SetBounds(image.Rect(area.Min.X+30, area.Min.Y+80, area.Max.X-30, area.Min.Y+200))
-		st := ui.NewStepper(func() float64 { return d.Num(desk.DuckerNode, 0, "duckerDepth") }, func(delta int) {
-			v := d.Num(desk.DuckerNode, 0, "duckerDepth") + float64(delta)
-			d.SetFloat(desk.DuckerNode, 0, "duckerDepth", max(-60, min(0, v)))
-		})
-		st.Label = env.T("DEPTH")
-		st.Text = func(v float64) string { return dbNum(v) }
-		st.Unit = "dB"
-		st.SetBounds(image.Rect(area.Min.X+80, area.Min.Y+230, area.Max.X-80, area.Min.Y+360))
-		return append(out, title, desc, st)
+	kind := d.SourceKindOf(src)
+	if kind == desk.KindPads {
+		return append(out, duckingPanel(env, area)...)
+	}
+	if kind == desk.KindNone {
+		return out
 	}
 	// Effects exist for the microphone inputs (a wired or wireless mic).
-	kind := d.Int(desk.InputNode, input, "inputType")
-	if kind == 0 || kind == 3 {
-		tabs := ui.NewSegmented([]string{env.T("PROCESSING"), env.T("EFFECTS")}, func() int { return 0 },
+	hasFx := kind == desk.KindCombo || kind == desk.KindHeadset || kind == desk.KindComboPair || kind == desk.KindWireless
+	if hasFx {
+		tabs := ui.NewSegmented([]string{env.T("PROCESSING"), env.T("EFFECTS")}, func() int { return p.tab },
 			func(i int) {
-				if i == 1 {
-					env.Nav.Push(NewEffectsRack(strip, 0))
-				}
+				p.tab = i
+				env.Nav.Refresh()
 			})
 		tabs.Bare = true
 		tabs.SetBounds(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+88))
 		out = append(out, tabs)
+		if p.tab == 1 {
+			return append(out, effectsPanel(env, strip, image.Rect(area.Min.X, area.Min.Y+100, area.Max.X, area.Max.Y))...)
+		}
 	} else {
-		title := ui.NewLabel(env.T("PROCESSING"), th.Fonts.Label, th.Text, font.Center)
+		title := ui.NewLabel(env.T("PROCESSING"), th.Fonts.Body, th.Text, font.Center)
 		title.SetBounds(image.Rect(area.Min.X, area.Min.Y+20, area.Max.X, area.Min.Y+70))
 		out = append(out, title)
 	}
 
-	// The processing presets, with the channel's current one (or its own
-	// settings) under the label; the page lists them.
-	row := image.Rect(area.Min.X+40, area.Min.Y+120, area.Max.X-40, area.Min.Y+300)
-	if len(d.Presets()) > 0 {
-		cur := d.PresetName(strip)
-		if cur == "" {
-			cur = env.TR("", "Eigene Einstellungen", "Custom settings")
+	advanced := d.Bool(desk.ChannelNode, strip, "channelAdvancedProcessing")
+	body := image.Rect(area.Min.X, area.Min.Y+100, area.Max.X, area.Max.Y-190)
+	if advanced {
+		out = append(out, processorMenu(env, strip, body)...)
+	} else {
+		knobs := []struct{ key, prop, icon string }{
+			{"DEPTH", "channelDepth", "IconDepth"}, {"SPARKLE", "channelSparkle", "IconSparkle"}, {"PUNCH", "channelPunch", "IconPunch"},
 		}
-		pb := ui.NewButton(env.T("PRESET")+": "+cur, func() { env.Nav.Push(NewPresets(strip)) })
-		pb.SetBounds(image.Rect(area.Min.X+40, area.Min.Y+98, area.Max.X-40, area.Min.Y+154))
-		out = append(out, pb)
-		row = image.Rect(area.Min.X+40, area.Min.Y+166, area.Max.X-40, area.Min.Y+320)
-	}
-	knobs := []struct{ key, prop, icon string }{
-		{"DEPTH", "channelDepth", "IconDepth"}, {"SPARKLE", "channelSparkle", "IconSparkle"}, {"PUNCH", "channelPunch", "IconPunch"},
-	}
-	cells := columns(row, 3, 20)
-	for i, k := range knobs {
-		prop := k.prop
-		kb := ui.NewKnob(func() float64 { return d.Num(desk.ChannelNode, strip, prop) },
-			func(v float64) { d.SetFloat(desk.ChannelNode, strip, prop, v) })
-		kb.Label, kb.Icon = env.T(k.key), k.icon
-		kb.SetBounds(cells[i])
-		out = append(out, kb)
+		row := image.Rect(area.Min.X+40, body.Min.Y+10, area.Max.X-40, body.Max.Y)
+		cells := columns(row, 3, 20)
+		for i, k := range knobs {
+			prop := k.prop
+			kb := ui.NewKnob(func() float64 { return d.Num(desk.ChannelNode, strip, prop) },
+				func(v float64) { d.SetMacro(strip, prop, v) })
+			kb.Label, kb.Icon = env.T(k.key), k.icon
+			kb.SetBounds(cells[i])
+			out = append(out, kb)
+		}
 	}
 	// channelBypassProcessing is inverted: true = processing off.
 	on := ui.NewRingToggle(env.T("PROCESSING"),
 		func() bool { return !d.Bool(desk.ChannelNode, strip, "channelBypassProcessing") },
 		func(v bool) { d.SetBool(desk.ChannelNode, strip, "channelBypassProcessing", !v) })
-	on.SetBounds(image.Rect(area.Min.X+area.Dx()/2-120, area.Min.Y+340, area.Max.X, area.Min.Y+404))
+	on.SetBounds(image.Rect(area.Min.X+area.Dx()/2-120, area.Max.Y-180, area.Max.X, area.Max.Y-116))
 	out = append(out, on)
 
-	adv := ui.NewButton(env.T("ADVANCED"), func() { env.Nav.Push(NewRack(strip, 0)) })
-	adv.Icon = "IconProcessingSettings"
-	adv.SetBounds(image.Rect(area.Min.X+16, area.Max.Y-96, area.Max.X-16, area.Max.Y-16))
-	// The digital sources have their own return: a way to that output's
-	// mix, beside the advanced button.
-	if o := outputOf(env, id); o >= 0 {
-		mid := (area.Min.X + area.Max.X) / 2
-		adv.SetBounds(image.Rect(area.Min.X+16, area.Max.Y-96, mid-8, area.Max.Y-16))
-		rt := ui.NewButton(env.T("ROUTING"), func() { env.Nav.Push(newRoutingMix(o)) })
-		rt.Icon = "IconRouting"
-		rt.SetBounds(image.Rect(mid+8, area.Max.Y-96, area.Max.X-16, area.Max.Y-16))
-		out = append(out, rt)
-	}
-	out = append(out, adv)
+	// The foot: Presets | Advanced ● (the dot green while advanced).
+	foot := image.Rect(area.Min.X, area.Max.Y-96, area.Max.X, area.Max.Y)
+	mid := (foot.Min.X + foot.Max.X) / 2
+	presets := ui.NewButton(env.T("PRESETS"), func() { env.Nav.Push(NewPresets(strip)) })
+	presets.Style = ui.StylePlain
+	presets.SetBounds(image.Rect(foot.Min.X, foot.Min.Y, mid-1, foot.Max.Y))
+	adv := &advancedButton{env: env, strip: strip, page: p}
+	adv.SetBounds(image.Rect(mid+1, foot.Min.Y, foot.Max.X, foot.Max.Y))
+	divider := ui.NewPanelView(th.Line)
+	divider.Radius = 0
+	divider.SetBounds(image.Rect(mid-1, foot.Min.Y+16, mid+1, foot.Max.Y-16))
+	out = append(out, presets, divider, adv)
+	// The card rebuilds when advanced mode changes elsewhere.
+	out = append(out, &updater{get: func() {
+		if d.Bool(desk.ChannelNode, strip, "channelAdvancedProcessing") != advanced {
+			env.Nav.Refresh()
+		}
+	}})
 	return out
+}
+
+// duckingPanel is the pads' channel's right card: the pads have no
+// processing; the ducker lives here.
+func duckingPanel(env *Env, area image.Rectangle) []ui.View {
+	th := env.Ctx.Theme
+	d := env.Desk
+	title := ui.NewLabel(env.T("DUCKING"), th.Fonts.Label, th.Text, font.Center)
+	title.SetBounds(image.Rect(area.Min.X, area.Min.Y+20, area.Max.X, area.Min.Y+70))
+	desc := ui.NewParagraph(env.T("DUCKING WILL TEMPORARILY LOWER THE LEVEL OF OTHER CHANNELS WHILE SOUND IS PRESENT IN THE HOST'S MICROPHONE (MICROPHONE 1)."), th.Fonts.Small, th.TextDim)
+	desc.Align = font.Center
+	desc.SetBounds(image.Rect(area.Min.X+30, area.Min.Y+80, area.Max.X-30, area.Min.Y+200))
+	st := ui.NewStepper(func() float64 { return d.Num(desk.DuckerNode, 0, "duckerDepth") }, func(delta int) {
+		v := d.Num(desk.DuckerNode, 0, "duckerDepth") + float64(delta)
+		d.SetFloat(desk.DuckerNode, 0, "duckerDepth", max(-60, min(0, v)))
+	})
+	st.Label = env.T("DEPTH")
+	st.Text = func(v float64) string { return dbNum(v) }
+	st.Unit = "dB"
+	st.SetBounds(image.Rect(area.Min.X+80, area.Min.Y+230, area.Max.X-80, area.Min.Y+360))
+	return []ui.View{title, desc, st}
+}
+
+// processorMenu is the advanced view: the eight processors as round icons
+// (HPF, de-esser, noise gate, compressor; EQ, Aural Exciter, Big Bottom,
+// pan), each opening its rack page. Ax and BB open the exciter page with
+// their half active.
+func processorMenu(env *Env, strip int, body image.Rectangle) []ui.View {
+	th := env.Ctx.Theme
+	items := []struct {
+		icon string
+		idx  int
+		side int
+	}{
+		{"procHighPass", procHPF, 0}, {"procDeesser", procDeesser, 0}, {"procNoiseGate", procGate, 0}, {"procCompressor", procComp, 0},
+		{"procEq", procEQ, 0}, {"procAuralExciter", procAphex, aphexAE}, {"procBigBottom", procAphex, aphexBB}, {"procLR", procPan, 0},
+	}
+	var out []ui.View
+	cells := grid(image.Rect(body.Min.X+30, body.Min.Y, body.Max.X-30, body.Max.Y), 4, 2, 16)
+	for i, it := range items {
+		it := it
+		b := ui.NewButton("", func() {
+			rk := NewRack(strip, it.idx).(*RackPage)
+			rk.aphexSide = it.side
+			env.Nav.Push(rk)
+		})
+		b.Icon, b.Style, b.Fill = it.icon, ui.StyleRound, th.Black
+		b.Tint = th.Text
+		b.SetBounds(cells[i])
+		ring := &ringOutline{}
+		ring.SetBounds(cells[i])
+		out = append(out, ring, b)
+	}
+	return out
+}
+
+// ringOutline draws the white ring of a processor button.
+type ringOutline struct{ ui.Base }
+
+func (r *ringOutline) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
+	sq := ui.Square(r.Bounds())
+	cx, cy := float64(sq.Min.X+sq.Max.X)/2, float64(sq.Min.Y+sq.Max.Y)/2
+	ui.Ring(dst, cx, cy, float64(sq.Dx())/2-2, 4, c.Theme.Text, clip)
+}
+
+// advancedButton is "Advanced" with its dot: a tap into advanced mode
+// writes channelAdvancedProcessing and drops the preset, as RØDE's button
+// does; a tap out of it asks first (the parameters go back to the macros).
+type advancedButton struct {
+	ui.Base
+	env     *Env
+	strip   int
+	page    *ChannelPage
+	pressed bool
+	last    bool
+}
+
+func (a *advancedButton) on() bool {
+	return a.env.Desk.Bool(desk.ChannelNode, a.strip, "channelAdvancedProcessing")
+}
+
+func (a *advancedButton) CanFocus() bool { return true }
+func (a *advancedButton) Activate() bool {
+	a.tap()
+	return false
+}
+
+func (a *advancedButton) tap() {
+	d := a.env.Desk
+	if !a.on() {
+		d.SetBool(desk.ChannelNode, a.strip, "channelAdvancedProcessing", true)
+		d.SetInt(desk.ChannelNode, a.strip, "channelCurrentFxPreset", -1)
+		a.env.Nav.Refresh()
+		return
+	}
+	strip := a.strip
+	env := a.env
+	env.Nav.Choose(env.T("ADVANCED"), env.T("DISABLING ADVANCED WILL RESET ALL PARAMETERS.\nSAVE A PRESET TO RECALL THEM AT A LATER TIME?"),
+		[]Option{
+			{Label: env.T("CANCEL")},
+			{Label: env.T("SAVE PRESET"), Do: func() { savePreset(env, strip, func() { leaveAdvanced(env, strip) }) }},
+			{Label: env.T("CLEAR"), Danger: true, Do: func() { leaveAdvanced(env, strip) }},
+		})
+}
+
+// leaveAdvanced switches a channel back to the simple mode.
+func leaveAdvanced(env *Env, strip int) {
+	env.Desk.SetBool(desk.ChannelNode, strip, "channelAdvancedProcessing", false)
+	env.Nav.Refresh()
+}
+
+func (a *advancedButton) Touch(phase ui.TouchPhase, p image.Point) bool {
+	switch phase {
+	case ui.Down:
+		a.pressed = true
+		a.MarkDirty()
+	case ui.Up:
+		if a.pressed {
+			a.tap()
+		}
+		a.pressed = false
+		a.MarkDirty()
+	}
+	return true
+}
+
+func (a *advancedButton) Dirty() []image.Rectangle {
+	if on := a.on(); on != a.last {
+		a.last = on
+		a.MarkDirty()
+	}
+	return a.Base.Dirty()
+}
+
+func (a *advancedButton) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle) {
+	th := c.Theme
+	r := a.Bounds()
+	if a.pressed {
+		ui.Panel(dst, r, th.Radius, th.PanelHi.WithAlpha(0.5), clip)
+	}
+	label := a.env.T("ADVANCED")
+	w := ui.TextWidth(th.Fonts.Body, label)
+	x := r.Min.X + (r.Dx()-w-40)/2
+	ui.Text(dst, th.Fonts.Body, label, image.Rect(x, r.Min.Y, x+w+4, r.Max.Y), font.Left, th.Text, clip)
+	dot := th.Line
+	if a.on() {
+		dot = th.Accent
+	}
+	ui.Circle(dst, float64(x+w+30), float64(r.Min.Y+r.Max.Y)/2, 8, dot, clip)
+	if a.Focused() {
+		ui.Focus(dst, r, th.Radius, false, th, clip)
+	}
 }

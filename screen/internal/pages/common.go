@@ -109,6 +109,7 @@ var sourceIcons = map[string]string{
 	"game": "VirtualInput_Game", "music": "VirtualInput_Music",
 	"virtuala": "Letter_A", "virtualb": "Letter_B",
 	"callme1": "CallMeFaderIcon1", "callme2": "CallMeFaderIcon2", "callme3": "CallMeFaderIcon3",
+	"wireless1": "IconStripWireless1", "wireless2": "IconStripWireless2", "headset": "headset",
 }
 
 func sourceIcon(id string) string {
@@ -117,6 +118,9 @@ func sourceIcon(id string) string {
 	}
 	if strings.HasPrefix(id, "combo") {
 		return "IconStripMic1"
+	}
+	if strings.HasPrefix(id, "sync") {
+		return "iconRCSync"
 	}
 	return ""
 }
@@ -129,6 +133,7 @@ var bigSourceIcons = map[string]string{
 	"usb1": "IconUsb1Main", "chat": "IconUsb1Comms", "usb2": "IconUsb2Main",
 	"bluetooth": "bluetooth", "soundpad": "smart_pads_sound",
 	"callme1": "CallMe_1", "callme2": "CallMe_2", "callme3": "CallMe_3",
+	"wireless1": "IconWireless1", "wireless2": "IconWireless2", "headset": "headset",
 }
 
 func sourceIconBig(id string) string {
