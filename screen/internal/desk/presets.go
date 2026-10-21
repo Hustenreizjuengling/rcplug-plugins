@@ -59,6 +59,10 @@ func ParsePreset(s string) (Preset, bool) {
 // Complete says whether the preset has every value this package understands.
 func (p Preset) Complete() bool { return len(p.Values) >= len(presetFields) }
 
+// Deletable reports whether the preset is a user's (field 8 is 1 on the
+// factory presets, 0 on a saved one; RØDE's panel gives only those a bin).
+func (p Preset) Deletable() bool { return len(p.Values) > 7 && p.Values[7] < 0.5 }
+
 // Presets lists the desk's processing presets in the tree's order.
 func (m *Model) Presets() []Preset {
 	m.mu.RLock()
@@ -94,14 +98,33 @@ func (m *Model) PresetName(strip int) string {
 	return ""
 }
 
-// ApplyPreset writes a preset to strip's channel: every value understood,
-// then the preset's index. False if the preset is incomplete.
+// ApplyPreset writes a preset to strip's channel the way RØDE's program
+// does (its FUN_00753240): the advanced flag first; then the ten VoxLab
+// parameters, computed from the preset's macros while the preset is a
+// simple one or taken from its fields when it is an advanced one; then the
+// other processor fields; the macros; and last the preset's index. The
+// macro set is the second for a combo input with a condenser microphone,
+// the first otherwise. False if the preset is incomplete.
 func (m *Model) ApplyPreset(strip int, p Preset) bool {
 	if !p.Complete() {
 		return false
 	}
+	set := m.PresetMacroSet(strip)
+	depth, sparkle, punch := p.Values[3*set], p.Values[3*set+1], p.Values[3*set+2]
+	advanced := p.Values[6] >= 0.5
+	m.SetBool(ChannelNode, strip, "channelAdvancedProcessing", advanced)
+	if advanced {
+		for _, name := range []string{"eqLowGain", "eqMidGain", "eqHighGain", "aphexBBDrive", "aphexAEMix",
+			"compressorThreshold", "compressorGain", "deesserThreshold", "noiseGateThreshold", "noiseGateRange"} {
+			m.SetFloat(ChannelNode, strip, name, p.Values[presetIndex(name)])
+		}
+	} else {
+		for _, d := range VoxLabDerived(depth, sparkle, punch) {
+			m.SetFloat(ChannelNode, strip, d.Prop, d.Value)
+		}
+	}
 	for i, name := range presetFields {
-		if name == "" {
+		if name == "" || derivedProps[name] || i < 8 {
 			continue
 		}
 		if strings.HasSuffix(name, "On") {
@@ -110,6 +133,25 @@ func (m *Model) ApplyPreset(strip int, p Preset) bool {
 			m.SetFloat(ChannelNode, strip, name, p.Values[i])
 		}
 	}
+	// The pan (fields 50…52) follows the preset as well.
+	if len(p.Values) >= 52 {
+		m.SetFloat(ChannelNode, strip, "channelPan", p.Values[49])
+		m.SetFloat(ChannelNode, strip, "channelPanL", p.Values[50])
+		m.SetFloat(ChannelNode, strip, "channelPanR", p.Values[51])
+	}
+	m.SetFloat(ChannelNode, strip, "channelDepth", depth)
+	m.SetFloat(ChannelNode, strip, "channelSparkle", sparkle)
+	m.SetFloat(ChannelNode, strip, "channelPunch", punch)
 	m.SetInt(ChannelNode, strip, "channelCurrentFxPreset", p.Idx)
 	return true
+}
+
+// presetIndex is the position of a property in a preset's values.
+func presetIndex(name string) int {
+	for i, n := range presetFields {
+		if n == name {
+			return i
+		}
+	}
+	return -1
 }
