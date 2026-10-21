@@ -356,6 +356,13 @@ func (p *ChannelPage) processingCard(env *Env, strip int, area image.Rectangle) 
 	if kind == desk.KindNone {
 		return out
 	}
+	// A USB microphone hosted on USB 2 brings its own channel (RØDE's
+	// Usb2HostedChannel): the processing card binds that one.
+	if src == desk.SourceUSB2 && d.USBMicHosted() {
+		if h := d.HostedChannel(); h >= 0 {
+			strip = h
+		}
+	}
 	// Effects exist for the microphone inputs (a wired or wireless mic).
 	hasFx := kind == desk.KindCombo || kind == desk.KindHeadset || kind == desk.KindComboPair || kind == desk.KindWireless
 	if hasFx {
@@ -526,8 +533,16 @@ func (a *advancedButton) tap() {
 		})
 }
 
-// leaveAdvanced switches a channel back to the simple mode.
+// leaveAdvanced is RØDE's "Clear": the channel gets the factory preset
+// with index 1 (Podcast Studio), which puts it back into simple mode; a
+// desk without that preset gets the flag alone.
 func leaveAdvanced(env *Env, strip int) {
+	for _, p := range env.Desk.Presets() {
+		if p.Idx == 1 && env.Desk.ApplyPreset(strip, p) {
+			env.Nav.Refresh()
+			return
+		}
+	}
 	env.Desk.SetBool(desk.ChannelNode, strip, "channelAdvancedProcessing", false)
 	env.Nav.Refresh()
 }
