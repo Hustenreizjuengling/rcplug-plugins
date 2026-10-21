@@ -35,41 +35,10 @@ func ScreenHolder() string {
 func (r *Registry) ScreenHeld() bool { return r.self != "" && ScreenHolder() == r.self }
 
 // TakeScreen asks the host for the device's screen.
-func (r *Registry) TakeScreen() error {
-	if err := r.hostPost("/api/screen/take"); err != nil {
-		return err
-	}
-	SetPanelWish(true)
-	return nil
-}
+func (r *Registry) TakeScreen() error { return r.hostPost("/api/screen/take") }
 
 // ReleaseScreen gives the device's screen back to RØDE's screen program.
-func (r *Registry) ReleaseScreen() error {
-	SetPanelWish(false)
-	return r.hostPost("/api/screen/release")
-}
-
-// PanelWish is the plugin's own memory of whether the interface belongs on
-// the device's screen: on until "Back to RØDE" (a fresh install means the
-// device's screen, that is what the plugin is for). The host keeps its own
-// record for the device's restarts; this one covers an update or a new
-// install, when the host has none yet.
-func PanelWish() bool {
-	b, err := os.ReadFile(sdk.StatePath("panel"))
-	if err != nil {
-		return true
-	}
-	return strings.TrimSpace(string(b)) != "off"
-}
-
-// SetPanelWish records the wish.
-func SetPanelWish(on bool) {
-	v := "off"
-	if on {
-		v = "on"
-	}
-	_ = sdk.WriteFileAtomic(sdk.StatePath("panel"), []byte(v+"\n"), 0o644)
-}
+func (r *Registry) ReleaseScreen() error { return r.hostPost("/api/screen/release") }
 
 // hostPost posts an empty body to the host's API with this plugin's token.
 func (r *Registry) hostPost(path string) error {

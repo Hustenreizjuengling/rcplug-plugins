@@ -3,11 +3,10 @@
   "name": "screen",
   "title": "Screen",
   "description": "RØDE's screen interface, page for page, in the browser and on the device's touchscreen: the mixer, channel and processing pages, SMART pads, shows and recordings, the menus and settings, CallMe and network, and pages for rcplug and other plugins. It reads RØDE's icons and text from the device at run time (no RØDE files are shipped). The browser page is always there; the device's screen is taken with “Take the device's screen” and given back with “Back to RØDE” (RØDE's own interface runs meanwhile). Needs rcplug 0.8.24 or later.",
-  "version": "0.5.1",
+  "version": "0.5.0",
   "exec": [
     "./screen"
   ],
-  "httpProxy": "127.0.0.1:{{port}}",
   "autostart": true,
   "order": 95,
   "icon": "▣",
