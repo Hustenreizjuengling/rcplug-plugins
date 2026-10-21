@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.33 - Unreleased
+## 0.5.33 - 2026-10-21
 
 ### Added
 - **Screen 0.4.2: the last open values, read from the screen program.** The routing
