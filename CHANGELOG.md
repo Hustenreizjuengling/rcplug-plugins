@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.29 - Unreleased
+## 0.5.29 - 2026-10-21
 
 ### Added
 - **Screen 0.3.11: the microphone choice on a combo input's channel page**, as on
