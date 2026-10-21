@@ -12,7 +12,8 @@ import (
 )
 
 // The recordings list (RecordingsPage): one row per recording the desk
-// found on its storage — name, date, length, Multitrack or Stereo — that
+// found on its storage — name, date, time of day, Multitrack or Stereo, all
+// from the recording's content string (see desk.ParseRecording) — that
 // scrolls by touch or the knob; a tap opens the player. The podcast player
 // (PodcastPlayerPage): the recording's name and date in the header, the
 // teal time display with the MULTI/STEREO marks, the transport row
@@ -96,16 +97,19 @@ func (w *recordingRow) Draw(dst *gfx.Image, c *ui.Context, clip image.Rectangle)
 	x += 90
 	ui.Text(dst, th.Fonts.Body, w.rec.Name, image.Rect(x, r.Min.Y, x+420, r.Max.Y), font.Left, th.Text, clip)
 	x += 440
+	// RØDE's item shows the recording's date and its time of day (the
+	// record's time field through juce::Time's date and time strings).
 	if !w.rec.Date.IsZero() {
 		ui.Text(dst, th.Fonts.Body, dateText(w.rec.Date), image.Rect(x, r.Min.Y, x+320, r.Max.Y), font.Left, th.TextDim, clip)
-	}
-	x += 340
-	if w.rec.Duration > 0 {
-		ui.Text(dst, th.Fonts.Body, recTime(w.rec.Duration), image.Rect(x, r.Min.Y, x+170, r.Max.Y), font.Left, th.TextDim, clip)
+		clock, suffix := clockText(w.rec.Date, w.env.Desk.Clock24h())
+		if len(clock) > 5 {
+			clock = clock[:len(clock)-3]
+		}
+		ui.Text(dst, th.Fonts.Body, clock+suffix, image.Rect(x+340, r.Min.Y, x+510, r.Max.Y), font.Left, th.TextDim, clip)
 	}
 	kind := w.env.T("STEREO")
 	if w.rec.Multi {
-		kind = w.env.T("MULTI")
+		kind = w.env.T("MULTITRACK")
 	}
 	ui.Text(dst, th.Fonts.Label, kind, image.Rect(r.Max.X-200, r.Min.Y, r.Max.X-24, r.Max.Y), font.Right, th.TextDim, clip)
 	if w.Focused() {
@@ -131,6 +135,7 @@ type playerPage struct {
 	loaded  bool
 	saved   [4]float64
 	lastRec string
+	markers cueMarkers // the file's cue points, read when the page opens
 }
 
 func newPlayerPage(uid int64) Page { return &playerPage{uid: uid} }
@@ -172,7 +177,13 @@ func (p *playerPage) Header(env *Env, bar image.Rectangle) ([]ui.View, bool) {
 			p.edit = false
 			env.Nav.Refresh()
 		}
-		views[1].(*ui.Button).OnTap = func() { p.edit = false; env.Nav.Refresh() }
+		// The tick keeps the edit: the envelope goes back into the
+		// recording's content, as RØDE's player writes it (0x81ee00).
+		views[1].(*ui.Button).OnTap = func() {
+			env.Desk.SaveRecordingEnv(rec, env.Desk.Player().Env)
+			p.edit = false
+			env.Nav.Refresh()
+		}
 		return append(views, name, date), true
 	}
 	return []ui.View{name, date}, false
@@ -189,9 +200,15 @@ func (p *playerPage) Build(env *Env, r image.Rectangle) ui.View {
 	}
 	if !p.loaded {
 		p.loaded = true
+		// RØDE's page loads the file and puts the recording's trim and fade
+		// envelope on the player (its constructor, 0x81c8a0).
 		if rec.Path != "" {
 			d.PlayerLoad(rec.Path)
 		}
+		for i, prop := range desk.PlayerEnvProps {
+			d.PlayerSetEnv(prop, rec.Env[i])
+		}
+		p.markers = loadCueMarkers(rec.Path)
 	}
 	teal := gfx.Hex(0x3ec6f0)
 	// The time display.
@@ -230,14 +247,28 @@ func (p *playerPage) Build(env *Env, r image.Rectangle) ui.View {
 	cut := func(x0, x1 int) image.Rectangle {
 		return image.Rect(row.Min.X+x0*w/1000, row.Min.Y, row.Min.X+x1*w/1000, row.Max.Y)
 	}
+	// The file's own rate when its header could be read, else the desk's.
 	sampleRate := 48000.0
-	seek := func(dt time.Duration) {
-		pl := d.Player()
-		pos := pl.Position + dt
+	if p.markers.rate > 0 {
+		sampleRate = float64(p.markers.rate)
+	}
+	jumpTo := func(pos time.Duration) {
 		if pos < 0 {
 			pos = 0
 		}
 		d.PlayerJump(int64(pos.Seconds() * sampleRate))
+	}
+	seek := func(dt time.Duration) { jumpTo(d.Player().Position + dt) }
+	// The flag buttons walk the file's markers: back to the previous one
+	// (the start without one), forward to the next.
+	prevMarker := func() {
+		t, _ := p.markers.before(d.Player().Position)
+		jumpTo(t)
+	}
+	nextMarker := func() {
+		if t, ok := p.markers.after(d.Player().Position); ok {
+			jumpTo(t)
+		}
 	}
 	mk := func(icon string, rc image.Rectangle, tint gfx.Color, tap func()) *ui.Button {
 		b := ui.NewButton("", tap)
@@ -254,7 +285,7 @@ func (p *playerPage) Build(env *Env, r image.Rectangle) ui.View {
 	})
 	scissors.Enabled = !p.edit
 	marker := gfx.Hex(0xa08c48)
-	mk("IconArrowBackFlag", cut(105, 205), marker, func() { seek(-time.Hour) })
+	mk("IconArrowBackFlag", cut(105, 205), marker, prevMarker)
 	mk("IconArrowBack15", cut(210, 310), th.Text, func() { seek(-15 * time.Second) })
 	play := mk("IconPlay", cut(315, 680), th.Text, func() {
 		if d.Player().State == playerPlaying {
@@ -274,7 +305,7 @@ func (p *playerPage) Build(env *Env, r image.Rectangle) ui.View {
 		}
 	}})
 	mk("IconArrowFrwd30", cut(685, 785), th.Text, func() { seek(30 * time.Second) })
-	mk("IconArrowFrwdFlag", cut(790, 890), marker, func() { seek(time.Hour) })
+	mk("IconArrowFrwdFlag", cut(790, 890), marker, nextMarker)
 	bin := mk("Bin", cut(895, 1000), th.Record, func() {
 		env.Nav.Confirm(env.T("DELETE"), env.T("ARE YOU SURE YOU WANT TO DELETE ")+" \""+rec.Name+"\"?", env.T("DELETE"), true, func() {
 			d.DeleteRecording(rec.UID)

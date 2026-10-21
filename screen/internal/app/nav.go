@@ -211,6 +211,7 @@ func (a *App) channelOpen() int {
 // goes out when the pages close.
 func (a *App) syncChannel() {
 	a.model.SelectChannel(a.channelOpen())
+	a.model.SelectMix(a.mixOpen())
 	a.syncEncoderRing()
 }
 

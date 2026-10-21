@@ -21,10 +21,15 @@ type Recording struct {
 	Node     int
 	UID      int64
 	Name     string
+	Hash     string
 	Path     string
+	Show     string // the fourth text field (the show the recording belongs to)
 	Date     time.Time
 	Duration time.Duration
-	Multi    bool // a multitrack recording (else stereo)
+	Multi    bool    // a multitrack recording (else stereo)
+	Flags    [2]bool // the two flags after the multitrack one
+	Env      [4]float64
+	Status   int64 // the cloud upload state the list's icon shows
 	Content  string
 }
 
@@ -56,43 +61,60 @@ func (m *Model) RecordingTotals() (count int64, total time.Duration) {
 // DeleteRecording asks the mixer to delete a recording by its UID.
 func (m *Model) DeleteRecording(uid int64) { m.SetInt(RecordingsNode, 0, "requestDeleteUID", uid) }
 
-// ParseRecording reads a recording's content string: fields separated by
-// "|" (the mixer's list format, as the show and mix properties use it):
-// name, path, date (seconds since the epoch), length (seconds), and a
-// multitrack flag. Fields that are missing stay empty; unknown layouts keep
-// the whole string as the name so a recording is never hidden.
+// SaveRecordingEnv writes a recording's trim and fade envelope back into
+// its content string, as RØDE's player does when an edit is kept
+// (0x81ee00 rebuilds the fourteen fields with the player's envelope).
+func (m *Model) SaveRecordingEnv(r Recording, env [4]float64) {
+	parts := strings.Split(r.Content, "|")
+	if len(parts) < recordingFields {
+		return
+	}
+	for i, v := range env {
+		parts[9+i] = strconv.FormatFloat(v, 'f', -1, 64)
+	}
+	m.SetStr(RecordingNode, r.Node, "recordingContent", strings.Join(parts, "|"))
+}
+
+// recordingFields is the number of fields in a content string.
+const recordingFields = 14
+
+// ParseRecording reads a recording's content string. RØDE's program keeps
+// it as fourteen "|"-separated fields (RcSyncTypes::Recording::Content_t,
+// its text form at 0x5b7950, its record at 0x8092b0): name, hash, path, a
+// fourth text, the time in milliseconds since the epoch, the length in
+// seconds, the multitrack flag and two more flags as 0/1, the four envelope
+// values (trim start, fade-in end, fade-out start, trim end) and a status
+// number. A shorter string keeps the whole text as the name so a recording
+// is never hidden.
 func ParseRecording(content string) Recording {
-	r := Recording{Content: content, Name: content}
+	r := Recording{Content: content, Name: content, Env: [4]float64{0, 0, 1, 1}}
 	parts := strings.Split(content, "|")
-	if len(parts) < 2 {
+	if len(parts) < recordingFields {
+		if len(parts) > 1 {
+			r.Name = parts[0]
+		}
 		return r
 	}
-	r.Name = parts[0]
-	for _, p := range parts[1:] {
-		switch {
-		case strings.HasPrefix(p, "/"):
-			r.Path = p
-			if r.Name == "" {
-				r.Name = strings.TrimSuffix(p[strings.LastIndex(p, "/")+1:], ".wav")
-			}
-		case p == "multi" || p == "multitrack":
-			r.Multi = true
-		case p == "stereo":
-			r.Multi = false
-		default:
-			n, err := strconv.ParseFloat(p, 64)
-			if err != nil {
-				continue
-			}
-			switch {
-			case n > 1e9 && r.Date.IsZero():
-				r.Date = time.Unix(int64(n), 0)
-			case r.Duration == 0 && n > 0:
-				r.Duration = time.Duration(n * float64(time.Second))
-			case n == 1 && !r.Multi:
-				r.Multi = true
-			}
+	r.Name, r.Hash, r.Path, r.Show = parts[0], parts[1], parts[2], parts[3]
+	if ms, err := strconv.ParseInt(parts[4], 10, 64); err == nil && ms != 0 {
+		r.Date = time.UnixMilli(ms)
+	}
+	if secs, err := strconv.ParseFloat(parts[5], 64); err == nil && secs > 0 {
+		r.Duration = time.Duration(secs * float64(time.Second))
+	}
+	r.Multi = flagField(parts[6])
+	r.Flags = [2]bool{flagField(parts[7]), flagField(parts[8])}
+	for i := range r.Env {
+		if v, err := strconv.ParseFloat(parts[9+i], 64); err == nil {
+			r.Env[i] = v
 		}
 	}
+	r.Status, _ = strconv.ParseInt(parts[13], 10, 64)
 	return r
+}
+
+// flagField reads a 0/1 field the way RØDE's program does (strtol != 0).
+func flagField(s string) bool {
+	n, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
+	return err == nil && n != 0
 }

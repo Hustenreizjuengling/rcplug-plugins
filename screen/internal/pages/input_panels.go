@@ -132,7 +132,13 @@ func usbMicPanel(env *Env, strip int, src int64, area image.Rectangle) []ui.View
 	card.SetBounds(tile)
 	pic := ui.NewIcon("podmic_usb", 0)
 	pic.SetBounds(image.Rect(tile.Min.X+12, tile.Min.Y+8, tile.Max.X-12, tile.Max.Y-56))
-	name := ui.NewLabel(env.TR("", "USB-Mikrofon", "USB Microphone"), th.Fonts.Body, th.Text, font.Center)
+	// The device's name from RØDE's USB device table, by the product id
+	// the mixer reports (desk.USBDevices); the generic caption otherwise.
+	caption := env.TR("", "USB-Mikrofon", "USB Microphone")
+	if dev, ok := env.Desk.USBHostDevice(); ok {
+		caption = dev.Name
+	}
+	name := ui.NewLabel(caption, th.Fonts.Body, th.Text, font.Center)
 	name.SetBounds(image.Rect(tile.Min.X, tile.Max.Y-56, tile.Max.X, tile.Max.Y-8))
 	out = append(out, card, pic, name)
 	out = append(out, gainRow(env, strip, int(src), area, "LEVEL")...)
