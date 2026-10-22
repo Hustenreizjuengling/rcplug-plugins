@@ -117,11 +117,18 @@ type hub struct {
 	trail    []trailPt // the last two seconds of blips, for the screen's radar
 	proc     *dsp.Processor
 	subs     map[chan []byte]struct{}
+	// screens are the device's screens streaming the page (screen.go):
+	// each gets a nudge per publish and builds the page itself.
+	screens map[chan struct{}]struct{}
+	// sources is the list of sources the page offers, kept for a few
+	// seconds: it comes from the host and JACK, too slow for every picture.
+	sources   []string
+	sourcesAt time.Time
 }
 
 func newHub(cfg dsp.Config, rate, block int, spec, statePath string) *hub {
 	return &hub{cfg: cfg, rate: rate, block: block, srcSpec: spec, statePath: statePath,
-		restart: make(chan struct{}, 1), subs: map[chan []byte]struct{}{}, channels: map[string]string{}}
+		restart: make(chan struct{}, 1), subs: map[chan []byte]struct{}{}, screens: map[chan struct{}]struct{}{}, channels: map[string]string{}}
 }
 
 // run is the supervised capture loop. It (re)opens the current source and
@@ -267,6 +274,12 @@ func (h *hub) publish(e dsp.Estimate) {
 		select {
 		case ch <- msg:
 		default: // drop if a slow client can't keep up
+		}
+	}
+	for ch := range h.screens {
+		select {
+		case ch <- struct{}{}:
+		default: // a screen still busy with the last picture takes the next
 		}
 	}
 }

@@ -6,6 +6,19 @@ may break compatibility).
 
 ## 0.5.42 - Unreleased
 
+### Changed
+- **Screen 0.6.0: a plugin's picture moves as it happens.** A shown plugin page
+  is streamed from the plugin (`GET /screen` with `Accept: text/event-stream`;
+  a plugin that answers plainly is polled as before), so a radar or a meter shows
+  the sound when it sounds, not up to a tenth of a second later. A canvas redraws
+  only where a shape moved and keeps its still shapes (a grid, labels) drawn,
+  the page flip is no longer waited for before the next touch is read, and the
+  copy to the panel goes in whole rows: a moving picture now costs a small part
+  of what it did, and the controls beside it answer as the menu does.
+- **Sonar 0.8.1 streams its page** to the screen, a picture with every estimate,
+  and asks the host for its source list a few times a minute instead of with
+  every picture.
+
 ## 0.5.41 - 2026-10-22
 
 ### Added

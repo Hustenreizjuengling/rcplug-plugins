@@ -49,8 +49,9 @@ type Display struct {
 	mode        []byte // the mode we set (drm_mode_modeinfo)
 	ModeName    string
 	bufs        []buffer
-	front       int  // the buffer on the panel
+	front       int  // the buffer on the panel (or on its way there)
 	Flips       bool // two buffers, flipped
+	pending     bool // a flip is under way: front is not on the panel yet
 }
 
 // buffer is a dumb buffer, mapped.
@@ -292,7 +293,8 @@ func (d *Display) show(fb uint32) error {
 }
 
 // Back is the buffer to draw the next frame into: the one not on the panel,
-// or the only one.
+// or the only one. Sync first: a flip still under way means the other
+// buffer is still being scanned out.
 func (d *Display) Back() []byte {
 	if d.Flips {
 		return d.bufs[1-d.front].mem
@@ -300,13 +302,37 @@ func (d *Display) Back() []byte {
 	return d.bufs[d.front].mem
 }
 
-// Present shows what was drawn into Back: a page flip, waited for until the
-// panel shows it (at its next refresh). If flipping fails, the display goes
-// on with the one buffer on the panel; full then says that buffer must be
-// drawn again whole.
+// Sync waits until the last flip is done (the panel scans the front buffer
+// out), so the back buffer is free to draw into. It returns at once when no
+// flip is pending, which is the usual case: a flip completes at the panel's
+// next refresh, long before the next frame is drawn, so the wait that
+// Present used to do at its end is spent handling touches instead. If the
+// flip never completes, the display goes on with the one buffer on the
+// panel; full then says that buffer must be drawn again whole.
+func (d *Display) Sync() (full bool, err error) {
+	if !d.pending {
+		return false, nil
+	}
+	d.pending = false
+	if err := d.waitFlip(); err != nil {
+		d.Flips = false
+		// The flip may still happen: show the buffer last drawn for good.
+		_ = d.show(d.bufs[d.front].fb)
+		return true, fmt.Errorf("page flip: %w; drawing into one buffer", err)
+	}
+	return false, nil
+}
+
+// Present shows what was drawn into Back: a page flip at the panel's next
+// refresh, not waited for (Sync does that before the next frame). If
+// flipping fails, the display goes on with the one buffer on the panel;
+// full then says that buffer must be drawn again whole.
 func (d *Display) Present() (full bool, err error) {
 	if !d.Flips {
 		return false, nil
+	}
+	if full, err := d.Sync(); full || err != nil {
+		return full, err
 	}
 	back := 1 - d.front
 	pf := make([]byte, 24) // drm_mode_crtc_page_flip
@@ -317,14 +343,8 @@ func (d *Display) Present() (full bool, err error) {
 		d.Flips = false
 		return true, fmt.Errorf("page flip: %w; drawing into one buffer", err)
 	}
-	if err := d.waitFlip(); err != nil {
-		d.Flips = false
-		// The flip may still happen: show the buffer just drawn for good.
-		d.front = back
-		_ = d.show(d.bufs[back].fb)
-		return true, fmt.Errorf("page flip: %w; drawing into one buffer", err)
-	}
 	d.front = back
+	d.pending = true
 	return false, nil
 }
 
@@ -397,7 +417,9 @@ func (d *Display) blank() {
 	if d.Flips {
 		if _, err := d.Present(); err == nil {
 			if _, err := d.Present(); err == nil {
-				return
+				if _, err := d.Sync(); err == nil {
+					return
+				}
 			}
 		}
 	}

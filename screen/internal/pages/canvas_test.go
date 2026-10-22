@@ -104,3 +104,130 @@ func TestCanvasPlace(t *testing.T) {
 		t.Errorf("wide: canvas %v rest %v", cv, rest)
 	}
 }
+
+// TestCanvasPartial: frames between two descriptions redraw only where the
+// moving shapes were and are, and what is on the screen after those
+// partial redraws is exactly the picture drawn whole.
+func TestCanvasPartial(t *testing.T) {
+	ctx := ui.NewContext(ui.Dark(ui.Liberation()), nil)
+	th := ctx.Theme
+	r := image.Rect(40, 64, 632, 656)
+	var pg *PluginPage
+	get := func() (PluginControl, *PluginPage, bool) { return pg.Controls[0], pg, true }
+	describe := func(az float64) {
+		pg = &PluginPage{Controls: []PluginControl{{ID: "c", Type: "canvas", W: 100, H: 100, Shapes: radarShapes(az, true)}}}
+	}
+	describe(-30)
+	now := time.Unix(1000, 0)
+	cv := newCanvas("Radar", get)
+	cv.now = func() time.Time { return now }
+	cv.SetBounds(r)
+	live := gfx.NewImage(1280, 720)
+	live.Set(live.Bounds(), th.Bg)
+	area := func(rs []image.Rectangle) (a int) {
+		for _, x := range rs {
+			a += x.Dx() * x.Dy()
+		}
+		return a
+	}
+	full := r.Dx() * r.Dy()
+	glides := 0
+	for step := 0; step < 30; step++ {
+		if step%3 == 0 {
+			describe(-30 + float64(step)*2)
+		}
+		rects := cv.Dirty()
+		if step == 0 && (len(rects) != 1 || rects[0] != r) {
+			t.Fatalf("the first frame should draw the whole canvas: %v", rects)
+		}
+		if step%3 != 0 && step > 3 {
+			glides++
+			if a := area(rects); a > full/3 {
+				t.Errorf("step %d: a gliding frame redraws %d of %d pixels: %v", step, a, full, rects)
+			}
+		}
+		for _, d := range rects { // as the root does
+			d = d.Intersect(r)
+			live.Set(d, th.Bg)
+			cv.Draw(live, ctx, d)
+		}
+		// The same picture drawn whole by a fresh canvas.
+		ref := newCanvas("Radar", get)
+		ref.now = cv.now
+		ref.SetBounds(r)
+		ref.units = cv.units
+		ref.next = append([]PluginShape(nil), cv.next...)
+		ref.full = true
+		whole := gfx.NewImage(1280, 720)
+		whole.Set(whole.Bounds(), th.Bg)
+		ref.Draw(whole, ctx, r)
+		for y := r.Min.Y; y < r.Max.Y; y++ {
+			for x := r.Min.X; x < r.Max.X; x++ {
+				if live.At(x, y) != whole.At(x, y) {
+					t.Fatalf("step %d: pixel %d,%d differs after partial redraws: %08x, whole %08x", step, x, y, live.At(x, y), whole.At(x, y))
+				}
+			}
+		}
+		now = now.Add(33 * time.Millisecond)
+	}
+	if glides == 0 {
+		t.Fatal("no gliding frames were checked")
+	}
+	if cv.static < 10 {
+		t.Errorf("the grid and its labels should be still: static %d", cv.static)
+	}
+}
+
+// TestCanvasStill: a change in the still part redraws everything once and
+// the still part is found again.
+func TestCanvasStill(t *testing.T) {
+	ctx := ui.NewContext(ui.Dark(ui.Liberation()), nil)
+	r := image.Rect(0, 0, 300, 300)
+	mk := func(label string, x float64) *PluginPage {
+		return &PluginPage{Controls: []PluginControl{{ID: "c", Type: "canvas", Shapes: []PluginShape{
+			{Shape: "ring", X: 50, Y: 50, R: 40, Color: "line"},
+			{Shape: "text", X: 50, Y: 10, Text: label},
+			{ID: "b", Shape: "circle", X: x, Y: 50, R: 3},
+		}}}}
+	}
+	pg := mk("A", 20)
+	now := time.Unix(1000, 0)
+	cv := newCanvas("", func() (PluginControl, *PluginPage, bool) { return pg.Controls[0], pg, true })
+	cv.now = func() time.Time { return now }
+	cv.SetBounds(r)
+	img := gfx.NewImage(300, 300)
+	frame := func() []image.Rectangle {
+		rects := cv.Dirty()
+		for _, d := range rects {
+			cv.Draw(img, ctx, d)
+		}
+		now = now.Add(100 * time.Millisecond)
+		return rects
+	}
+	frame()
+	pg = mk("A", 80)
+	frame()
+	if cv.static != 2 {
+		t.Fatalf("ring and label should be still: static %d", cv.static)
+	}
+	pg = mk("A", 20)
+	if rects := frame(); len(rects) == 0 || area(rects) > 150*150 {
+		t.Fatalf("a moved blip should redraw a small part: %v", rects)
+	}
+	pg = mk("B", 20)
+	if rects := frame(); len(rects) != 1 || rects[0] != r {
+		t.Fatalf("a changed label should redraw everything: %v", rects)
+	}
+	pg = mk("B", 60)
+	frame()
+	if cv.static != 2 {
+		t.Fatalf("the still part should be found again: static %d", cv.static)
+	}
+}
+
+func area(rs []image.Rectangle) (a int) {
+	for _, x := range rs {
+		a += x.Dx() * x.Dy()
+	}
+	return a
+}

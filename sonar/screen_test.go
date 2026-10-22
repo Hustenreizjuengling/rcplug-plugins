@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -129,5 +131,70 @@ func TestTrail(t *testing.T) {
 	h.mu.Unlock()
 	if n < 20+len(h.trail)/2 {
 		t.Errorf("radar with %d shapes for %d trail points", n, len(h.trail))
+	}
+}
+
+// TestScreenStream: asked for an event stream, the page comes as one: a
+// picture at once and one with every publish, each the whole page.
+func TestScreenStream(t *testing.T) {
+	h := newHub(dsp.DefaultConfig(48000), 48000, 480, "test", "")
+	srv := httptest.NewServer(http.HandlerFunc(h.handleScreen))
+	defer srv.Close()
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/screen?lang=en", nil)
+	req.Header.Set("Accept", "text/event-stream")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/event-stream") {
+		t.Fatalf("content type %q", ct)
+	}
+	events := make(chan []byte, 8)
+	go func() {
+		sc := bufio.NewScanner(resp.Body)
+		sc.Buffer(make([]byte, 64<<10), 1<<20)
+		for sc.Scan() {
+			if line := sc.Bytes(); bytes.HasPrefix(line, []byte("data: ")) {
+				events <- append([]byte(nil), line[6:]...)
+			}
+		}
+		close(events)
+	}()
+	read := func() []byte {
+		select {
+		case ev := <-events:
+			return ev
+		case <-time.After(2 * time.Second):
+			t.Fatal("no picture arrived")
+		}
+		return nil
+	}
+	first := read()
+	for i := 0; i < 2; i++ {
+		h.publish(dsp.Estimate{Azimuth: 30, Level: 0.5, Conf: 0.9, Dist: 0.5})
+		time.Sleep(10 * time.Millisecond)
+	}
+	second := read()
+	for _, ev := range [][]byte{first, second} {
+		var page struct {
+			Title    string          `json:"title"`
+			Every    int             `json:"every"`
+			Controls []screenControl `json:"controls"`
+		}
+		if err := json.Unmarshal(ev, &page); err != nil {
+			t.Fatalf("event %s: %v", ev, err)
+		}
+		if page.Title != "Sonar" || page.Every != screenEvery || len(page.Controls) < 7 || page.Controls[0].Type != "canvas" {
+			t.Fatalf("event is not the page: %+v", page)
+		}
+	}
+	// A publish while the screen is still busy is not queued up: at most
+	// one picture waits.
+	h.mu.Lock()
+	n := len(h.screens)
+	h.mu.Unlock()
+	if n != 1 {
+		t.Fatalf("screens: %d", n)
 	}
 }

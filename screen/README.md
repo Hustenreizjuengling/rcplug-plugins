@@ -141,10 +141,16 @@ page under rcplug → Plugins. Sonar and Backup have one.
 ]}
 ```
 
-`value` and `meter` show a text or a level and follow the plugin (the page is
-fetched again while it is shown: about twice a second, or at the pace the page
-asks for in `every`, 80 to 5000 ms). A `choice` lists its options and names the
-chosen one by index in `value`. A change is a `POST /screen` with
+`value` and `meter` show a text or a level and follow the plugin. While the
+page is shown, the screen asks the plugin for it as a stream (`GET /screen`
+with `Accept: text/event-stream`): a plugin that answers with
+`Content-Type: text/event-stream` then sends the page as `data:` events, one
+whenever it has something new, and the screen shows each as it arrives; a
+plugin that answers with the plain page is fetched again instead, about twice a
+second or at the pace the page asks for in `every` (80 to 5000 ms). A plugin
+only needs the stream when its picture moves; a page of settings does well
+without one. A `choice` lists its options and names the chosen one by index in
+`value`. A change is a `POST /screen` with
 `{"control": "<id>", "value": …}`: `true`/`false` for a toggle, the number for a
 slider, the option's index for a choice, `true` for a button (after the
 confirmation, if one is declared). The plugin answers 200 and reflects the
@@ -174,8 +180,11 @@ Every shape takes `color` — a name from the look (`accent`, `text`, `dim`,
 a hairline. A shape with an `id` glides from where the previous description had
 it to where this one has it, over the time between the two descriptions, so a
 plugin that describes its picture ten times a second gets motion as smooth as
-the screen draws; shapes without an id just appear where they are. The canvas
-is display only: touch goes to the controls.
+the screen draws; shapes without an id just appear where they are. The screen
+draws only what moved: the shapes at the start of the list that stay as they
+are (a grid, its labels) are drawn once and kept, so a plugin should put its
+still shapes first and its moving ones after. The canvas is display only:
+touch goes to the controls.
 
 ## Packages
 

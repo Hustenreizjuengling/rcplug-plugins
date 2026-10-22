@@ -11,7 +11,9 @@ import (
 
 // Screen is the device's display as an Output: two buffers flipped at the
 // panel's refresh. The buffer drawn into last showed the page two frames
-// ago, so it gets what changed in the last frame and in this one.
+// ago, so it gets what changed in the last frame and in this one. A flip is
+// not waited for when it is issued but before the next frame is copied, so
+// the time until the panel's refresh goes to the touches, not to waiting.
 type Screen struct {
 	d    *Display
 	turn int
@@ -43,7 +45,13 @@ func (s *Screen) Present(page *gfx.Image, dirty []image.Rectangle) error {
 	if page.W != s.d.H || page.H != s.d.W {
 		return fmt.Errorf("panel: page %d × %d does not fit the panel %d × %d", page.W, page.H, s.d.H, s.d.W)
 	}
-	if dirty == nil {
+	// The last frame's flip, if it is still under way; the back buffer is
+	// free after it.
+	full, err := s.d.Sync()
+	if err != nil {
+		s.logf("panel: %v", err)
+	}
+	if dirty == nil || full {
 		dirty = []image.Rectangle{page.Bounds()}
 	}
 	back := s.d.Back()
@@ -54,7 +62,7 @@ func (s *Screen) Present(page *gfx.Image, dirty []image.Rectangle) error {
 		Turn(page, r, back, s.d.Pitch(), s.turn)
 	}
 	s.prev = append(s.prev[:0], dirty...)
-	full, err := s.d.Present()
+	full, err = s.d.Present()
 	if err != nil {
 		s.logf("panel: %v", err)
 	}

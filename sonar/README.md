@@ -159,9 +159,11 @@ trail of the last two seconds, the readouts and the left and right level, next
 to what it listens to, the source to listen to, the smoothing and the left/right
 swap, and the calibration buttons. The plugin serves the page at `/screen` as a
 description the screen draws itself: the radar is a `canvas` of shapes in a
-100 × 100 picture, fetched ten times a second, and the screen glides the beam,
-the blip and the bars between two pictures (see the screen plugin's README for
-the format; a screen before 0.5.0 shows the page without the radar).
+100 × 100 picture, and the screen glides the beam, the blip and the bars between
+two pictures (see the screen plugin's README for the format; a screen before
+0.5.0 shows the page without the radar). A screen since 0.6.0 gets the page as
+a stream, a picture with every estimate (about thirty a second, as the web
+view); an older one fetches it ten times a second.
 
 ## API
 

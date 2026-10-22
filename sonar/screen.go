@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -63,8 +64,10 @@ type screenShape struct {
 	Alpha  float64      `json:"alpha,omitempty"`
 }
 
-// screenEvery is how often the screen asks for the page while it shows it
-// (ms): ten pictures a second, which the screen smooths between.
+// screenEvery is how often a screen that polls asks for the page while it
+// shows it (ms): ten pictures a second, which the screen smooths between.
+// A screen since 0.6.0 asks for a stream instead and gets a picture with
+// every estimate (about thirty a second).
 const screenEvery = 100
 
 // trailPt is one recent blip for the radar's trail.
@@ -250,15 +253,27 @@ func sourceName(t map[string]string, spec string) string {
 }
 
 // screenSources lists the sources the page offers: the desk's JACK pairs by
-// name, then the test signal.
-func (h *hub) screenSources(r *http.Request) []string {
+// name, then the test signal. The list is asked of the host and JACK at
+// most every few seconds; the pictures between use the last one.
+func (h *hub) screenSources(ctx context.Context) []string {
+	h.mu.Lock()
+	if h.sources != nil && time.Since(h.sourcesAt) < 5*time.Second {
+		out := h.sources
+		h.mu.Unlock()
+		return out
+	}
+	h.mu.Unlock()
 	var out []string
-	for _, p := range listJackPairs(r.Context()) {
+	for _, p := range listJackPairs(ctx) {
 		if _, ok := namedPairs[p]; ok {
 			out = append(out, "jack:"+p)
 		}
 	}
-	return append(out, "test")
+	out = append(out, "test")
+	h.mu.Lock()
+	h.sources, h.sourcesAt = out, time.Now()
+	h.mu.Unlock()
+	return out
 }
 
 func (h *hub) handleScreen(w http.ResponseWriter, r *http.Request) {
@@ -267,7 +282,15 @@ func (h *hub) handleScreen(w http.ResponseWriter, r *http.Request) {
 		h.handleScreenChange(w, r, t)
 		return
 	}
-	sources := h.screenSources(r)
+	if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+		h.streamScreen(w, r, t)
+		return
+	}
+	sdk.WriteJSON(w, http.StatusOK, h.screenPage(t, h.screenSources(r.Context())))
+}
+
+// screenPage is the page: the radar, what Sonar hears and what can be set.
+func (h *hub) screenPage(t map[string]string, sources []string) map[string]interface{} {
 	now := time.Now()
 	h.mu.Lock()
 	e, spec, srcErr, cfg := h.last, h.srcSpec, h.srcErr, h.cfg
@@ -300,7 +323,58 @@ func (h *hub) handleScreen(w http.ResponseWriter, r *http.Request) {
 		{ID: "far", Type: "button", Label: t["far"]},
 		{ID: "reset", Type: "button", Label: t["reset"], Danger: true, Confirm: t["resetConfirm"]},
 	}
-	sdk.WriteJSON(w, http.StatusOK, map[string]interface{}{"title": "Sonar", "icon": "IconListen", "every": screenEvery, "controls": controls})
+	return map[string]interface{}{"title": "Sonar", "icon": "IconListen", "every": screenEvery, "controls": controls}
+}
+
+// streamScreen sends the page as an event stream: one picture now and one
+// with every estimate (the web's rate), each the whole page, so the screen
+// shows the sound as it happens instead of asking ten times a second.
+func (h *hub) streamScreen(w http.ResponseWriter, r *http.Request, t map[string]string) {
+	fl, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	ch := make(chan struct{}, 1)
+	h.mu.Lock()
+	if len(h.screens) >= maxStreams {
+		h.mu.Unlock()
+		sdk.WriteError(w, sdk.NewError(http.StatusServiceUnavailable, "too_many_clients", "too many live connections"))
+		return
+	}
+	h.screens[ch] = struct{}{}
+	h.mu.Unlock()
+	defer func() {
+		h.mu.Lock()
+		delete(h.screens, ch)
+		h.mu.Unlock()
+	}()
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	send := func() bool {
+		payload, err := json.Marshal(h.screenPage(t, h.screenSources(r.Context())))
+		if err != nil {
+			return false
+		}
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", payload); err != nil {
+			return false
+		}
+		fl.Flush()
+		return true
+	}
+	if !send() {
+		return
+	}
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-ch:
+			if !send() {
+				return
+			}
+		}
+	}
 }
 
 // handleScreenChange applies one control's new value from the screen.
@@ -319,7 +393,7 @@ func (h *hub) handleScreenChange(w http.ResponseWriter, r *http.Request, t map[s
 	str := func(s string) *string { return &s }
 	switch in.Control {
 	case "listen":
-		sources := h.screenSources(r)
+		sources := h.screenSources(r.Context())
 		i := int(num)
 		if i < 0 || i >= len(sources) {
 			sdk.WriteError(w, sdk.NewError(http.StatusBadRequest, "bad_request", "no such source"))

@@ -3,7 +3,7 @@
   "name": "screen",
   "title": "Screen",
   "description": "An alternative interface on the device's touchscreen: a mixer, channel and processing pages, SMART pads, the menus and settings, the rcplug pages (overview, processes, plugins, updates, catalog, RØDE's services) and pages for other plugins — built to look and work like RØDE's own screen. It reads RØDE's icons and text from the device at run time (no RØDE files are shipped). The main knob works as on RØDE's screen: it sets the monitor level, a press moves it to the virtual faders, and on the menus it steps through the controls. RØDE's screen comes back with the “Back to RØDE” button or when the plugin is stopped. Starts from the dashboard.",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "exec": [
     "./screen"
   ],

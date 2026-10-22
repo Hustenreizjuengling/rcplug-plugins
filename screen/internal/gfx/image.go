@@ -164,8 +164,11 @@ func (m *Image) DrawIn(src *Image, x, y int, alpha uint8, clip image.Rectangle) 
 }
 
 // Copy replaces the pixels at (x, y) with src (no blending).
-func (m *Image) Copy(src *Image, x, y int) {
-	dr := image.Rect(x, y, x+src.W, y+src.H).Intersect(m.Bounds())
+func (m *Image) Copy(src *Image, x, y int) { m.CopyIn(src, x, y, m.Bounds()) }
+
+// CopyIn is Copy limited to the clip rectangle.
+func (m *Image) CopyIn(src *Image, x, y int, clip image.Rectangle) {
+	dr := image.Rect(x, y, x+src.W, y+src.H).Intersect(m.Bounds()).Intersect(clip)
 	for yy := dr.Min.Y; yy < dr.Max.Y; yy++ {
 		copy(m.Pix[yy*m.Stride+dr.Min.X:yy*m.Stride+dr.Max.X], src.Pix[(yy-y)*src.Stride+(dr.Min.X-x):])
 	}

@@ -1,8 +1,11 @@
 package panel
 
 import (
+	"bytes"
 	"image"
+	"math/rand"
 	"testing"
+	"unsafe"
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/gfx"
 )
@@ -66,4 +69,55 @@ func TestTurnPartial(t *testing.T) {
 		}
 	}
 	_ = pg
+}
+
+// turnSlow is Turn as it was first written, one pixel at a time: the
+// reference the tiled copy must match, whatever the rectangle.
+func turnSlow(page *gfx.Image, r image.Rectangle, dst []byte, pitch, turn int) {
+	r = r.Intersect(page.Bounds())
+	px := unsafe.Slice((*uint32)(unsafe.Pointer(&dst[0])), len(dst)/4)
+	stride := pitch / 4
+	pw, ph := page.H, page.W
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			v := page.Pix[y*page.Stride+x] | 0xff000000
+			o := x*stride + pw - 1 - y
+			if turn == 270 {
+				o = (ph-1-x)*stride + y
+			}
+			if o < len(px) {
+				px[o] = v
+			}
+		}
+	}
+}
+
+func TestTurnMatchesReference(t *testing.T) {
+	page := gfx.NewImage(1280, 720)
+	rnd := rand.New(rand.NewSource(1))
+	for i := range page.Pix {
+		page.Pix[i] = uint32(rnd.Int63()) & 0xffffff
+	}
+	rects := []image.Rectangle{
+		page.Bounds(), image.Rect(0, 64, 592, 656), image.Rect(3, 5, 7, 9),
+		image.Rect(100, 100, 101, 101), image.Rect(1200, 700, 1280, 720), image.Rect(31, 31, 65, 97),
+		image.Rect(-10, -10, 40, 40), image.Rect(1270, 710, 1300, 730),
+	}
+	for _, turn := range []int{90, 270} {
+		for _, pitch := range []int{720 * 4, 720*4 + 64} {
+			for _, r := range rects {
+				want := make([]byte, pitch*1280)
+				got := make([]byte, pitch*1280)
+				turnSlow(page, r, want, pitch, turn)
+				Turn(page, r, got, pitch, turn)
+				if !bytes.Equal(want, got) {
+					t.Fatalf("turn %d pitch %d rect %v: the tiled copy differs from the reference", turn, pitch, r)
+				}
+			}
+		}
+	}
+	// A buffer shorter than the panel takes what fits and does not panic.
+	short := make([]byte, 720*4*100)
+	Turn(page, page.Bounds(), short, 720*4, 90)
+	Turn(page, page.Bounds(), short, 720*4, 270)
 }
