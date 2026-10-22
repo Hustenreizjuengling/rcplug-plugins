@@ -150,13 +150,15 @@ type PluginInfo struct {
 // in the RØDE style; the plugin never draws pixels itself).
 type PluginPage struct {
 	Title    string          `json:"title"`
+	Icon     string          `json:"icon"`  // a RØDE icon name for the plugin's tile (IconMetering …)
+	Every    int             `json:"every"` // ms between fetches while shown (80 … 5000; 0 = 600)
 	Controls []PluginControl `json:"controls"`
 }
 
 // PluginControl is one control on a plugin page.
 type PluginControl struct {
 	ID      string   `json:"id"`
-	Type    string   `json:"type"` // toggle slider choice button value meter
+	Type    string   `json:"type"` // toggle slider choice button value meter canvas
 	Label   string   `json:"label"`
 	Value   float64  `json:"value"`
 	On      bool     `json:"on"`
@@ -167,6 +169,37 @@ type PluginControl struct {
 	Options []string `json:"options"`
 	Danger  bool     `json:"danger"`  // a button that asks before acting
 	Confirm string   `json:"confirm"` // the confirmation message
+
+	// A canvas: the plugin's own picture, as shapes in its own units
+	// (W × H, 100 × 100 when 0), which the screen scales to fit and draws
+	// in the RØDE style. The first canvas of a page gets the big spot next
+	// to the controls.
+	W      float64       `json:"w"`
+	H      float64       `json:"h"`
+	Shapes []PluginShape `json:"shapes"`
+}
+
+// PluginShape is one shape on a canvas. A shape with an id moves smoothly
+// from where the previous description had it to where this one has it,
+// over the time between two descriptions.
+type PluginShape struct {
+	ID     string       `json:"id"`
+	Shape  string       `json:"shape"` // circle glow ring arc line polygon rect text
+	X      float64      `json:"x"`
+	Y      float64      `json:"y"`
+	R      float64      `json:"r"` // circle, glow, ring, arc: the radius
+	W      float64      `json:"w"` // rect: the size
+	H      float64      `json:"h"`
+	Radius float64      `json:"radius"` // rect: the corner
+	A0     float64      `json:"a0"`     // arc: degrees, 0 = right, growing clockwise
+	A1     float64      `json:"a1"`
+	Width  float64      `json:"width"`  // ring, arc, line: the stroke (units; 0 = hairline)
+	Points [][2]float64 `json:"points"` // line, polygon
+	Text   string       `json:"text"`
+	Size   string       `json:"size"`  // text: tiny small body label title big (small when "")
+	Align  string       `json:"align"` // text: left centre right (centre when "")
+	Color  string       `json:"color"` // accent text dim muted line panel black record warn blue, or #rrggbb
+	Alpha  float64      `json:"alpha"` // 0 = opaque
 }
 
 // FullBleedOf reports whether a page wants the whole screen.

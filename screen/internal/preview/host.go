@@ -1,6 +1,7 @@
 package preview
 
 import (
+	"strings"
 	"time"
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/screen/internal/pages"
@@ -62,19 +63,65 @@ func (p *Plugins) PluginList() ([]pages.HostPlugin, bool) {
 
 func (p *Plugins) Updates() (*pages.HostUpdates, bool) {
 	at := time.Now().Add(-42 * time.Minute)
-	return &pages.HostUpdates{Enabled: true, Current: "0.8.26", CheckedAt: &at, AutoCheck: true, Available: 1,
+	job := p.job()
+	screen := pages.HostUpdateTarget{Target: "plugin:screen", Name: "Screen", Repo: "Hustenreizjuengling/rcplug-plugins", Current: "0.4.6", Latest: "0.4.7", Available: true}
+	available := 1
+	if job != nil && job.Target == "plugin:screen" && job.State == "done" {
+		screen.Current, screen.Available, available = screen.Latest, false, 0
+	}
+	return &pages.HostUpdates{Enabled: true, Current: "0.8.26", CheckedAt: &at, AutoCheck: true, Available: available,
 		Targets: []pages.HostUpdateTarget{
 			{Target: "rcplug", Name: "rcplug", Repo: "Hustenreizjuengling/rcplug", Current: "0.8.26", Latest: "0.8.26"},
-			{Target: "plugin:screen", Name: "Screen", Repo: "Hustenreizjuengling/rcplug-plugins", Current: "0.4.6", Latest: "0.4.7", Available: true},
+			screen,
 			{Target: "plugin:sonar", Name: "Sonar", Repo: "Hustenreizjuengling/rcplug-plugins", Current: "0.3.1", Latest: "0.3.1"},
 		},
+		Job:  job,
 		Last: &pages.HostLastUpdate{OK: true, At: "2026-10-21T21:41:00Z", From: "0.8.25", To: "0.8.26"},
 	}, true
 }
 
+// StartJob begins a simulated installation that started `ago` (the
+// preview and renders): six seconds of download, two of unpacking, two of
+// installing, two restarting, then done.
+func (p *Plugins) StartJob(target, version string, ago time.Duration) {
+	p.mu.Lock()
+	p.jobTarget, p.jobVersion, p.jobStart = target, version, time.Now().Add(-ago)
+	p.mu.Unlock()
+}
+
+// job is the simulated installation as it stands now, or nil.
+func (p *Plugins) job() *pages.HostJob {
+	p.mu.Lock()
+	target, version, start := p.jobTarget, p.jobVersion, p.jobStart
+	p.mu.Unlock()
+	if target == "" {
+		return nil
+	}
+	const size = 6100000
+	j := &pages.HostJob{Target: target, Version: version, State: "running"}
+	el := time.Since(start).Seconds()
+	switch {
+	case el < 6:
+		j.Phase, j.Done, j.Total, j.ETA = "download", int64(size*el/6), size, int(6-el+0.5)
+	case el < 8:
+		j.Phase, j.Done, j.Total = "unpack", int64(size*(el-6)/2), size
+	case el < 10:
+		j.Phase = "install"
+	case el < 12:
+		j.State = "restarting"
+	default:
+		j.State = "done"
+	}
+	return j
+}
+
 func (p *Plugins) Catalog() (*pages.HostCatalog, bool) {
 	at := time.Now().Add(-3 * time.Hour)
-	return &pages.HostCatalog{Enabled: true, CheckedAt: &at,
+	var job *pages.HostJob
+	if j := p.job(); j != nil && !strings.HasPrefix(j.Target, "plugin:") && j.Target != "rcplug" {
+		job = j
+	}
+	return &pages.HostCatalog{Enabled: true, CheckedAt: &at, Job: job,
 		Sources: []pages.HostCatalogSource{{GitHub: "Hustenreizjuengling/rcplug-plugins", Official: true, Release: "0.5.40", Plugins: 6}},
 		Plugins: []pages.HostCatalogEntry{
 			{Name: "sonar", Title: "Sonar", Version: "0.3.1", Repo: "Hustenreizjuengling/rcplug-plugins", Official: true, Installed: "0.3.1", Permissions: []string{"audio"}, Size: 4200000},
@@ -108,12 +155,21 @@ func ok(done func(error)) {
 	}
 }
 
-func (p *Plugins) CheckUpdates(done func(error))            { p.record("check"); ok(done) }
-func (p *Plugins) InstallUpdate(t string, done func(error)) { p.record("install", t); ok(done) }
-func (p *Plugins) SetAutoCheck(on bool, done func(error))   { p.record("auto", on); ok(done) }
-func (p *Plugins) RefreshCatalog(done func(error))          { p.record("catalog"); ok(done) }
+func (p *Plugins) CheckUpdates(done func(error)) { p.record("check"); ok(done) }
+func (p *Plugins) InstallUpdate(t string, done func(error)) {
+	p.record("install", t)
+	version := "0.4.7"
+	if t == "rcplug" {
+		version = "0.8.26"
+	}
+	p.StartJob(t, version, 0)
+	ok(done)
+}
+func (p *Plugins) SetAutoCheck(on bool, done func(error)) { p.record("auto", on); ok(done) }
+func (p *Plugins) RefreshCatalog(done func(error))        { p.record("catalog"); ok(done) }
 func (p *Plugins) InstallFromCatalog(repo, plugin string, done func(error)) {
 	p.record("catalog-install", repo, plugin)
+	p.StartJob(plugin, "", 0)
 	ok(done)
 }
 func (p *Plugins) SetService(id string, on bool, done func(error)) {

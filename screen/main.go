@@ -54,7 +54,7 @@ const screenMarker = "/run/rcplug-screen"
 func main() {
 	var (
 		pngOut    = flag.String("png", "", "draw one frame into this PNG file and exit (development)")
-		pngPage   = flag.String("page", "", "with --png: navigate to this page first (settings, outputs, display, system, pads, routing, rcplug, rcplug:overview|procs|updates|catalog|services|plugin:<name>, channel)")
+		pngPage   = flag.String("page", "", "with --png: navigate to this page first (settings, outputs, display, system, pads, routing, rcplug, rcplug:overview|procs|updates|catalog|services|installing|plugin:<name>|page:<name>, channel)")
 		serve     = flag.String("serve", "", "run the interface in a web browser on this address, e.g. 127.0.0.1:8099 (development)")
 		resources = flag.String("resources", "", "folder of the device's extracted icons and text, for --png/--serve (development)")
 		card      = flag.String("card", "/dev/dri/card0", "the display's DRM device")
@@ -237,6 +237,11 @@ func runPNG(out, resources, langCode, page string) error {
 		a.Push(pages.NewMasterRack())
 	case page == "fx":
 		a.Push(pages.NewEffectsRack(0, 0))
+	case page == "rcplug:installing":
+		// The updates page four seconds into a simulated installation.
+		previewPlugins.StartJob("plugin:screen", "0.4.7", 4*time.Second)
+		a.Open(pages.IDRcplug)
+		a.Push(pages.RcplugSub("updates"))
 	case strings.HasPrefix(page, "rcplug:"):
 		a.Open(pages.IDRcplug)
 		if sub := pages.RcplugSub(strings.TrimPrefix(page, "rcplug:")); sub != nil {
@@ -338,9 +343,13 @@ func offlineApp(resources, langCode string) (*app.App, *desk.Model, error) {
 	if err := model.LoadRaw(preview.BuildTree()); err != nil {
 		return nil, nil, err
 	}
-	a := app.New(1280, 720, ctxUI, model, texts, preview.NewPlugins())
+	previewPlugins = preview.NewPlugins()
+	a := app.New(1280, 720, ctxUI, model, texts, previewPlugins)
 	return a, model, nil
 }
+
+// previewPlugins is the stand-in for the other plugins in the preview.
+var previewPlugins *preview.Plugins
 
 // handoverOK checks that rcplug stopped RØDE's screen for this plugin.
 func handoverOK(name string) error {

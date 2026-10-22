@@ -58,12 +58,37 @@ func (p *pluginPage) Build(env *Env, r image.Rectangle) ui.View {
 		}
 	}})
 
+	// The plugin's own picture, if it has one, takes the big spot; the
+	// controls take the rest.
+	listR := r
+	if cv, has := canvasOf(spec); has {
+		canvasR, rest := canvasPlace(r, cv, th.Pad)
+		cid := cv.ID
+		view := newCanvas(cv.Label, func() (PluginControl, *PluginPage, bool) {
+			cur, ok := env.Plugins.Page(name)
+			if !ok {
+				return PluginControl{}, nil, false
+			}
+			for _, ctl := range cur.Controls {
+				if ctl.ID == cid && ctl.Type == "canvas" {
+					return ctl, cur, true
+				}
+			}
+			return PluginControl{}, nil, false
+		})
+		view.SetBounds(canvasR)
+		c.Add(view)
+		listR = rest
+	}
+
 	list := ui.NewScrollList(th.Row, th.Gap)
 	var rows []ui.View
 	for _, ctl := range spec.Controls {
 		ctl := ctl
 		id := ctl.ID
 		switch ctl.Type {
+		case "canvas":
+			continue // drawn above (one per page)
 		case "toggle":
 			on, pending := ctl.On, false
 			row := &ui.Container{}
@@ -168,7 +193,7 @@ func (p *pluginPage) Build(env *Env, r image.Rectangle) ui.View {
 		}
 	}
 	list.SetRows(rows)
-	list.SetBounds(r)
+	list.SetBounds(listR)
 	c.Add(list)
 	return c
 }

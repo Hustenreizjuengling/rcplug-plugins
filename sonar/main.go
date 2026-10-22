@@ -114,6 +114,7 @@ type hub struct {
 	channels map[string]string
 	lastPub  time.Time
 	recent   []reading // the last seconds of sound, for calibrating the distance
+	trail    []trailPt // the last two seconds of blips, for the screen's radar
 	proc     *dsp.Processor
 	subs     map[chan []byte]struct{}
 }
@@ -253,6 +254,7 @@ func (h *hub) publish(e dsp.Estimate) {
 	defer h.mu.Unlock()
 	h.last = e
 	h.lastPub = time.Now()
+	h.noteTrail(e, h.lastPub)
 	payload, _ := json.Marshal(struct {
 		dsp.Estimate
 		Source string `json:"source"`

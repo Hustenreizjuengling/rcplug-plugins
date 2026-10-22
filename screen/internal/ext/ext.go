@@ -78,14 +78,27 @@ func (r *Registry) pageURL(name string) string {
 	return u
 }
 
-// pollEvery is how often a shown page is fetched at most.
-const pollEvery = 600 * time.Millisecond
+// pollEvery is how often a shown page is fetched at most, unless the page
+// asks for another pace ("every", between pollLeast and pollMost).
+const (
+	pollEvery = 600 * time.Millisecond
+	pollLeast = 80 * time.Millisecond
+	pollMost  = 5 * time.Second
+)
 
-// Poll fetches a plugin's page again, in the background, at most every
-// pollEvery (the page's rows call it every frame).
+// pollPace is how often a plugin's page is fetched while shown.
+func pollPace(pg *pages.PluginPage) time.Duration {
+	if pg == nil || pg.Every <= 0 {
+		return pollEvery
+	}
+	return min(max(time.Duration(pg.Every)*time.Millisecond, pollLeast), pollMost)
+}
+
+// Poll fetches a plugin's page again, in the background, at most at the
+// page's pace (the page's rows call it every frame).
 func (r *Registry) Poll(name string) {
 	r.mu.Lock()
-	if r.polling[name] || time.Since(r.polled[name]) < pollEvery {
+	if r.polling[name] || time.Since(r.polled[name]) < pollPace(r.cache[name]) {
 		r.mu.Unlock()
 		return
 	}

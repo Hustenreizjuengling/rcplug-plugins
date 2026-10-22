@@ -114,16 +114,24 @@ between, and when that plugin ends this interface comes back (rcplug 0.8.18).
 
 ## Extending it
 
-Other plugins can add a page without drawing anything themselves: they serve a
+Other plugins can add a page without drawing pixels themselves: they serve a
 small JSON description of their controls at `/screen` (the host proxies it as
 `/plugins/<name>/screen`) and accept changes there. The interface renders those
-controls in the RØDE style, so a plugin can never break the screen; it lists the
-page under rcplug → Plugins while the plugin runs. Sonar and Backup have one.
+controls in the RØDE style, so a plugin can never break the screen. While the
+plugin runs, its page has a tile on the rcplug menu and a button on its plugin
+page under rcplug → Plugins. Sonar and Backup have one.
 
 `GET /screen?lang=<de|en>` answers with the page in that language:
 
 ```json
-{"title": "Sonar", "controls": [
+{"title": "Sonar", "icon": "IconListen", "every": 100, "controls": [
+  {"id": "radar",     "type": "canvas", "w": 100, "h": 100, "shapes": [
+    {"shape": "arc",    "x": 50, "y": 56, "r": 44, "a0": 180, "a1": 360, "color": "line"},
+    {"shape": "text",   "x": 50, "y": 8, "text": "0°", "size": "tiny", "color": "dim"},
+    {"shape": "line",   "id": "beam", "points": [[50, 56], [20, 24]], "width": 0.5, "color": "accent", "alpha": 0.7},
+    {"shape": "glow",   "id": "glow", "x": 36, "y": 40, "r": 6, "color": "accent"},
+    {"shape": "circle", "id": "blip", "x": 36, "y": 40, "r": 0.9, "color": "text"}
+  ]},
   {"id": "source",    "type": "value",  "label": "Listening to", "text": "Mic 1 + Mic 2"},
   {"id": "level",     "type": "meter",  "label": "Level", "value": 0.6, "min": 0, "max": 1},
   {"id": "listen",    "type": "choice", "label": "Listen to", "options": ["Mic 1 + Mic 2", "USB 1"], "value": 0},
@@ -134,12 +142,40 @@ page under rcplug → Plugins while the plugin runs. Sonar and Backup have one.
 ```
 
 `value` and `meter` show a text or a level and follow the plugin (the page is
-fetched again about twice a second while it is shown). A `choice` lists its
-options and names the chosen one by index in `value`. A change is a
-`POST /screen` with `{"control": "<id>", "value": …}`: `true`/`false` for a
-toggle, the number for a slider, the option's index for a choice, `true` for a
-button (after the confirmation, if one is declared). The plugin answers 200
-and reflects the change in its next description.
+fetched again while it is shown: about twice a second, or at the pace the page
+asks for in `every`, 80 to 5000 ms). A `choice` lists its options and names the
+chosen one by index in `value`. A change is a `POST /screen` with
+`{"control": "<id>", "value": …}`: `true`/`false` for a toggle, the number for a
+slider, the option's index for a choice, `true` for a button (after the
+confirmation, if one is declared). The plugin answers 200 and reflects the
+change in its next description. `icon` names a RØDE icon for the plugin's tile
+(`IconListen`, `IconMetering`, `IconRecordings` …; `IconSystem` when left out).
+
+**A picture of its own.** A `canvas` is the plugin's own display: a list of
+shapes in the plugin's units (`w` × `h`, 100 × 100 when left out) that the
+screen scales to fit and draws itself, in the RØDE style. The first canvas of a
+page gets the big spot — on the left when it is about square or taller, on top
+when it is wide — and the controls take the rest. Shapes:
+
+| shape | fields |
+|---|---|
+| `circle` | `x`, `y`, `r` (filled) |
+| `glow` | `x`, `y`, `r`: a soft light fading to the edge |
+| `ring` | `x`, `y`, `r`, `width` (outline) |
+| `arc` | `x`, `y`, `r`, `a0`, `a1` in degrees (0 = right, growing clockwise), `width` |
+| `line` | `points` `[[x, y], …]`, `width` (round ends and joins) |
+| `polygon` | `points` (filled, closed) |
+| `rect` | `x`, `y`, `w`, `h`, `radius` (filled) |
+| `text` | `x`, `y`, `text`, `size` (`tiny` `small` `body` `label` `title` `big` `huge`), `align` (`left` `centre` `right`; the point is the text's middle line) |
+
+Every shape takes `color` — a name from the look (`accent`, `text`, `dim`,
+`muted`, `line`, `panel`, `black`, `record`, `warn`, `blue`) or `#rrggbb`;
+`accent` when left out, `text` for text — and `alpha` (0 … 1). A `width` of 0 is
+a hairline. A shape with an `id` glides from where the previous description had
+it to where this one has it, over the time between the two descriptions, so a
+plugin that describes its picture ten times a second gets motion as smooth as
+the screen draws; shapes without an id just appear where they are. The canvas
+is display only: touch goes to the controls.
 
 ## Packages
 

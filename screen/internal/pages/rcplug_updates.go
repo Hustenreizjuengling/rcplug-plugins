@@ -37,35 +37,6 @@ func updatesShape(u *HostUpdates) string {
 	return b.String()
 }
 
-// jobText describes an installation under way.
-func jobText(env *Env, j *HostJob) string {
-	if j == nil {
-		return ""
-	}
-	what := j.Target
-	if strings.HasPrefix(what, "plugin:") {
-		what = strings.TrimPrefix(what, "plugin:")
-	}
-	what += " " + j.Version
-	switch j.State {
-	case "running":
-		s := env.TR("", "wird installiert", "installing")
-		if j.Total > 0 {
-			s += " · " + intText(j.Done*100/j.Total) + " %"
-		} else if j.Phase != "" {
-			s += " · " + j.Phase
-		}
-		return what + " · " + s
-	case "restarting":
-		return what + " · " + env.TR("", "startet neu …", "restarting…")
-	case "done":
-		return what + " · " + env.TR("", "fertig", "done")
-	case "error":
-		return what + " · " + env.TR("", "fehlgeschlagen", "failed") + ": " + j.Error
-	}
-	return what + " · " + j.State
-}
-
 func (p *updatesPage) Build(env *Env, r image.Rectangle) ui.View {
 	c := &ui.Container{}
 	c.SetBounds(r)
@@ -175,12 +146,13 @@ func (p *updatesPage) Build(env *Env, r image.Rectangle) ui.View {
 			}, right, 300))
 		}
 		if u.Job != nil {
-			rows = append(rows, newInfoRow(env, env.TR("", "Installation", "Installation"), func() string {
+			// The installation first, where it is seen without scrolling.
+			rows = append([]ui.View{newJobRow(env, func() *HostJob {
 				if now := get(); now != nil {
-					return jobText(env, now.Job)
+					return now.Job
 				}
-				return ""
-			}, nil, 0))
+				return nil
+			})}, rows...)
 		}
 		if u.Last != nil {
 			rows = append(rows, newInfoRow(env, env.TR("", "Letztes Update", "Last update"), func() string {

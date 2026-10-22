@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Hustenreizjuengling/rcplug-plugins/sonar/internal/dsp"
 )
@@ -35,6 +36,30 @@ func TestScreenPage(t *testing.T) {
 	}
 	if ids["source"].Text != "Testsignal" {
 		t.Fatalf("source: %q", ids["source"].Text)
+	}
+	// The radar: a canvas with the grid, the beam and the blip, in the
+	// screen's units; the page asks to be fetched ten times a second.
+	if c := ids["radar"]; c.Type != "canvas" || c.W != 100 || c.H != 100 || len(c.Shapes) < 20 {
+		t.Fatalf("radar: %+v", ids["radar"])
+	}
+	var pageMeta struct {
+		Every int    `json:"every"`
+		Icon  string `json:"icon"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &pageMeta)
+	if pageMeta.Every != screenEvery || pageMeta.Icon == "" {
+		t.Fatalf("page meta: %+v", pageMeta)
+	}
+	byID := map[string]screenShape{}
+	for _, sh := range ids["radar"].Shapes {
+		if sh.ID != "" {
+			byID[sh.ID] = sh
+		}
+	}
+	for _, id := range []string{"beam", "glow", "blip", "l", "r"} {
+		if _, ok := byID[id]; !ok {
+			t.Errorf("radar without the %q shape", id)
+		}
 	}
 	// A toggle from the screen.
 	rec = httptest.NewRecorder()
@@ -66,5 +91,43 @@ func TestSourceNames(t *testing.T) {
 		if got := sourceName(en, spec); got != want {
 			t.Errorf("%s: %q, want %q", spec, got, want)
 		}
+	}
+}
+
+// TestTrail: the trail keeps the last two seconds of sound, thinned to one
+// point per 60 ms and at most trailMax points, and quiet readings add
+// nothing.
+func TestTrail(t *testing.T) {
+	h := newHub(dsp.DefaultConfig(48000), 48000, 480, "test", "")
+	now := time.Now()
+	for i := 0; i < 200; i++ {
+		h.noteTrail(dsp.Estimate{Level: 0.5, Azimuth: float64(i)}, now.Add(time.Duration(i)*20*time.Millisecond))
+	}
+	if n := len(h.trail); n == 0 || n > trailMax {
+		t.Fatalf("%d points after 4 s of sound", n)
+	}
+	last := now.Add(199 * 20 * time.Millisecond)
+	if p := h.trail[len(h.trail)-1]; last.Sub(p.at) >= trailStep {
+		t.Errorf("the newest point is %v old, want one within %v", last.Sub(p.at), trailStep)
+	}
+	if first := h.trail[0]; last.Sub(first.at) > trailFor+trailStep {
+		t.Errorf("a point older than %v kept: %v", trailFor, last.Sub(first.at))
+	}
+	for i := 1; i < len(h.trail); i++ {
+		if d := h.trail[i].at.Sub(h.trail[i-1].at); d < trailStep {
+			t.Fatalf("points %v apart, want %v or more", d, trailStep)
+		}
+	}
+	before := len(h.trail)
+	h.noteTrail(dsp.Estimate{Level: 0.01}, last)
+	if len(h.trail) != before {
+		t.Errorf("a quiet reading changed the trail (%d → %d)", before, len(h.trail))
+	}
+	// The picture carries the trail as faint dots on top of the grid.
+	h.mu.Lock()
+	n := len(radar(screenTexts["en"], dsp.Estimate{Level: 0.5, LevelDb: -20}, h.cfg, h.trail, last))
+	h.mu.Unlock()
+	if n < 20+len(h.trail)/2 {
+		t.Errorf("radar with %d shapes for %d trail points", n, len(h.trail))
 	}
 }

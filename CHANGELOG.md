@@ -6,6 +6,31 @@ may break compatibility).
 
 ## 0.5.41 - Unreleased
 
+### Added
+- **Screen 0.5.0: a plugin's own picture on the device's screen.** A plugin's `/screen`
+  page can carry a `canvas`: shapes in the plugin's own units (circles, glows, rings,
+  arcs, lines, polygons, rectangles, text, each with a colour from the look or `#rrggbb`
+  and an alpha) that the screen scales and draws itself, so a plugin shows what it does
+  without ever drawing pixels or being able to break the screen. The first canvas of a
+  page gets the big spot next to the controls. A page names its own pace (`every`, 80 to
+  5000 ms) and shapes with an `id` glide between two descriptions, so ten pictures a
+  second move smoothly. A page can also name an `icon` for its tile.
+- **Screen: plugin tiles on the rcplug menu.** Every running plugin that serves a page has
+  a tile on the rcplug menu (Sonar, Backup …), beside the tiles of the plugins that take
+  the screen themselves (PlugRain); the menu uses five columns when it holds more than
+  eight tiles. The page is still reachable from the plugin's page under Plugins.
+- **Screen: a bar for installations.** On the Updates and Catalog pages an installation
+  under way is the first row, with one bar that fills from the download through unpacking
+  and installing to the restart, the step with its percentage and the time left, and a
+  light running along the bar while a step has no count. The row shows the result
+  (done, or the error in red) until the next installation.
+- **Sonar 0.8.0: the radar on the device's screen.** Sonar's page on the screen now shows
+  the radar itself — the half-disc with rings and spokes, the trail of the last two
+  seconds, the beam and the blip, the readouts (direction, distance, level, confidence)
+  and the left and right level — next to the source, the settings and the calibration.
+  Sonar describes the picture ten times a second; the screen smooths between them. Its
+  tile carries the listening icon.
+
 ## 0.5.40 - 2026-10-22
 
 ### Added

@@ -36,26 +36,19 @@ func (p *rcplugPage) Build(env *Env, r image.Rectangle) ui.View {
 		{de: "Katalog", en: "Catalog", icon: "cloud_outline", push: func() Page { return &catalogPage{} }},
 		{de: "RØDE-Dienste", en: "RØDE services", icon: "IconSwitchOff", push: func() Page { return &servicesPage{} }},
 	}
+	// A tile per plugin with a page of its own (Sonar's radar), and one per
+	// plugin that takes the screen itself (PlugRain): a tap on the latter
+	// hands the screen over; this interface comes back when that plugin ends.
+	tiles = append(tiles, pluginTiles(env)...)
 	rodeLabel := env.TR("", "Zurück zu RØDE", "Back to RØDE")
 	tiles = append(tiles, tile{de: rodeLabel, en: rodeLabel, icon: "IconHome", do: func(env *Env) {
 		env.Nav.Confirm(rodeLabel, env.TR("", "Zurück zur RØDE-Oberfläche?", "Switch back to RØDE's interface?"), env.T("OK"), false, env.Nav.RodeScreen)
 	}})
-	// A tile per plugin that takes the screen itself (PlugRain): a tap hands
-	// the screen over; this interface comes back when that plugin ends.
-	if env.Plugins != nil {
-		for _, pi := range env.Plugins.Plugins() {
-			if !pi.Screen {
-				continue
-			}
-			pi := pi
-			title := pi.Title
-			if title == "" {
-				title = pi.Name
-			}
-			tiles = append(tiles, tile{de: title, en: title, icon: "IconPlay", do: func(env *Env) { handoverTo(env, pi.Name, title) }})
-		}
+	cols := 4
+	if len(tiles) > 8 {
+		cols = 5 // two rows of full-size tiles rather than three small ones
 	}
-	menu := &menuPage{title: "rcplug", cols: 4, tiles: tiles, banner: func(env *Env) string {
+	menu := &menuPage{title: "rcplug", cols: cols, tiles: tiles, banner: func(env *Env) string {
 		if h == nil {
 			return ""
 		}
@@ -70,17 +63,68 @@ func (p *rcplugPage) Build(env *Env, r image.Rectangle) ui.View {
 	c := &ui.Container{}
 	c.SetBounds(r)
 	c.Add(menu.Build(env, r))
-	if h != nil {
-		// The banner follows the update state, which arrives after the build.
-		shown := menu.banner(env) != ""
-		c.Add(&updater{get: func() {
-			if now := menu.banner(env) != ""; now != shown {
-				shown = now
-				env.Nav.Refresh()
-			}
-		}})
-	}
+	// The banner follows the update state, which arrives after the build,
+	// and the plugin tiles follow the plugins (one starts serving its page
+	// a moment after it is installed).
+	shown := menu.banner(env) != ""
+	tilesWere := pluginTileShape(env)
+	c.Add(&updater{get: func() {
+		now := menu.banner(env) != ""
+		if tilesNow := pluginTileShape(env); now != shown || tilesNow != tilesWere {
+			shown, tilesWere = now, tilesNow
+			env.Nav.Refresh()
+		}
+	}})
 	return c
+}
+
+// pluginTiles are the rcplug menu's tiles for the other plugins: one per
+// plugin that serves a page (opening it), one per plugin that takes the
+// screen itself (handing the screen over).
+func pluginTiles(env *Env) []tile {
+	if env.Plugins == nil {
+		return nil
+	}
+	var tiles []tile
+	for _, pi := range env.Plugins.Plugins() {
+		pi := pi
+		title := pi.Title
+		if title == "" {
+			title = pi.Name
+		}
+		if pg, ok := env.Plugins.Page(pi.Name); ok && pi.Running {
+			if pg.Title != "" {
+				title = pg.Title
+			}
+			icon := pg.Icon
+			if icon == "" {
+				icon = "IconSystem"
+			}
+			name := pi.Name
+			tiles = append(tiles, tile{de: title, en: title, icon: icon, push: func() Page { return newPluginPage(name, title) }})
+			continue
+		}
+		if pi.Screen {
+			tiles = append(tiles, tile{de: title, en: title, icon: "IconPlay", do: func(env *Env) { handoverTo(env, pi.Name, title) }})
+		}
+	}
+	return tiles
+}
+
+// pluginTileShape tells one set of plugin tiles from another.
+func pluginTileShape(env *Env) string {
+	if env.Plugins == nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, pi := range env.Plugins.Plugins() {
+		if pg, ok := env.Plugins.Page(pi.Name); ok && pi.Running {
+			b.WriteString(pi.Name + ":" + pg.Title + ":" + pg.Icon + ";")
+		} else if pi.Screen {
+			b.WriteString(pi.Name + ":screen;")
+		}
+	}
+	return b.String()
 }
 
 // handoverTo asks, then hands the screen to another screen plugin.
@@ -612,7 +656,8 @@ func trimFloat(v float64) string {
 }
 
 // RcplugSub returns one of the rcplug pages by name (previews and tests):
-// overview, procs, updates, catalog, services, or plugin:<name>.
+// overview, procs, updates, catalog, services, plugin:<name> (its facts)
+// or page:<name> (the page the plugin serves).
 func RcplugSub(kind string) Page {
 	switch {
 	case kind == "overview":
@@ -628,6 +673,9 @@ func RcplugSub(kind string) Page {
 	case strings.HasPrefix(kind, "plugin:"):
 		n := strings.TrimPrefix(kind, "plugin:")
 		return newPluginDetail(n, strings.ToUpper(n[:1])+n[1:])
+	case strings.HasPrefix(kind, "page:"):
+		n := strings.TrimPrefix(kind, "page:")
+		return newPluginPage(n, strings.ToUpper(n[:1])+n[1:])
 	}
 	return nil
 }

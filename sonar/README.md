@@ -153,10 +153,15 @@ growing pause (1 to 10 s) and the error is shown on the page, for ALSA and JACK 
 
 ## On the device's screen
 
-With the `screen` plugin running, Sonar has a page under rcplug → Plugins: what
-it listens to, the direction, level and distance, the source to listen to, the
-smoothing and the left/right swap, and the calibration buttons. The plugin
-serves it at `/screen` (see the screen plugin's README for the format).
+With the `screen` plugin running, Sonar has a tile on the screen's rcplug menu
+(and a page under rcplug → Plugins): the radar itself, as on this page, with the
+trail of the last two seconds, the readouts and the left and right level, next
+to what it listens to, the source to listen to, the smoothing and the left/right
+swap, and the calibration buttons. The plugin serves the page at `/screen` as a
+description the screen draws itself: the radar is a `canvas` of shapes in a
+100 × 100 picture, fetched ten times a second, and the screen glides the beam,
+the blip and the bars between two pictures (see the screen plugin's README for
+the format; a screen before 0.5.0 shows the page without the radar).
 
 ## API
 

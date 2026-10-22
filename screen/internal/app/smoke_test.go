@@ -68,7 +68,7 @@ func TestRenderRcplugPages(t *testing.T) {
 		if got := a.RenderOnce(); len(got) == 0 {
 			t.Fatal("plugin list rendered nothing")
 		}
-		for _, kind := range []string{"overview", "procs", "updates", "catalog", "services", "plugin:sonar", "plugin:screen", "plugin:plugrain"} {
+		for _, kind := range []string{"overview", "procs", "updates", "catalog", "services", "plugin:sonar", "plugin:screen", "plugin:plugrain", "page:sonar", "page:backup"} {
 			a.Open(pages.IDRcplug)
 			a.Push(pages.RcplugSub(kind))
 			if got := a.RenderOnce(); len(got) == 0 {

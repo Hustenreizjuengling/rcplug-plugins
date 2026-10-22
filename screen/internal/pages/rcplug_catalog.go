@@ -129,12 +129,13 @@ func (p *catalogPage) Build(env *Env, r image.Rectangle) ui.View {
 			}, right, 240))
 		}
 		if cat.Job != nil {
-			rows = append(rows, newInfoRow(env, env.TR("", "Installation", "Installation"), func() string {
+			// The installation first, where it is seen without scrolling.
+			rows = append([]ui.View{newJobRow(env, func() *HostJob {
 				if now := get(); now != nil {
-					return jobText(env, now.Job)
+					return now.Job
 				}
-				return ""
-			}, nil, 0))
+				return nil
+			})}, rows...)
 		}
 	}
 	list.SetRows(rows)
