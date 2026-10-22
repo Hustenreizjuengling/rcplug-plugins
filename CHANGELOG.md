@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.42 - Unreleased
+## 0.5.42 - 2026-10-22
 
 ### Changed
 - **Screen 0.6.0: a plugin's picture moves as it happens.** A shown plugin page
