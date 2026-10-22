@@ -54,7 +54,7 @@ const screenMarker = "/run/rcplug-screen"
 func main() {
 	var (
 		pngOut    = flag.String("png", "", "draw one frame into this PNG file and exit (development)")
-		pngPage   = flag.String("page", "", "with --png: navigate to this page first (settings, outputs, display, system, pads, routing, rcplug, channel)")
+		pngPage   = flag.String("page", "", "with --png: navigate to this page first (settings, outputs, display, system, pads, routing, rcplug, rcplug:overview|procs|updates|catalog|services|plugin:<name>, channel)")
 		serve     = flag.String("serve", "", "run the interface in a web browser on this address, e.g. 127.0.0.1:8099 (development)")
 		resources = flag.String("resources", "", "folder of the device's extracted icons and text, for --png/--serve (development)")
 		card      = flag.String("card", "/dev/dri/card0", "the display's DRM device")
@@ -237,6 +237,11 @@ func runPNG(out, resources, langCode, page string) error {
 		a.Push(pages.NewMasterRack())
 	case page == "fx":
 		a.Push(pages.NewEffectsRack(0, 0))
+	case strings.HasPrefix(page, "rcplug:"):
+		a.Open(pages.IDRcplug)
+		if sub := pages.RcplugSub(strings.TrimPrefix(page, "rcplug:")); sub != nil {
+			a.Push(sub)
+		}
 	case strings.HasPrefix(page, "plugin:"):
 		a.Open(pages.IDRcplug)
 		a.Open(pages.IDPlugins)

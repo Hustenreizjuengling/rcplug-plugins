@@ -49,6 +49,37 @@ func TestRenderAllPages(t *testing.T) {
 	}
 }
 
+// TestRenderRcplugPages builds and draws the rcplug pages over the
+// preview's host data (the system, processes, plugins, updates, catalog
+// and services), so a layout panic or an empty frame shows up here.
+func TestRenderRcplugPages(t *testing.T) {
+	model := desk.NewOffline(nil)
+	if err := model.LoadRaw(preview.BuildTree()); err != nil {
+		t.Fatal(err)
+	}
+	ctx := ui.NewContext(ui.Dark(ui.Liberation()), nil)
+	for _, code := range []string{"de", "en"} {
+		a := app.New(1280, 720, ctx, model, lang.New(code, nil), preview.NewPlugins())
+		a.Open(pages.IDRcplug)
+		if got := a.RenderOnce(); len(got) == 0 {
+			t.Fatal("rcplug menu rendered nothing")
+		}
+		a.Open(pages.IDPlugins)
+		if got := a.RenderOnce(); len(got) == 0 {
+			t.Fatal("plugin list rendered nothing")
+		}
+		for _, kind := range []string{"overview", "procs", "updates", "catalog", "services", "plugin:sonar", "plugin:screen", "plugin:plugrain"} {
+			a.Open(pages.IDRcplug)
+			a.Push(pages.RcplugSub(kind))
+			if got := a.RenderOnce(); len(got) == 0 {
+				t.Errorf("%s: rcplug page %q rendered nothing", code, kind)
+			}
+			// A second frame reads the live values again.
+			a.RenderOnce()
+		}
+	}
+}
+
 // TestDialogAndKeyboard checks the modal overlays build and render.
 func TestDialogAndKeyboard(t *testing.T) {
 	model := desk.NewOffline(nil)

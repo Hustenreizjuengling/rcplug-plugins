@@ -18,6 +18,7 @@ type tile struct {
 	icon string
 	open string      // an id for Nav.Open, or ""
 	push func() Page // a page to push, or nil
+	do   func(*Env)  // an action instead of a page, or nil
 	text string      // a caption inside the tile instead of an icon
 }
 
@@ -58,6 +59,8 @@ func (m *menuPage) Build(env *Env, r image.Rectangle) ui.View {
 		t := t
 		open := func() {
 			switch {
+			case t.do != nil:
+				t.do(env)
 			case t.push != nil:
 				env.Nav.Push(t.push())
 			case t.open != "":

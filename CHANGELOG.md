@@ -6,6 +6,24 @@ may break compatibility).
 
 ## 0.5.40 - Unreleased
 
+### Added
+- **Screen 0.4.7: the rcplug pages.** The rcplug tile in the configuration menu now opens
+  an rcplug menu with what the dashboard offers, on the device's screen: an **overview**
+  (rcplug version, host, device and rcplug uptime, CPU temperature, load, memory, storage,
+  and the dashboard's address as a QR code), the **processes** (the device's CPU use now,
+  the busiest processes by CPU or by their own memory, tagged with their plugin or RØDE),
+  the **plugins** (version and state in the list; a page per plugin with its facts,
+  description and permissions, and start, stop, restart, its page, hand over the screen
+  to a screen plugin, and remove with or without its data; read the plugins folder
+  again), **updates** (check now, the daily check, one row per target with install,
+  the installation's progress and the last update's outcome), the **catalog** (the
+  plugins the catalogs offer, installed after a confirmation that names what they
+  declare) and **RØDE's services** (CallMe, rpcbind, ModemManager: their cost now, on
+  and off with the dashboard's explanations). The menu shows the dashboard's update
+  banner when an update is waiting; "Back to RØDE" and the screen plugins' tiles stay.
+  All of it reads the host's own API from a cache that is refreshed in the background,
+  so a page never waits on the network; actions report back as toasts.
+
 ## 0.5.39 - 2026-10-21
 
 ### Removed

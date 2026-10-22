@@ -36,6 +36,8 @@ type Registry struct {
 	kick    chan struct{}        // a refresh asked for now
 	rev     uint64               // bumps when the plugin list changes
 	polling map[string]bool
+
+	hc hostCache // the dashboard's data and actions (host.go)
 }
 
 // New makes a registry for the host (hostURL "" uses the plugin's host). self
